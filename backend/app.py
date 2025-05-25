@@ -1464,6 +1464,42 @@ def create_dev_environment():
         logger.error(f"Error creating dev environment: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/api/dev-sandbox/create-local', methods=['POST'])
+def create_local_dev_environment():
+    """Create a new local development environment without Docker"""
+    try:
+        if not dev_sandbox_manager:
+            return jsonify({
+                "success": False,
+                "error": "DevSandbox not available",
+                "message": "🏗️ DevSandbox system not initialized"
+            }), 503
+        
+        data = request.get_json()
+        environment = data.get('environment')
+        template = data.get('template')
+        
+        if not environment:
+            return jsonify({"success": False, "error": "Environment config required"}), 400
+        
+        # Force local fallback creation (no cloud providers)
+        result = asyncio.run(dev_sandbox_manager._create_local_fallback(environment))
+        
+        logger.info(f"🏠 Created local development environment: {environment.get('name')}")
+        
+        return jsonify({
+            "success": True,
+            "environmentId": result.get('environment', {}).get('id'),
+            "workspaceRoot": result.get('environment', {}).get('workspace_dir'),
+            "workspaceDir": result.get('environment', {}).get('workspace_dir'),
+            "url": result.get('environment', {}).get('url'),
+            "message": f"🏠 Local environment {environment.get('name')} created successfully"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error creating local dev environment: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
 @app.route('/api/dev-sandbox/<env_id>/files', methods=['GET'])
 def get_environment_files(env_id):
     """Get file tree for environment"""
@@ -1903,63 +1939,7 @@ def vertex_garden_terminal():
         logger.error(f"Error in terminal command: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/vertex-garden/execute-code', methods=['POST'])
-def execute_code():
-    """Execute code in a sandboxed environment"""
-    try:
-        data = request.get_json()
-        code = data.get('code', '')
-        language = data.get('language', 'python')
-        session_id = data.get('session_id', '')
-        
-        if not code:
-            return jsonify({"success": False, "error": "No code provided"}), 400
-        
-        # For now, only support Python
-        if language.lower() != 'python':
-            return jsonify({"success": False, "error": f"Language '{language}' not supported yet"}), 400
-        
-        try:
-            import subprocess
-            import tempfile
-            import os
-            
-            # Create a temporary file
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.py', delete=False) as f:
-                f.write(code)
-                temp_file = f.name
-            
-            try:
-                # Execute the Python code
-                result = subprocess.run(
-                    ['python3', temp_file],
-                    capture_output=True,
-                    text=True,
-                    timeout=10
-                )
-                
-                output = result.stdout if result.returncode == 0 else result.stderr
-                
-                return jsonify({
-                    "success": True,
-                    "output": output,
-                    "return_code": result.returncode
-                })
-                
-            finally:
-                # Clean up temp file
-                os.unlink(temp_file)
-                
-        except subprocess.TimeoutExpired:
-            return jsonify({"success": False, "error": "Code execution timed out"}), 400
-        except Exception as e:
-            return jsonify({"success": False, "error": f"Execution error: {str(e)}"}), 400
-        
-    except Exception as e:
-        logger.error(f"Error executing code: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-# ==================== MULTIMODAL SUPPORT ENDPOINTS ====================
+# ==================== VERTEX GARDEN: MULTIMODAL SUPPORT ====================
 
 @app.route('/api/vertex-garden/upload', methods=['POST'])
 def upload_multimodal_file():
@@ -2048,7 +2028,7 @@ def list_uploaded_files():
         
     except Exception as e:
         logger.error(f"Error listing files: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({"success": False, "error": str(e)}),  500
 
 @app.route('/api/vertex-garden/files/<int:file_id>', methods=['GET'])
 def get_file(file_id):
