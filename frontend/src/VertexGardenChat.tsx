@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MODEL_REGISTRY, ModelConfig, ChatSession, ChatMessage, MediaAttachment, getModelById } from './ModelRegistry';
 import DevSandbox from './DevSandbox';
 import MultimodalInput from './components/MultimodalInput';
-import { buildApiUrl, API_ENDPOINTS } from './config/api';
+import { buildApiUrl, buildDynamicApiUrl, API_ENDPOINTS } from './config/api';
 import './VertexGardenChat.css';
 
 interface VertexGardenChatProps {
@@ -139,7 +139,7 @@ const VertexGardenChat: React.FC<VertexGardenChatProps> = ({ initialModelId = 'm
   
   const loadSessionMessages = async (sessionId: string) => {
     try {
-      const response = await fetch(`buildDynamicApiUrl(API_ENDPOINTS.VERTEX_GARDEN.SESSION_MESSAGES, {sessionId: ${sessionId}})`);
+      const response = await fetch(buildDynamicApiUrl(API_ENDPOINTS.VERTEX_GARDEN.SESSION_MESSAGES, {sessionId}));
       const data = await response.json();
       if (data.success) {
         setMessages(data.messages);

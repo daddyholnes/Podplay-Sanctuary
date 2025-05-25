@@ -1323,3 +1323,105 @@
 .chat-messages::-webkit-scrollbar-thumb:hover {
   background: #484f58;
 }
+
+/* ==================== RESIZE HANDLES ==================== */
+
+.resize-handle {
+  background: transparent;
+  position: relative;
+  user-select: none;
+  transition: background 0.2s ease;
+  z-index: 10;
+}
+
+.resize-handle:hover {
+  background: #58a6ff40;
+}
+
+.resize-handle.vertical {
+  width: 6px;
+  cursor: col-resize;
+  background: transparent;
+  border-right: 1px solid #30363d;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.resize-handle.vertical:hover {
+  background: #58a6ff20;
+  border-right-color: #58a6ff;
+}
+
+.resize-handle.vertical:active {
+  background: #58a6ff40;
+  border-right-color: #58a6ff;
+}
+
+.resize-handle.horizontal {
+  height: 6px;
+  cursor: row-resize;
+  background: transparent;
+  border-top: 1px solid #30363d;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.resize-handle.horizontal:hover {
+  background: #58a6ff20;
+  border-top-color: #58a6ff;
+}
+
+.resize-handle.horizontal:active {
+  background: #58a6ff40;
+  border-top-color: #58a6ff;
+}
+
+/* Visual feedback during resize */
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  background: transparent;
+  transition: background 0.2s;
+}
+
+.resize-handle.vertical::before {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 2px;
+  height: 20px;
+  background: #30363d;
+  border-radius: 1px;
+}
+
+.resize-handle.horizontal::before {
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 20px;
+  height: 2px;
+  background: #30363d;
+  border-radius: 1px;
+}
+
+.resize-handle:hover::before {
+  background: #58a6ff;
+}
+
+/* Improved resize experience */
+.resizing {
+  user-select: none;
+  pointer-events: none;
+}
+
+.resizing .resize-handle {
+  background: #58a6ff40;
+}
+
+.resizing .resize-handle.vertical {
+  border-right-color: #58a6ff;
+}
+
+.resizing .resize-handle.horizontal {
+  border-top-color: #58a6ff;
+}

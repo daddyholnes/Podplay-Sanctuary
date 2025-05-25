@@ -514,20 +514,63 @@ class MamaBearAgent:
         
         # Discover new MCP tools
         discovered_tools = self.discovery_agent.discover_new_mcp_servers()
-        new_tools = self.marketplace.get_trending_servers(5)
+        trending_servers_data = self.marketplace.get_trending_servers(5)
         
-        # Combine discovered and trending tools
+        # Convert to proper MCPServer objects
+        new_tools: List[MCPServer] = []
+        
+        # Add discovered tools
         if discovered_tools:
-            # Convert discovered tools to match expected format
             for tool in discovered_tools[:3]:  # Limit to 3 new discoveries
-                new_tools.append({
-                    'name': tool['name'],
-                    'description': tool['description'],
-                    'author': tool['author'],
-                    'category': 'discovery',
-                    'is_installed': False,
-                    'tags': ['new', 'discovered']
-                })
+                mcp_tool = MCPServer(
+                    name=tool['name'],
+                    description=tool['description'],
+                    author=tool['author'],
+                    repository_url=tool.get('repository_url', ''),
+                    category=MCPCategory.DEVELOPMENT_TOOLS,  # Use valid enum value
+                    version=tool.get('version', '1.0.0'),
+                    installation_method=tool.get('installation_method', 'npm'),
+                    capabilities=tool.get('capabilities', []),
+                    dependencies=tool.get('dependencies', []),
+                    configuration_schema=tool.get('configuration_schema', {}),
+                    popularity_score=tool.get('popularity_score', 0),
+                    last_updated=tool.get('last_updated', today),
+                    is_official=tool.get('is_official', False),
+                    is_installed=False,
+                    installation_status='not_installed',
+                    tags=['new', 'discovered']
+                )
+                new_tools.append(mcp_tool)
+        
+        # Add trending servers (convert from Dict to MCPServer)
+        for server_data in trending_servers_data[:3]:  # Limit to 3 trending
+            try:
+                # Convert category string to enum
+                category_str = server_data.get('category', 'development_tools')
+                category = MCPCategory(category_str) if category_str in [c.value for c in MCPCategory] else MCPCategory.DEVELOPMENT_TOOLS
+                
+                mcp_server = MCPServer(
+                    name=server_data['name'],
+                    description=server_data['description'],
+                    author=server_data['author'],
+                    repository_url=server_data.get('repository_url', ''),
+                    category=category,
+                    version=server_data.get('version', '1.0.0'),
+                    installation_method=server_data.get('installation_method', 'npm'),
+                    capabilities=server_data.get('capabilities', []),
+                    dependencies=server_data.get('dependencies', []),
+                    configuration_schema=server_data.get('configuration_schema', {}),
+                    popularity_score=server_data.get('popularity_score', 0),
+                    last_updated=server_data.get('last_updated', today),
+                    is_official=server_data.get('is_official', False),
+                    is_installed=server_data.get('is_installed', False),
+                    installation_status=server_data.get('installation_status', 'not_installed'),
+                    tags=server_data.get('tags', ['trending'])
+                )
+                new_tools.append(mcp_server)
+            except (KeyError, ValueError) as e:
+                logger.warning(f"Skipping invalid server data: {e}")
+                continue
         
         # Updated models (placeholder - would integrate with actual model APIs)
         updated_models = [
@@ -545,7 +588,7 @@ class MamaBearAgent:
         
         # System status
         system_status = {
-            "installed_mcp_servers": len([s for s in new_tools if s.get('is_installed', False)]),
+            "installed_mcp_servers": len([s for s in new_tools if s.is_installed]),
             "available_mcp_servers": len(new_tools),
             "sanctuary_health": "excellent",
             "memory_system": "active" if self.enhanced_mama.memory else "local_only",
@@ -618,7 +661,9 @@ class EnhancedMamaBear:
         if MEM0_AVAILABLE and os.getenv('MEM0_API_KEY'):
             try:
                 # Use MemoryClient for pro account features
-                os.environ["MEM0_API_KEY"] = os.getenv('MEM0_API_KEY')
+                mem0_api_key = os.getenv('MEM0_API_KEY')
+                if mem0_api_key:
+                    os.environ["MEM0_API_KEY"] = mem0_api_key
                 self.memory = MemoryClient()
                 self.user_id = os.getenv('MEM0_USER_ID', 'nathan_sanctuary')
                 logger.info("🧠 Mama Bear memory system initialized with Mem0.ai Pro")
@@ -630,7 +675,9 @@ class EnhancedMamaBear:
         # Initialize Together.ai if available
         if TOGETHER_AVAILABLE and os.getenv('TOGETHER_AI_API_KEY'):
             try:
-                together.api_key = os.getenv('TOGETHER_AI_API_KEY')
+                together_api_key = os.getenv('TOGETHER_AI_API_KEY')
+                if together and together_api_key:
+                    together.api_key = together_api_key
                 self.together_client = together
                 logger.info("🔧 Mama Bear sandbox initialized with Together.ai")
             except Exception as e:
@@ -902,109 +949,508 @@ class ProactiveDiscoveryAgent:
         
         return recommendations[:5]  # Limit to top 5 recommendations
 
-# ==================== INITIALIZATION ====================
+# ==================== APPLICATION INITIALIZATION ====================
 
-# Initialize the sanctuary
+# Initialize core systems
 db = SanctuaryDB()
 marketplace = MCPMarketplaceManager(db)
 mama_bear = MamaBearAgent(db, marketplace)
 
-# Initialize DevSandbox Manager
-if DEV_SANDBOX_AVAILABLE:
-    dev_sandbox_manager = DevSandboxManager()
-    logger.info("🏗️ DevSandbox Manager initialized")
-else:
-    dev_sandbox_manager = None
-    logger.warning("🏗️ DevSandbox not available - check dependencies")
-
-# Initialize Mem0 Chat Manager
-if MEM0_CHAT_AVAILABLE:
-    # The mem0_chat_manager is already initialized in the module import
-    logger.info("🧠 Mem0 Chat Manager initialized and ready for intelligent persistence")
-else:
-    mem0_chat_manager = None
-    logger.warning("🧠 Mem0 Chat Manager not available - check dependencies")
-
-# Initialize Enhanced Mama Bear with Vertex AI
-if ENHANCED_MAMA_AVAILABLE:
-    enhanced_vertex_mama = VertexAIMamaBear()
-    logger.info("🐻 Enhanced Mama Bear with Vertex AI initialized")
-else:
-    enhanced_vertex_mama = None
-    logger.warning("🐻 Enhanced Mama Bear not available - check dependencies")
-
-# Legacy enhanced mama bear for backward compatibility
-enhanced_mama_bear = EnhancedMamaBear(db)
-
-# ==================== API ENDPOINTS ====================
-
-@app.route('/')
-def index():
-    """Serve the React frontend for Electron app"""
+# Initialize enhanced Vertex AI Mama Bear if available
+enhanced_vertex_mama = None
+if ENHANCED_MAMA_AVAILABLE and VertexAIMamaBear:
     try:
-        # Serve the built React frontend
-        frontend_dist = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'dist')
-        return send_from_directory(frontend_dist, 'index.html')
+        enhanced_vertex_mama = VertexAIMamaBear()
+        logger.info("🐻 Enhanced Vertex AI Mama Bear initialized")
     except Exception as e:
-        # Fallback to API response if frontend not available
-        return jsonify({
-            "message": "🐻 Welcome to Nathan's Podplay Build Sanctuary",
-            "agent": "Mama Bear Gem - Lead Developer Agent", 
-            "status": "ready",
-            "philosophy": "Your sanctuary for calm, empowered creation",
-            "note": "Frontend not available, using API fallback"
-        })
+        logger.warning(f"Enhanced Mama Bear not available: {e}")
 
-# Serve static assets from React build
-@app.route('/assets/<path:filename>')
-def serve_assets(filename):
-    """Serve React build assets"""
-    frontend_dist = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'frontend', 'dist')
-    return send_from_directory(os.path.join(frontend_dist, 'assets'), filename)
+# Initialize enhanced mama bear for backward compatibility
+enhanced_mama_bear = mama_bear.enhanced_mama
 
-@app.route('/api/status')
-def api_status():
-    """API status endpoint"""
-    return jsonify({
-        "message": "🐻 Welcome to Nathan's Podplay Build Sanctuary",
-        "agent": "Mama Bear Gem - Lead Developer Agent",
-        "status": "ready", 
-        "philosophy": "Your sanctuary for calm, empowered creation"
-    })
-
-@app.route('/api/mama-bear/briefing', methods=['GET'])
-def get_daily_briefing():
-    """Get Mama Bear's daily briefing"""
+# Initialize DevSandbox manager
+dev_sandbox_manager = None
+if DEV_SANDBOX_AVAILABLE and DevSandboxManager:
     try:
-        briefing = mama_bear.generate_daily_briefing()
+        dev_sandbox_manager = DevSandboxManager()
+        logger.info("🏗️ DevSandbox manager initialized")
+    except Exception as e:
+        logger.warning(f"DevSandbox not available: {e}")
+
+logger.info("🐻 Mama Bear Sanctuary - All systems initialized!")
+
+# ==================== CORE SERVER ENDPOINTS ====================
+
+@app.route('/', methods=['GET'])
+def server_health_check():
+    """Server health check endpoint"""
+    try:
         return jsonify({
             "success": True,
-            "briefing": asdict(briefing),
-            "message": "☕ Good morning, Nathan! Here's your daily briefing."
+            "status": "🐻 Mama Bear's Sanctuary is operational",
+            "agent": "Enhanced Mama Bear v2.5",
+            "philosophy": "🏠 Creating calm, empowered development sanctuaries",
+            "systems": {
+                "mama_bear": ENHANCED_MAMA_AVAILABLE,
+                "mem0_chat": MEM0_CHAT_AVAILABLE,
+                "dev_sandbox": DEV_SANDBOX_AVAILABLE,
+                "agentic_dev": AGENTIC_DEV_AVAILABLE
+            },
+            "timestamp": datetime.now().isoformat()
         })
     except Exception as e:
-        logger.error(f"Error generating briefing: {e}")
+        logger.error(f"Error in health check: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/mcp/search', methods=['GET'])
 def search_mcp_servers():
-    """Search MCP servers in the marketplace"""
+    """Search MCP marketplace for servers"""
     try:
         query = request.args.get('query', '')
         category = request.args.get('category')
         official_only = request.args.get('official_only', 'false').lower() == 'true'
+        
+        if not marketplace:
+            return jsonify({
+                "success": False,
+                "error": "MCP marketplace not available",
+                "servers": []
+            }), 503
         
         servers = marketplace.search_servers(query, category, official_only)
         
         return jsonify({
             "success": True,
             "servers": servers,
-            "total": len(servers),
             "query": query,
-            "category": category
+            "total": len(servers)
         })
     except Exception as e:
         logger.error(f"Error searching MCP servers: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "servers": []
+        }), 500
+
+@app.route('/api/vertex/code/execute', methods=['POST'])
+def execute_python_code():
+    """Execute Python code safely in a sandboxed environment"""
+    try:
+        data = request.get_json()
+        code = data.get('code', '')
+        language = data.get('language', 'python')
+        
+        if not code:
+            return jsonify({"success": False, "error": "No code provided"}), 400
+        
+        if language != 'python':
+            return jsonify({
+                "success": False,
+                "error": f"Language {language} not supported. Only Python is currently supported."
+            }), 400
+        
+        # Basic security check - prevent dangerous operations
+        dangerous_keywords = ['import os', 'import sys', 'subprocess', 'eval(', 'exec(', '__import__', 'open(']
+        for keyword in dangerous_keywords:
+            if keyword in code:
+                return jsonify({
+                    "success": False,
+                    "error": f"Code contains potentially dangerous operation: {keyword}"
+                }), 400
+        
+        # Execute code in a restricted environment
+        import io
+        import contextlib
+        from datetime import datetime
+        
+        output_buffer = io.StringIO()
+        error_buffer = io.StringIO()
+        
+        # Create a safe execution environment
+        safe_globals = {
+            '__builtins__': {
+                'print': print,
+                'len': len,
+                'str': str,
+                'int': int,
+                'float': float,
+                'bool': bool,
+                'list': list,
+                'dict': dict,
+                'tuple': tuple,
+                'set': set,
+                'range': range,
+                'enumerate': enumerate,
+                'zip': zip,
+                'map': map,
+                'filter': filter,
+                'sum': sum,
+                'max': max,
+                'min': min,
+                'abs': abs,
+                'round': round,
+                'sorted': sorted,
+                'reversed': reversed
+            }
+        }
+        
+        try:
+            with contextlib.redirect_stdout(output_buffer), contextlib.redirect_stderr(error_buffer):
+                exec(code, safe_globals)
+            
+            output = output_buffer.getvalue()
+            error = error_buffer.getvalue()
+            
+            return jsonify({
+                "success": True,
+                "output": output,
+                "error": error,
+                "code": code,
+                "language": language,
+                "timestamp": datetime.now().isoformat()
+            })
+        
+        except Exception as exec_error:
+            return jsonify({
+                "success": False,
+                "output": output_buffer.getvalue(),
+                "error": str(exec_error),
+                "code": code,
+                "language": language
+            }), 400
+    
+    except Exception as e:
+        logger.error(f"Error executing code: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/vertex-garden/execute-code', methods=['POST'])
+def execute_python_code_vertex_garden():
+    """Execute Python code safely in Vertex Garden context"""
+    try:
+        data = request.get_json()
+        code = data.get('code', '')
+        language = data.get('language', 'python')
+        session_id = data.get('session_id', '')
+        
+        if not code:
+            return jsonify({"success": False, "error": "No code provided"}), 400
+        
+        if language != 'python':
+            return jsonify({
+                "success": False,
+                "error": f"Language {language} not supported. Only Python is currently supported."
+            }), 400
+        
+        # Basic security check - prevent dangerous operations
+        dangerous_keywords = ['import os', 'import sys', 'subprocess', 'eval(', 'exec(', '__import__', 'open(']
+        for keyword in dangerous_keywords:
+            if keyword in code:
+                return jsonify({
+                    "success": False,
+                    "error": f"Code contains potentially dangerous operation: {keyword}"
+                }), 400
+        
+        # Execute code in a restricted environment
+        import io
+        import contextlib
+        from datetime import datetime
+        
+        output_buffer = io.StringIO()
+        error_buffer = io.StringIO()
+        
+        # Create a safe execution environment
+        safe_globals = {
+            '__builtins__': {
+                'print': print,
+                'len': len,
+                'str': str,
+                'int': int,
+                'float': float,
+                'bool': bool,
+                'list': list,
+                'dict': dict,
+                'tuple': tuple,
+                'set': set,
+                'range': range,
+                'enumerate': enumerate,
+                'zip': zip,
+                'map': map,
+                'filter': filter,
+                'sum': sum,
+                'max': max,
+                'min': min,
+                'abs': abs,
+                'round': round,
+                'sorted': sorted,
+                'reversed': reversed
+            }
+        }
+        
+        try:
+            with contextlib.redirect_stdout(output_buffer), contextlib.redirect_stderr(error_buffer):
+                exec(code, safe_globals)
+            
+            output = output_buffer.getvalue()
+            error = error_buffer.getvalue()
+            
+            return jsonify({
+                "success": True,
+                "output": output,
+                "error": error,
+                "code": code,
+                "language": language,
+                "session_id": session_id,
+                "timestamp": datetime.now().isoformat()
+            })
+        
+        except Exception as exec_error:
+            return jsonify({
+                "success": False,
+                "output": output_buffer.getvalue(),
+                "error": str(exec_error),
+                "code": code,
+                "language": language,
+                "session_id": session_id
+            }), 400
+    
+    except Exception as e:
+        logger.error(f"Error executing code in vertex garden: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/vertex-garden/chat', methods=['POST'])
+def vertex_garden_chat():
+    """Chat with Vertex Garden AI models with persistent memory"""
+    try:
+        data = request.get_json()
+        message = data.get('message')
+        user_id = data.get('user_id', 'nathan')
+        session_id = data.get('session_id')
+        model_id = data.get('model_id', 'gemini-2.0-flash-exp')
+        context = data.get('context', {})
+        
+        if not message:
+            return jsonify({"success": False, "error": "Message is required"}), 400
+        
+        # Generate session ID if not provided
+        if not session_id:
+            session_id = f"vertex_session_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{user_id}"
+        
+        # Use enhanced Vertex AI Mama Bear for chat
+        if enhanced_vertex_mama:
+            response_data = enhanced_vertex_mama.vertex_garden_chat(
+                message, session_id, context, user_id, model_id
+            )
+            return jsonify(response_data)
+        else:
+            # Fallback response
+            return jsonify({
+                "success": True,
+                "response": f"🤖 Vertex Garden Chat (Fallback Mode)\n\nReceived: {message}\n\nVertex AI integration not available. Please configure your credentials.",
+                "session_id": session_id,
+                "model_id": model_id,
+                "user_id": user_id,
+                "tokens_used": 0,
+                "timestamp": datetime.now().isoformat()
+            })
+            
+    except Exception as e:
+        logger.error(f"Error in Vertex Garden chat: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/vertex-garden/chat-history', methods=['GET'])
+def vertex_garden_chat_history():
+    """Get chat history for Vertex Garden"""
+    try:
+        user_id = request.args.get('user_id', 'nathan')
+        
+        # Try to get chat history from Mem0
+        if mem0_manager:
+            try:
+                memories = mem0_manager.get_all_memories(user_id)
+                
+                # Group memories by session
+                sessions = {}
+                for memory in memories:
+                    session_id = memory.get('metadata', {}).get('session_id', 'default')
+                    if session_id not in sessions:
+                        sessions[session_id] = {
+                            'id': session_id,
+                            'user_id': user_id,
+                            'created_at': memory.get('created_at'),
+                            'updated_at': memory.get('updated_at'),
+                            'messages': []
+                        }
+                    
+                    sessions[session_id]['messages'].append({
+                        'id': memory.get('id'),
+                        'content': memory.get('memory'),
+                        'timestamp': memory.get('created_at')
+                    })
+                
+                return jsonify({
+                    "success": True,
+                    "sessions": list(sessions.values()),
+                    "total_sessions": len(sessions)
+                })
+                
+            except Exception as mem_error:
+                logger.warning(f"Mem0 history retrieval failed: {mem_error}")
+        
+        # Fallback to empty history
+        return jsonify({
+            "success": True,
+            "sessions": [],
+            "total_sessions": 0,
+            "message": "No chat history available"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting chat history: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/vertex-garden/session/<session_id>/messages', methods=['GET'])
+def get_session_messages(session_id):
+    """Get messages for a specific session"""
+    try:
+        user_id = request.args.get('user_id', 'nathan')
+        
+        # Try to get session messages from Mem0
+        if mem0_manager:
+            try:
+                memories = mem0_manager.search_memories(
+                    f"session:{session_id}", 
+                    user_id=user_id,
+                    limit=100
+                )
+                
+                messages = []
+                for memory in memories:
+                    if memory.get('metadata', {}).get('session_id') == session_id:
+                        messages.append({
+                            'id': memory.get('id'),
+                            'content': memory.get('memory'),
+                            'role': memory.get('metadata', {}).get('role', 'user'),
+                            'timestamp': memory.get('created_at'),
+                            'model_id': memory.get('metadata', {}).get('model_id')
+                        })
+                
+                # Sort by timestamp
+                messages.sort(key=lambda x: x.get('timestamp', ''))
+                
+                return jsonify({
+                    "success": True,
+                    "session_id": session_id,
+                    "messages": messages,
+                    "total_messages": len(messages)
+                })
+                
+            except Exception as mem_error:
+                logger.warning(f"Mem0 session retrieval failed: {mem_error}")
+        
+        # Fallback to empty messages
+        return jsonify({
+            "success": True,
+            "session_id": session_id,
+            "messages": [],
+            "total_messages": 0,
+            "message": "No messages found for this session"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting session messages: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ==================== AGENTIC DEVSANDBOX ENDPOINTS ====================
+
+@app.route('/api/dev-sandbox/<env_id>/suggestions', methods=['GET'])
+def get_contextual_suggestions(env_id):
+    """Get contextual suggestions for the development environment"""
+    try:
+        if not dev_sandbox_manager:
+            return jsonify({"success": False, "error": "DevSandbox not available"}), 503
+        
+        if not agentic_dev_assistant:
+            return jsonify({
+                "success": True,
+                "suggestions": [
+                    "Initialize project structure",
+                    "Set up development dependencies",
+                    "Configure build tools",
+                    "Add testing framework",
+                    "Create documentation"
+                ]
+            })
+        
+        # Get environment details
+        env_result = asyncio.run(dev_sandbox_manager.get_environment(env_id))
+        if not env_result.get('success'):
+            return jsonify({"success": False, "error": "Environment not found"}), 404
+        
+        environment = env_result.get('environment')
+        if not environment:
+            return jsonify({"success": False, "error": "Environment data not found"}), 404
+        
+        # Get contextual suggestions
+        suggestions = asyncio.run(agentic_dev_assistant.get_contextual_suggestions(environment))
+        
+        return jsonify({
+            "success": True,
+            "suggestions": suggestions,
+            "environment_type": environment.get('type') if environment else None,
+            "provider": environment.get('provider') if environment else None
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting suggestions: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/dev-sandbox/<env_id>/chat', methods=['POST'])
+def chat_with_mama_bear(env_id):
+    """Chat with Mama Bear about the development environment"""
+    try:
+        if not enhanced_vertex_mama:
+            return jsonify({
+                "success": False,
+                "error": "Mama Bear not available",
+                "response": "🐻 Sorry, I need Vertex AI configuration to chat about development environments."
+            }), 503
+        
+        data = request.get_json()
+        message = data.get('message', '')
+        
+        if not message:
+            return jsonify({"success": False, "error": "Message is required"}), 400
+        
+        # Get environment context
+        env_result = asyncio.run(dev_sandbox_manager.get_environment(env_id)) if dev_sandbox_manager else None
+        environment_context = env_result.get('environment') if env_result and env_result.get('success') else {}
+        
+        # Build context for Mama Bear
+        context = {
+            "environment_id": env_id,
+            "environment": environment_context,
+            "chat_type": "dev_sandbox"
+        }
+        
+        # Get response from Mama Bear
+        response_data = enhanced_vertex_mama.mama_bear_chat(
+            message, 
+            chat_history=None, 
+            context=context, 
+            user_id="nathan"
+        )
+        
+        return jsonify({
+            "success": response_data.get('success', True),
+            "response": response_data.get('response', "🐻 I'm here to help with your development environment!"),
+            "environment_id": env_id,
+            "mama_bear_available": True,
+            "agentic_available": AGENTIC_DEV_AVAILABLE
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in Mama Bear dev chat: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/mcp/discover', methods=['GET'])
@@ -1118,6 +1564,54 @@ def mama_bear_learn():
         logger.error(f"Error in Mama Bear learning: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/api/mama-bear/briefing', methods=['GET'])
+def mama_bear_briefing():
+    """Get Mama Bear's daily briefing"""
+    try:
+        # Generate daily briefing using mama bear agent
+        briefing = mama_bear.generate_daily_briefing()
+        
+        return jsonify({
+            "success": True,
+            "briefing": {
+                "id": briefing.id,
+                "date": briefing.date,
+                "summary": briefing.summary,
+                "new_tools": [
+                    {
+                        "name": tool.name,
+                        "description": tool.description,
+                        "category": tool.category,
+                        "installation_command": tool.installation_command,
+                        "is_official": tool.is_official
+                    } for tool in briefing.new_tools
+                ],
+                "updated_models": briefing.updated_models,
+                "project_priorities": [
+                    {
+                        "id": priority.id,
+                        "title": priority.title,
+                        "description": priority.description,
+                        "priority": priority.priority,
+                        "status": priority.status,
+                        "created_at": priority.created_at
+                    } for priority in briefing.project_priorities
+                ],
+                "insights": briefing.insights,
+                "recommendations": briefing.recommendations
+            },
+            "mama_bear_message": "🐻 Good morning! Here's your daily briefing to keep your sanctuary organized and productive.",
+            "timestamp": datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        logger.error(f"Error generating briefing: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "fallback_message": "🐻 Sorry, I couldn't generate your briefing right now. Let me know if you need help with anything else!"
+        }), 500
+
 @app.route('/api/mama-bear/chat', methods=['POST'])
 def mama_bear_chat():
     """Chat with Mama Bear - the lead developer agent (Enhanced with Vertex AI)"""
@@ -1207,15 +1701,56 @@ def manage_project_priorities():
 def get_vertex_models():
     """Get all available Vertex AI models"""
     try:
-        if not enhanced_vertex_mama:
-            return jsonify({
-                "success": False,
-                "error": "Enhanced Vertex AI Mama Bear not available",
-                "message": "🐻 Vertex AI integration not configured"
-            }), 503
+        # Try to get models from enhanced_vertex_mama first
+        if enhanced_vertex_mama:
+            models_info = enhanced_vertex_mama.list_models()
+            return jsonify(models_info)
         
-        models_info = enhanced_vertex_mama.list_models()
-        return jsonify(models_info)
+        # Fallback: Return a static list of popular models
+        fallback_models = [
+            {
+                "name": "Gemini 2.5 Flash (002)",
+                "display_name": "Latest Gemini 2.5 Flash model with enhanced capabilities",
+                "type": "generative",
+                "capabilities": ["text", "multimodal", "fast", "latest"],
+                "pricing": "$0.04/1K tokens",
+                "is_mama_bear": True
+            },
+            {
+                "name": "Gemini Experimental 1206", 
+                "display_name": "Latest experimental Gemini model",
+                "type": "generative",
+                "capabilities": ["text", "multimodal", "experimental"],
+                "pricing": "$0.05/1K tokens",
+                "is_mama_bear": True
+            },
+            {
+                "name": "Claude 3.5 Sonnet",
+                "display_name": "Advanced reasoning and coding capabilities",
+                "type": "generative",
+                "capabilities": ["text", "reasoning", "coding", "analysis"],
+                "pricing": "$0.15/1K tokens"
+            },
+            {
+                "name": "GPT-4o",
+                "display_name": "OpenAI's flagship multimodal model",
+                "type": "generative", 
+                "capabilities": ["text", "vision", "reasoning"],
+                "pricing": "$0.15/1K tokens"
+            }
+        ]
+        
+        return jsonify({
+            "success": True,
+            "models": fallback_models,
+            "total_models": len(fallback_models),
+            "message": "🐻 Using fallback model list - full Vertex AI integration not configured",
+            "mama_bear_models": [
+                model["name"] for model in fallback_models 
+                if model.get("is_mama_bear", False)
+            ]
+        })
+        
     except Exception as e:
         logger.error(f"Error getting Vertex models: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
@@ -1826,222 +2361,101 @@ def get_dev_suggestions(env_id):
             "suggestions": [],
             "error": str(e)
         }), 500
-# ==================== VERTEX GARDEN CHAT ENDPOINTS (MEM0) ====================
 
-@app.route('/api/vertex-garden/chat-history', methods=['GET'])
-def get_vertex_garden_chat_history():
-    """Get chat history for all models using Mem0"""
-    if not MEM0_CHAT_AVAILABLE or mem0_chat_manager is None:
-        return jsonify({"success": False, "error": "Mem0 not available"}), 503
-    
+@app.route('/api/dev-sandbox/<env_id>/chat', methods=['POST'])
+def chat_with_mama_bear_dev(env_id):
+    """Chat with Mama Bear about the development environment"""
     try:
-        import asyncio
+        if not dev_sandbox_manager:
+            return jsonify({"success": False, "error": "DevSandbox not available"}), 503
         
-        async def get_sessions_async():
-            # Get sessions for popular models
-            all_sessions = []
-            popular_models = ['mama-bear-gemini-25', 'claude-4-opus', 'claude-4-sonnet', 'gpt-4o']
-            
-            for model_id in popular_models:
-                try:
-                    result = await mem0_chat_manager.get_model_sessions(model_id, limit=10)
-                    if result.get('success'):
-                        all_sessions.extend(result.get('sessions', []))
-                except Exception as e:
-                    logger.warning(f"Could not get sessions for {model_id}: {e}")
-            
-            return all_sessions
+        data = request.get_json()
+        message = data.get('message', '')
         
-        # Run the async function
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        all_sessions = loop.run_until_complete(get_sessions_async())
-        loop.close()
+        if not message:
+            return jsonify({"success": False, "error": "Message is required"}), 400
+        
+        # Mock environment context
+        environment_context = {
+            "id": env_id,
+            "type": data.get('type', 'node'),
+            "name": data.get('name', f'Environment {env_id}'),
+            "status": "running",
+            "workspaceRoot": f"/tmp/podplay_sandbox/{env_id}",
+            "task_type": "development_assistance"
+        }
+        
+        # Get response from agentic assistant if available
+        if agentic_dev_assistant:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                response = loop.run_until_complete(
+                    agentic_dev_assistant.get_intelligent_assistance(environment_context, message)
+                )
+            finally:
+                loop.close()
+        else:
+            # Fallback response
+            response = {
+                "success": True,
+                "response": f"🐻 I understand you're working on a {environment_context.get('type', 'development')} project. While my AI capabilities are limited without full integration, I can help with general development guidance and project structure suggestions.",
+                "suggestions": [
+                    "Set up proper project structure",
+                    "Configure development environment", 
+                    "Add testing and linting tools",
+                    "Document your project properly"
+                ]
+            }
         
         return jsonify({
             "success": True,
-            "sessions": all_sessions
+            "message": response.get('response', ''),
+            "suggestions": response.get('suggestions', []),
+            "context": environment_context,
+            "mama_bear_available": ENHANCED_MAMA_AVAILABLE,
+            "agentic_available": AGENTIC_DEV_AVAILABLE
         })
         
     except Exception as e:
-        logger.error(f"Error getting chat history: {e}")
+        logger.error(f"Error in Mama Bear dev chat: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/vertex-garden/session/<session_id>/messages', methods=['GET'])
-def get_session_messages(session_id: str):
-    """Get messages for a specific session using Mem0"""
-    if not MEM0_CHAT_AVAILABLE or mem0_chat_manager is None:
-        return jsonify({"success": False, "error": "Mem0 not available"}), 503
-    
+@app.route('/api/dev-sandbox/capabilities', methods=['GET'])
+def get_devsandbox_capabilities():
+    """Get DevSandbox system capabilities and available features"""
     try:
-        import asyncio
+        capabilities = {
+            "dev_sandbox_available": DEV_SANDBOX_AVAILABLE,
+            "mama_bear_available": ENHANCED_MAMA_AVAILABLE,
+            "agentic_available": AGENTIC_DEV_AVAILABLE,
+            "mem0_available": MEM0_CHAT_AVAILABLE,
+            "providers": []
+        }
         
-        async def get_messages_async():
-            # Extract model_id from session_id (assuming format: session_YYYYMMDD_HHMMSS_model_id)
-            parts = session_id.split('_')
-            if len(parts) >= 4:
-                model_id = '_'.join(parts[3:])
-            else:
-                model_id = 'mama-bear-gemini-25'  # Default fallback
-            
-            return await mem0_chat_manager.get_session_messages(session_id, model_id)
+        # Get available cloud providers if DevSandbox is available
+        if dev_sandbox_manager and hasattr(dev_sandbox_manager, 'providers'):
+            capabilities["providers"] = [
+                name for name, config in dev_sandbox_manager.providers.items()
+                if config.get('available', False)
+            ]
         
-        # Run the async function
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(get_messages_async())
-        loop.close()
-        
-        if result.get('success'):
-            return jsonify({
-                "success": True,
-                "messages": result.get('messages', []),
-                "session_id": session_id
-            })
-        else:
-            return jsonify({"success": False, "error": result.get('error')}), 500
+        return jsonify({
+            "success": True,
+            "capabilities": capabilities,
+            "features": [
+                "Local development environments",
+                "Cloud provider integration",
+                "AI-powered assistance",
+                "Real-time file operations",
+                "Terminal access",
+                "Environment templates"
+            ]
+        })
         
     except Exception as e:
-        logger.error(f"Error getting session messages: {e}")
+        logger.error(f"Error getting DevSandbox capabilities: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/vertex-garden/chat', methods=['POST'])
-def vertex_garden_chat():
-    """Main chat endpoint using Mem0 for persistence"""
-    if not MEM0_CHAT_AVAILABLE or mem0_chat_manager is None:
-        return jsonify({"success": False, "error": "Mem0 not available"}), 503
-    
-    try:
-        import asyncio
-        
-        data = request.get_json()
-        model_id = data.get('model_id', 'mama-bear-gemini-25')
-        session_id = data.get('session_id')
-        message = data.get('message', '')
-        context = data.get('context', {})
-        
-        if not message:
-            return jsonify({"success": False, "error": "No message provided"}), 400
-        
-        async def chat_async():
-            nonlocal session_id
-            
-            # Create session if it doesn't exist
-            if not session_id:
-                session_result = await mem0_chat_manager.create_chat_session(model_id)
-                if session_result.get('success'):
-                    session_id = session_result['session']['id']
-                else:
-                    raise Exception("Could not create session")
-            
-            # Save user message to Mem0
-            user_message = {
-                "id": f"msg_{datetime.now().strftime('%Y%m%d_%H%M%S')}_user",
-                "role": "user",
-                "content": message,
-                "timestamp": datetime.now().isoformat()
-            }
-            
-            await mem0_chat_manager.save_message(session_id, model_id, user_message)
-            
-            # Get conversation context from Mem0
-            context_result = await mem0_chat_manager.get_conversation_context(session_id, model_id)
-            conversation_context = context_result.get('context', {}) if context_result.get('success') else {}
-            
-            # Generate AI response using the selected model
-            # For now, using a simple response - this would integrate with actual AI models
-            ai_response = f"I'm {model_id}. You said: '{message}'. This is a simulated response using Mem0 for persistence."
-            
-            # Calculate token usage and cost (placeholder)
-            tokens_used = len(message.split()) + len(ai_response.split())
-            cost = tokens_used * 0.0001  # Placeholder cost calculation
-            
-            # Save assistant message to Mem0
-            assistant_message = {
-                "id": f"msg_{datetime.now().strftime('%Y%m%d_%H%M%S')}_assistant",
-                "role": "assistant",
-                "content": ai_response,
-                "timestamp": datetime.now().isoformat(),
-                "tokens_used": tokens_used,
-                "cost": cost
-            }
-            
-            await mem0_chat_manager.save_message(session_id, model_id, assistant_message)
-            
-            return {
-                "success": True,
-                "response": ai_response,
-                "session_id": session_id,
-                "tokens_used": tokens_used,
-                "cost": cost,
-                "metadata": {
-                    "model_id": model_id,
-                    "conversation_context": conversation_context
-                }
-            }
-        
-        # Run the async function
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        result = loop.run_until_complete(chat_async())
-        loop.close()
-        
-        return jsonify(result)
-        
-    except Exception as e:
-        logger.error(f"Error in vertex garden chat: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/vertex-garden/terminal', methods=['POST'])
-def vertex_garden_terminal():
-    """Terminal command execution for VertexGardenChat"""
-    try:
-        data = request.get_json()
-        command = data.get('command', '')
-        session_id = data.get('session_id', '')
-        working_directory = data.get('working_directory', '/tmp')
-        
-        if not command:
-            return jsonify({"success": False, "error": "No command provided"}), 400
-        
-        # For security, limit to safe commands
-        safe_commands = ['ls', 'pwd', 'echo', 'cat', 'mkdir', 'touch', 'python3', 'node', 'npm']
-        command_parts = command.split()
-        if not command_parts or command_parts[0] not in safe_commands:
-            return jsonify({
-                "success": False, 
-                "error": f"Command '{command_parts[0] if command_parts else command}' not allowed for security reasons"
-            }), 400
-        
-        try:
-            import subprocess
-            result = subprocess.run(
-                command,
-                shell=True,
-                cwd=working_directory,
-                capture_output=True,
-                text=True,
-                timeout=30
-            )
-            
-            output = result.stdout if result.returncode == 0 else result.stderr
-            
-            return jsonify({
-                "success": True,
-                "output": output,
-                "return_code": result.returncode,
-                "working_directory": working_directory
-            })
-            
-        except subprocess.TimeoutExpired:
-            return jsonify({"success": False, "error": "Command timed out"}), 400
-        except Exception as e:
-            return jsonify({"success": False, "error": f"Execution error: {str(e)}"}), 400
-        
-    except Exception as e:
-        logger.error(f"Error in terminal command: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
 # ==================== VERTEX GARDEN: MULTIMODAL SUPPORT ====================
 
 @app.route('/api/vertex-garden/upload', methods=['POST'])
@@ -2409,14 +2823,16 @@ def list_drive_files():
         logger.error(f"Error listing Drive files: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-# ==================== APPLICATION STARTUP ====================
-
+# Start the Flask application
 if __name__ == '__main__':
-    logger.info("🐻 Mama Bear: Starting the Podplay Build Sanctuary...")
-    logger.info("🏠 Your sanctuary for calm, empowered creation is ready!")
+    print("\n🚀 Starting Podplay Backend Server...")
+    print(f"🌐 Server will be available at: http://localhost:5000")
+    print("📊 API endpoints ready for DevSandbox, Mama Bear, and Vertex Garden")
+    print("🔧 Press Ctrl+C to stop the server\n")
     
-    try:
-        socketio.run(app, host='0.0.0.0', port=8000, debug=True, allow_unsafe_werkzeug=True)
-    except Exception as e:
-        logger.error(f"Failed to start server: {e}")
-        logger.info("🐻 Mama Bear: I encountered an issue starting the sanctuary. Please check the configuration.")
+    app.run(
+        host='0.0.0.0',
+        port=5000,
+        debug=True,
+        threaded=True
+    )
