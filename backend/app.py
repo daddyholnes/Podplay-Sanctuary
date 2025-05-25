@@ -79,7 +79,7 @@ except ImportError:
     MEM0_CHAT_AVAILABLE = False
     mem0_chat_manager = None
 
-# Configure logging for the sanctuary
+# Configure logging for the sanctuary first
 logging.basicConfig(
     level=logging.INFO,
     format='🐻 Mama Bear: %(asctime)s - %(levelname)s - %(message)s',
@@ -89,6 +89,17 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+# Import agentic capabilities
+try:
+    from cloud_dev_sandbox import AgenticDevSandbox
+    AGENTIC_DEV_AVAILABLE = True
+    agentic_dev_assistant = AgenticDevSandbox()
+    logger.info("🤖 Agentic DevSandbox assistant initialized")
+except ImportError as e:
+    AGENTIC_DEV_AVAILABLE = False
+    agentic_dev_assistant = None
+    logger.warning(f"Agentic DevSandbox not available: {e}")
 
 app = Flask(__name__)
 CORS(app)
@@ -1614,33 +1625,32 @@ def create_terminal_session(env_id):
         logger.error(f"Error creating terminal session: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/dev-sandbox/terminal/<session_id>/execute', methods=['POST'])
-def execute_terminal_command_sandbox(session_id):
-    """Execute command in terminal session"""
+@app.route('/api/dev-sandbox/execute', methods=['POST'])
+def execute_command_in_sandbox():
+    """Execute command in the development sandbox"""
     try:
+        data = request.get_json()
+        env_id = data.get('env_id')
+        command = data.get('command')
+        
+        if not env_id or not command:
+            return jsonify({"success": False, "error": "env_id and command are required"}), 400
+        
         if not dev_sandbox_manager:
             return jsonify({"success": False, "error": "DevSandbox not available"}), 503
         
-        data = request.get_json()
-        command = data.get('command')
-        
-        if not command:
-            return jsonify({"success": False, "error": "Command required"}), 400
-        
-        result = dev_sandbox_manager.execute_command(session_id, command)
-        
-        if result is None:
-            return jsonify({"success": False, "error": "Terminal session not found"}), 404
+        # Execute command in the specified environment
+        result = dev_sandbox_manager.execute_command(env_id, command)
         
         return jsonify({
             "success": True,
             "output": result.get('stdout', ''),
             "error": result.get('stderr', ''),
-            "exitCode": result.get('exit_code', 0)
+            "exit_code": result.get('exit_code', 0)
         })
         
     except Exception as e:
-        logger.error(f"Error executing terminal command: {e}")
+        logger.error(f"Error executing command in sandbox: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/dev-sandbox/<env_id>/preview/start', methods=['POST'])
@@ -1723,6 +1733,99 @@ def delete_environment(env_id):
         logger.error(f"Error deleting environment: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+# ==================== DEV SANDBOX AGENTIC ENDPOINTS ====================
+
+@app.route('/api/dev-sandbox/<env_id>/assistance', methods=['POST'])
+def get_dev_assistance(env_id):
+    """Get intelligent assistance for a development environment"""
+    try:
+        if not agentic_dev_assistant:
+            return jsonify({
+                "success": False,
+                "response": "🤖 Agentic assistant not available. Please check Mama Bear and Mem0 configuration.",
+                "suggestions": []
+            }), 503
+        
+        data = request.get_json() or {}
+        user_query = data.get('query', '')
+        
+        # Mock environment context - in a real scenario, this would come from the actual environment
+        environment_context = {
+            "id": env_id,
+            "type": data.get('type', 'node'),
+            "name": data.get('name', f'Environment {env_id}'),
+            "status": "running",
+            "workspaceRoot": f"/tmp/podplay_sandbox/{env_id}",
+            "port": 3000
+        }
+        
+        # Get assistance (convert async to sync)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            assistance = loop.run_until_complete(
+                agentic_dev_assistant.get_intelligent_assistance(environment_context, user_query)
+            )
+            suggestions = loop.run_until_complete(
+                agentic_dev_assistant.get_contextual_suggestions(environment_context)
+            )
+            assistance["suggestions"] = suggestions
+        finally:
+            loop.close()
+        
+        return jsonify(assistance)
+        
+    except Exception as e:
+        logger.error(f"Error getting dev assistance: {e}")
+        return jsonify({
+            "success": False,
+            "response": f"🚫 Error getting assistance: {str(e)}",
+            "suggestions": []
+        }), 500
+
+@app.route('/api/dev-sandbox/<env_id>/suggestions', methods=['GET'])
+def get_dev_suggestions(env_id):
+    """Get contextual suggestions for a development environment"""
+    try:
+        if not agentic_dev_assistant:
+            return jsonify({
+                "success": False,
+                "suggestions": [],
+                "message": "Agentic assistant not available"
+            }), 503
+        
+        # Mock environment context
+        environment_context = {
+            "id": env_id,
+            "type": request.args.get('type', 'node'),
+            "name": request.args.get('name', f'Environment {env_id}'),
+            "status": "running",
+            "workspaceRoot": f"/tmp/podplay_sandbox/{env_id}"
+        }
+        
+        # Get suggestions (convert async to sync)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            suggestions = loop.run_until_complete(
+                agentic_dev_assistant.get_contextual_suggestions(environment_context)
+            )
+        finally:
+            loop.close()
+        
+        return jsonify({
+            "success": True,
+            "suggestions": suggestions,
+            "environment_id": env_id
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting suggestions: {e}")
+        return jsonify({
+            "success": False,
+            "suggestions": [],
+            "error": str(e)
+        }), 500
 # ==================== VERTEX GARDEN CHAT ENDPOINTS (MEM0) ====================
 
 @app.route('/api/vertex-garden/chat-history', methods=['GET'])

@@ -5,22 +5,29 @@ Container-based development environments with MCP integration
 
 import os
 import json
-import asyncio
 import docker
-import subprocess
+import asyncio
 import tempfile
-import shutil
-import socket
-from pathlib import Path
-from flask import Flask, request, jsonify
-from flask_socketio import SocketIO, emit
 import uuid
-import psutil
-import threading
+import shutil
+import subprocess
+from pathlib import Path
+from typing import Dict, List, Optional, Any
 import time
+import logging
+
+# Import the agentic capabilities
+try:
+    from cloud_dev_sandbox import AgenticDevSandbox
+    AGENTIC_AVAILABLE = True
+except ImportError:
+    AGENTIC_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
 
 class DevSandboxManager:
     def __init__(self):
+        # ...existing initialization...
         try:
             self.docker_client = docker.from_env()
             self.docker_available = True
@@ -35,6 +42,15 @@ class DevSandboxManager:
         self.terminal_sessions = {}
         self.active_ports = set()
         
+        # Initialize agentic capabilities
+        self.agentic_assistant = None
+        if AGENTIC_AVAILABLE:
+            try:
+                self.agentic_assistant = AgenticDevSandbox()
+                logger.info("🤖 Agentic DevSandbox assistant initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize agentic assistant: {e}")
+    
     async def create_environment(self, env_config, template=None):
         """Create a new containerized development environment"""
         if not self.docker_available:
@@ -687,6 +703,41 @@ This is a {env_type} development environment.
         except Exception as e:
             print(f"Error deleting environment: {e}")
             return False
-
-# Global sandbox manager instance
-sandbox_manager = DevSandboxManager()
+    
+    async def get_intelligent_assistance(self, env_id: str, user_query: str = "") -> Dict[str, Any]:
+        """Get intelligent assistance for a development environment"""
+        if not self.agentic_assistant:
+            return {
+                "success": False,
+                "response": "🤖 Agentic assistant not available. Please check Mama Bear and Mem0 configuration.",
+                "suggestions": []
+            }
+        
+        # Get environment context
+        environment = self.environments.get(env_id)
+        if not environment:
+            return {
+                "success": False,
+                "response": f"🚫 Environment {env_id} not found",
+                "suggestions": []
+            }
+        
+        try:
+            # Get assistance from the agentic system
+            assistance = await self.agentic_assistant.get_intelligent_assistance(
+                environment, user_query
+            )
+            
+            # Add contextual suggestions
+            suggestions = await self.agentic_assistant.get_contextual_suggestions(environment)
+            assistance["suggestions"] = suggestions
+            
+            return assistance
+            
+        except Exception as e:
+            logger.error(f"Error getting intelligent assistance: {e}")
+            return {
+                "success": False,
+                "response": f"🚫 Error getting assistance: {str(e)}",
+                "suggestions": []
+            }

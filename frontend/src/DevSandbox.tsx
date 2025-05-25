@@ -168,6 +168,12 @@ const DevSandbox: React.FC = () => {
     }
   };
   
+  const handleChatSend = async () => {
+    if (chatInput.trim()) {
+      await sendChatMessage(chatInput);
+    }
+  };
+  
   const executeEnvironmentAction = async (action: any) => {
     switch (action.type) {
       case 'create_file':
@@ -183,55 +189,6 @@ const DevSandbox: React.FC = () => {
         break;
       default:
         console.log('Unknown action:', action);
-    }
-  };
-
-  // ==================== ENVIRONMENT MANAGEMENT ====================
-  
-  // Helper functions
-  const generateEnvironmentId = () => `env_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  
-  const getAvailablePort = async () => {
-    // For now, return a random port between 3000-9000
-    return Math.floor(Math.random() * 6000) + 3000;
-  };
-
-  const getLanguageFromPath = (path: string): string => {
-    const ext = path.split('.').pop()?.toLowerCase();
-    const langMap: Record<string, string> = {
-      'js': 'javascript',
-      'jsx': 'javascript',
-      'ts': 'typescript',
-      'tsx': 'typescript',
-      'py': 'python',
-      'html': 'html',
-      'css': 'css',
-      'json': 'json',
-      'md': 'markdown',
-      'yml': 'yaml',
-      'yaml': 'yaml'
-    };
-    return langMap[ext || ''] || 'plaintext';
-  };
-
-  const shouldRefreshPreview = (filePath: string): boolean => {
-    const previewExtensions = ['html', 'css', 'js', 'ts', 'jsx', 'tsx'];
-    const ext = filePath.split('.').pop()?.toLowerCase();
-    return previewExtensions.includes(ext || '');
-  };
-
-  const refreshPreview = () => {
-    if (livePreview) {
-      setLivePreview(prev => prev ? {
-        ...prev,
-        lastUpdate: new Date().toISOString(),
-        status: 'loading'
-      } : null);
-      
-      // Simulate refresh delay
-      setTimeout(() => {
-        setLivePreview(prev => prev ? { ...prev, status: 'ready' } : null);
-      }, 1000);
     }
   };
 
@@ -385,6 +342,7 @@ const DevSandbox: React.FC = () => {
 
   const createOfflineEnvironment = (env: DevEnvironment, template?: string): DevEnvironment => {
     // Create a mock environment for offline development
+    console.log(`Creating offline environment${template ? ` with template: ${template}` : ''}`);
     const mockFileTree: FileNode = {
       name: env.name,
       path: '/',
@@ -1061,13 +1019,13 @@ const DevSandbox: React.FC = () => {
                 
                 <div className="chat-input-container">
                   <MultimodalInput
-                    onSend={sendChatMessage}
+                    onSend={handleChatSend}
                     placeholder="Ask Mama Bear about your development environment..."
                     disabled={isChatLoading}
                     value={chatInput}
                     onChange={setChatInput}
-                    showModelSelector={false}
-                    compactMode={true}
+                    onAttachmentsChange={() => {}} // Not used in DevSandbox currently
+                    attachments={[]} // No attachments in DevSandbox currently
                   />
                 </div>
               </div>

@@ -1,6 +1,7 @@
 """
 Cloud Development Sandbox - Docker-Free Alternative
 Supports GitHub Codespaces, Replit, and StackBlitz for containerized development
+Enhanced with Mama Bear AI agent and Mem0 persistent memory
 """
 
 import os
@@ -14,6 +15,186 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 import time
 import base64
+import logging
+
+# Try to import Mama Bear and Mem0 integrations
+try:
+    from enhanced_mama_bear import VertexAIMamaBear
+    MAMA_BEAR_AVAILABLE = True
+except ImportError:
+    MAMA_BEAR_AVAILABLE = False
+
+try:
+    from mem0_chat_manager import Mem0ChatManager
+    MEM0_AVAILABLE = True
+except ImportError:
+    MEM0_AVAILABLE = False
+
+logger = logging.getLogger(__name__)
+
+class AgenticDevSandbox:
+    """AI-powered development assistant for DevSandbox environments"""
+    
+    def __init__(self):
+        self.mama_bear = None
+        self.mem0_manager = None
+        
+        # Initialize Mama Bear if available
+        if MAMA_BEAR_AVAILABLE:
+            try:
+                self.mama_bear = VertexAIMamaBear()
+                logger.info("🐻 Mama Bear agent initialized for DevSandbox")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Mama Bear: {e}")
+                self.mama_bear = None
+        
+        # Initialize Mem0 if available
+        if MEM0_AVAILABLE:
+            try:
+                self.mem0_manager = Mem0ChatManager()
+                logger.info("🧠 Mem0 memory system initialized for DevSandbox")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Mem0: {e}")
+                self.mem0_manager = None
+    
+    async def get_intelligent_assistance(self, environment_context: Dict[str, Any], 
+                                       user_query: str = "") -> Dict[str, Any]:
+        """Get intelligent assistance from Mama Bear for development tasks"""
+        if not self.mama_bear:
+            return {
+                "success": False,
+                "response": "🐻 Mama Bear agent not available. Please check Vertex AI configuration.",
+                "suggestions": []
+            }
+        
+        try:
+            # Build context for Mama Bear
+            context = {
+                "environment": environment_context,
+                "user_query": user_query,
+                "timestamp": time.time(),
+                "sandbox_type": "dev_environment"
+            }
+            
+            # Get response from Mama Bear
+            response = self.mama_bear.mama_bear_chat(
+                user_query or "Provide intelligent assistance for this development environment",
+                chat_history=None,
+                context=context,
+                user_id="nathan"
+            )
+            
+            # Store interaction in Mem0 if available
+            if self.mem0_manager and response.get('success'):
+                await self._store_interaction_memory(environment_context, user_query, response)
+            
+            return response
+            
+        except Exception as e:
+            logger.error(f"Error getting intelligent assistance: {e}")
+            return {
+                "success": False,
+                "response": f"🐻 Error getting assistance: {str(e)}",
+                "suggestions": []
+            }
+    
+    async def _store_interaction_memory(self, environment: Dict, query: str, response: Dict):
+        """Store development interaction in persistent memory"""
+        if not self.mem0_manager:
+            return
+        
+        try:
+            memory_data = {
+                "type": "dev_sandbox_interaction",
+                "environment_id": environment.get('id'),
+                "environment_type": environment.get('type'),
+                "user_query": query,
+                "assistant_response": response.get('response', '')[:500],  # Truncate long responses
+                "timestamp": time.time(),
+                "context": {
+                    "workspace_root": environment.get('workspaceRoot'),
+                    "environment_status": environment.get('status')
+                }
+            }
+            
+            await self.mem0_manager.save_message(
+                session_id=environment.get('id', 'dev_sandbox'),
+                model_id="mama_bear_dev_assistant",
+                message={
+                    "role": "assistant", 
+                    "content": f"DevSandbox interaction: {query}",
+                    "metadata": memory_data
+                }
+            )
+            
+        except Exception as e:
+            logger.error(f"Error storing interaction memory: {e}")
+    
+    async def get_contextual_suggestions(self, environment: Dict[str, Any]) -> List[str]:
+        """Get contextual suggestions based on environment state and memory"""
+        suggestions = []
+        
+        # Basic suggestions based on environment type
+        env_type = environment.get('type', 'node')
+        if env_type == 'react':
+            suggestions.extend([
+                "Set up React development server with hot reload",
+                "Configure ESLint and Prettier for code quality",
+                "Add TypeScript support for better type safety"
+            ])
+        elif env_type == 'node':
+            suggestions.extend([
+                "Initialize package.json with npm init",
+                "Set up Express.js server for backend API",
+                "Configure nodemon for automatic restarts"
+            ])
+        elif env_type == 'python':
+            suggestions.extend([
+                "Create virtual environment with venv",
+                "Set up Flask or FastAPI for web development",
+                "Configure pytest for testing"
+            ])
+        
+        # Get memory-based suggestions if Mem0 is available
+        if self.mem0_manager:
+            try:
+                memory_suggestions = await self._get_memory_based_suggestions(environment)
+                suggestions.extend(memory_suggestions)
+            except Exception as e:
+                logger.error(f"Error getting memory-based suggestions: {e}")
+        
+        return suggestions[:5]  # Limit to 5 suggestions
+    
+    async def _get_memory_based_suggestions(self, environment: Dict) -> List[str]:
+        """Get suggestions based on past interactions stored in Mem0"""
+        if not self.mem0_manager:
+            return []
+        
+        try:
+            # Search for related memories
+            search_query = f"DevSandbox {environment.get('type')} development"
+            memories = await self.mem0_manager.search_conversations(search_query, limit=3)
+            
+            suggestions = []
+            for memory in memories:
+                # Extract actionable suggestions from past interactions
+                if isinstance(memory, dict):
+                    content = memory.get('content', '')
+                else:
+                    content = str(memory) if memory else ''
+                
+                if 'install' in content.lower():
+                    suggestions.append("Consider installing commonly used packages")
+                elif 'configure' in content.lower():
+                    suggestions.append("Set up environment configuration files")
+                elif 'test' in content.lower():
+                    suggestions.append("Add testing framework and initial tests")
+            
+            return suggestions
+            
+        except Exception as e:
+            logger.error(f"Error getting memory-based suggestions: {e}")
+            return []
 
 class CloudDevSandboxManager:
     def __init__(self):
@@ -64,7 +245,7 @@ class CloudDevSandboxManager:
         else:
             print("⚠️ No cloud providers configured - will use local fallback mode")
     
-    async def create_environment(self, env_config: Dict[str, Any], template: str = None) -> Dict[str, Any]:
+    async def create_environment(self, env_config: Dict[str, Any], template: Optional[str] = None) -> Dict[str, Any]:
         """Create a new cloud development environment"""
         env_id = env_config.get('id', str(uuid.uuid4()))
         env_type = env_config.get('type', 'node')
@@ -382,7 +563,7 @@ app.get('/api/health', (req, res) => {
 });
 
 app.listen(port, () => {
-  console.log(\`Server running on port \${port}\`);
+  console.log(`Server running on port ${port}`);
 });''',
                 "public/index.html": '''<!DOCTYPE html>
 <html>
