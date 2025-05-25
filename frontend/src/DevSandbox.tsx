@@ -93,6 +93,7 @@ const DevSandbox: React.FC = () => {
   const [leftPanelWidth, setLeftPanelWidth] = useState(300);
   const [bottomPanelHeight, setBottomPanelHeight] = useState(200);
   const [showChat, setShowChat] = useState(true);
+  const [chatPanelWidth, setChatPanelWidth] = useState(400);
   
   // ==================== MAMA BEAR CHAT STATE ====================
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -100,12 +101,90 @@ const DevSandbox: React.FC = () => {
   const [isChatLoading, setIsChatLoading] = useState(false);
 
   // ==================== RESIZE HANDLERS ====================
+  const [isResizing, setIsResizing] = useState(false);
+  
   const handleLeftPanelResize = (newWidth: number) => {
-    setLeftPanelWidth(Math.max(200, Math.min(500, newWidth)));
+    setLeftPanelWidth(Math.max(200, Math.min(600, newWidth)));
   };
 
   const handleBottomPanelResize = (newHeight: number) => {
-    setBottomPanelHeight(Math.max(150, Math.min(400, newHeight)));
+    setBottomPanelHeight(Math.max(150, Math.min(500, newHeight)));
+  };
+
+  const handleChatPanelResize = (newWidth: number) => {
+    setChatPanelWidth(Math.max(300, Math.min(600, newWidth)));
+  };
+
+  const startVerticalResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    
+    const startX = e.clientX;
+    const startWidth = leftPanelWidth;
+    
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const newWidth = startWidth + (moveEvent.clientX - startX);
+      handleLeftPanelResize(newWidth);
+    };
+    
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.body.classList.remove('resizing');
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+    
+    document.body.classList.add('resizing');
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const startHorizontalResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    
+    const startY = e.clientY;
+    const startHeight = bottomPanelHeight;
+    
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const newHeight = startHeight + (startY - moveEvent.clientY);
+      handleBottomPanelResize(newHeight);
+    };
+    
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.body.classList.remove('resizing');
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+    
+    document.body.classList.add('resizing');
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const startChatResize = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    
+    const startX = e.clientX;
+    const startWidth = chatPanelWidth;
+    
+    const handleMouseMove = (moveEvent: MouseEvent) => {
+      const newWidth = startWidth + (startX - moveEvent.clientX);
+      handleChatPanelResize(newWidth);
+    };
+    
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.body.classList.remove('resizing');
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+    
+    document.body.classList.add('resizing');
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
   };
 
   // ==================== CHAT FUNCTIONS ====================
@@ -862,24 +941,9 @@ const DevSandbox: React.FC = () => {
 
         {/* Resize Handle */}
         <div 
-          className="resize-handle vertical"
-          onMouseDown={(e) => {
-            const startX = e.clientX;
-            const startWidth = leftPanelWidth;
-            
-            const handleMouseMove = (moveEvent: MouseEvent) => {
-              const newWidth = startWidth + (moveEvent.clientX - startX);
-              handleLeftPanelResize(newWidth);
-            };
-            
-            const handleMouseUp = () => {
-              document.removeEventListener('mousemove', handleMouseMove);
-              document.removeEventListener('mouseup', handleMouseUp);
-            };
-            
-            document.addEventListener('mousemove', handleMouseMove);
-            document.addEventListener('mouseup', handleMouseUp);
-          }}
+          className={`resize-handle vertical ${isResizing ? 'resizing' : ''}`}
+          onMouseDown={startVerticalResize}
+          title="Drag to resize file explorer"
         />
 
         {/* Main Content Area */}
@@ -954,81 +1018,89 @@ const DevSandbox: React.FC = () => {
 
             {/* Mama Bear Chat Panel */}
             {showChat && (
-              <div className="chat-panel">
-                <div className="chat-header">
-                  <h3>🐻 Mama Bear Assistant</h3>
-                  <div className="chat-controls">
-                    <button onClick={() => setShowChat(false)} title="Hide Chat">📖</button>
-                    <button onClick={() => setChatMessages([])} title="Clear Chat">🗑️</button>
-                  </div>
-                </div>
-                
-                <div className="chat-messages">
-                  {chatMessages.length === 0 ? (
-                    <div className="chat-welcome">
-                      <div className="welcome-icon">🐻</div>
-                      <h4>Welcome to your Development Sanctuary!</h4>
-                      <p>I'm Mama Bear, your AI development assistant. I can help you:</p>
-                      <ul>
-                        <li>🏗️ Create and manage development environments</li>
-                        <li>📝 Write, debug, and optimize code</li>
-                        <li>🔧 Run terminal commands and manage projects</li>
-                        <li>🚀 Deploy applications and manage infrastructure</li>
-                        <li>💡 Provide coding tips and best practices</li>
-                      </ul>
-                      <p>Just ask me anything about your project!</p>
+              <>
+                {/* Chat Resize Handle */}
+                <div 
+                  className={`resize-handle vertical ${isResizing ? 'resizing' : ''}`}
+                  onMouseDown={startChatResize}
+                  title="Drag to resize chat panel"
+                />
+                <div className="chat-panel" style={{ width: chatPanelWidth }}>
+                  <div className="chat-header">
+                    <h3>🐻 Mama Bear Assistant</h3>
+                    <div className="chat-controls">
+                      <button onClick={() => setShowChat(false)} title="Hide Chat">📖</button>
+                      <button onClick={() => setChatMessages([])} title="Clear Chat">🗑️</button>
                     </div>
-                  ) : (
-                    chatMessages.map(message => (
-                      <div key={message.id} className={`chat-message ${message.role}`}>
+                  </div>
+                  
+                  <div className="chat-messages">
+                    {chatMessages.length === 0 ? (
+                      <div className="chat-welcome">
+                        <div className="welcome-icon">🐻</div>
+                        <h4>Welcome to your Development Sanctuary!</h4>
+                        <p>I'm Mama Bear, your AI development assistant. I can help you:</p>
+                        <ul>
+                          <li>🏗️ Create and manage development environments</li>
+                          <li>📝 Write, debug, and optimize code</li>
+                          <li>🔧 Run terminal commands and manage projects</li>
+                          <li>🚀 Deploy applications and manage infrastructure</li>
+                          <li>💡 Provide coding tips and best practices</li>
+                        </ul>
+                        <p>Just ask me anything about your project!</p>
+                      </div>
+                    ) : (
+                      chatMessages.map(message => (
+                        <div key={message.id} className={`chat-message ${message.role}`}>
+                          <div className="message-header">
+                            <span className="message-role">
+                              {message.role === 'user' ? '👤' : '🐻'} {message.role === 'user' ? 'You' : 'Mama Bear'}
+                            </span>
+                            <span className="message-time">
+                              {new Date(message.timestamp).toLocaleTimeString()}
+                            </span>
+                          </div>
+                          <div className="message-content">
+                            {message.content}
+                          </div>
+                          {message.environmentContext && (
+                            <div className="message-context">
+                              📁 Environment: {environments.find(e => e.id === message.environmentContext)?.name || 'Unknown'}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                    
+                    {isChatLoading && (
+                      <div className="chat-message assistant loading">
                         <div className="message-header">
-                          <span className="message-role">
-                            {message.role === 'user' ? '👤' : '🐻'} {message.role === 'user' ? 'You' : 'Mama Bear'}
-                          </span>
-                          <span className="message-time">
-                            {new Date(message.timestamp).toLocaleTimeString()}
-                          </span>
+                          <span className="message-role">🐻 Mama Bear</span>
                         </div>
                         <div className="message-content">
-                          {message.content}
-                        </div>
-                        {message.environmentContext && (
-                          <div className="message-context">
-                            📁 Environment: {environments.find(e => e.id === message.environmentContext)?.name || 'Unknown'}
+                          <div className="typing-indicator">
+                            <span></span>
+                            <span></span>
+                            <span></span>
                           </div>
-                        )}
-                      </div>
-                    ))
-                  )}
-                  
-                  {isChatLoading && (
-                    <div className="chat-message assistant loading">
-                      <div className="message-header">
-                        <span className="message-role">🐻 Mama Bear</span>
-                      </div>
-                      <div className="message-content">
-                        <div className="typing-indicator">
-                          <span></span>
-                          <span></span>
-                          <span></span>
                         </div>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                  
+                  <div className="chat-input-container">
+                    <MultimodalInput
+                      onSend={handleChatSend}
+                      placeholder="Ask Mama Bear about your development environment..."
+                      disabled={isChatLoading}
+                      value={chatInput}
+                      onChange={setChatInput}
+                      onAttachmentsChange={() => {}} // Not used in DevSandbox currently
+                      attachments={[]} // No attachments in DevSandbox currently
+                    />
+                  </div>
                 </div>
-                
-                <div className="chat-input-container">
-                  <MultimodalInput
-                    onSend={handleChatSend}
-                    placeholder="Ask Mama Bear about your development environment..."
-                    disabled={isChatLoading}
-                    value={chatInput}
-                    onChange={setChatInput}
-                    onAttachmentsChange={() => {}} // Not used in DevSandbox currently
-                    attachments={[]} // No attachments in DevSandbox currently
-                  />
-                </div>
-              </div>
+              </>
             )}
           </div>
         </div>
@@ -1036,24 +1108,9 @@ const DevSandbox: React.FC = () => {
 
       {/* Resize Handle for Bottom Panel */}
       <div 
-        className="resize-handle horizontal"
-        onMouseDown={(e) => {
-          const startY = e.clientY;
-          const startHeight = bottomPanelHeight;
-          
-          const handleMouseMove = (moveEvent: MouseEvent) => {
-            const newHeight = startHeight + (startY - moveEvent.clientY);
-            handleBottomPanelResize(newHeight);
-          };
-          
-          const handleMouseUp = () => {
-            document.removeEventListener('mousemove', handleMouseMove);
-            document.removeEventListener('mouseup', handleMouseUp);
-          };
-          
-          document.addEventListener('mousemove', handleMouseMove);
-          document.addEventListener('mouseup', handleMouseUp);
-        }}
+        className={`resize-handle horizontal ${isResizing ? 'resizing' : ''}`}
+        onMouseDown={startHorizontalResize}
+        title="Drag to resize terminal panel"
       />
 
       {/* Bottom Panel - Terminal */}
