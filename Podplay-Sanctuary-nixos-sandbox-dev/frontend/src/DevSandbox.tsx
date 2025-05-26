@@ -16,7 +16,6 @@ interface DevEnvironment {
   type: 'web' | 'python' | 'node' | 'react' | 'nextjs' | 'custom';
   status: 'creating' | 'running' | 'stopped' | 'error';
   containerId?: string;
-  workspaceId?: string; // For NixOS workspaces
   port: number;
   previewUrl: string;
   workspaceRoot: string;
@@ -24,39 +23,6 @@ interface DevEnvironment {
   environmentVariables: Record<string, string>;
   createdAt: string;
   lastAccessed: string;
-  deploymentMode?: 'local' | 'cloud' | 'nixos';
-}
-
-interface NixOSWorkspace {
-  id: string;
-  name: string;
-  status: 'creating' | 'running' | 'stopped' | 'error';
-  memoryMB: number;
-  vcpus: number;
-  sshHost?: string;
-  sshPort?: number;
-  createdAt: string;
-  lastAccessed: string;
-}
-
-interface ScoutAgentStatus {
-  isActive: boolean;
-  currentPlan?: string;
-  lastActivity: string;
-  projectId?: string;
-  totalActions: number;
-  successfulActions: number;
-  failedActions: number;
-}
-
-interface ScoutLogEntry {
-  id: string;
-  timestamp: string;
-  level: 'info' | 'warning' | 'error' | 'debug';
-  message: string;
-  projectId?: string;
-  action?: string;
-  metadata?: Record<string, any>;
 }
 
 interface FileNode {
@@ -104,9 +70,6 @@ const DevSandbox: React.FC = () => {
   const [environments, setEnvironments] = useState<DevEnvironment[]>([]);
   const [activeEnvironment, setActiveEnvironment] = useState<DevEnvironment | null>(null);
   const [showEnvironmentCreator, setShowEnvironmentCreator] = useState(false);
-
-  // ==================== NIXOS WORKSPACE STATE ====================
-  const [activeWorkspace, setActiveWorkspace] = useState<NixOSWorkspace | null>(null);
 
   // ==================== FILE SYSTEM STATE ====================
   const [fileTree, setFileTree] = useState<FileNode | null>(null);
@@ -307,7 +270,7 @@ const DevSandbox: React.FC = () => {
         }
         break;
       case 'create_environment':
-        await createLocalEnvironment(action.type, action.name, action.template);
+        await createEnvironment(action.name, action.type, action.template);
         break;
       default:
         console.log('Unknown action:', action);
@@ -375,45 +338,90 @@ const DevSandbox: React.FC = () => {
       installedPackages: [],
       environmentVariables: {},
       createdAt: new Date().toISOString(),
-      lastAccessed: new Date().toISOString(),
-      deploymentMode: 'local',
+      lastAccessed: new Date().toISOString()
     };
 
     setEnvironments(prev => [...prev, newEnv]);
 
     try {
-      // Try to create via local backend
-      const response = await fetch('http://localhost:5000/api/dev-sandbox/create-local', {
+      // Try to create via local backend first
+      const response = await fetch('http://localhost:8000/api/dev-sandbox/create-local', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           environment: newEnv,
-          template
+          template,
+          useDocker: false // Start with local mode
         })
       });
 
       if (response.ok) {
         const result = await response.json();
+        
         const updatedEnv = {
           ...newEnv,
           status: 'running' as const,
           previewUrl: `http://localhost:${newEnv.port}`,
           workspaceRoot: result.workspaceRoot || newEnv.workspaceRoot
         };
-        setEnvironments(prev => prev.map(env => env.id === newEnv.id ? updatedEnv : env));
+        
+        setEnvironments(prev => prev.map(env => 
+          env.id === newEnv.id ? updatedEnv : env
+        ));
+        
         setActiveEnvironment(updatedEnv);
         await loadFileTree(updatedEnv.id);
         await createTerminalSession(updatedEnv.id);
+        
         return updatedEnv;
       }
     } catch (error) {
-      console.warn('Local backend not available, creating offline environment');
+      console.warn('Local backend not available, falling back to Docker/offline mode');
+    }
+
+    // Fallback to Docker mode if local backend fails
+    try {
+      const dockerResponse = await fetch('http://localhost:8000/api/dev-sandbox/create-docker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          environment: newEnv,
+          template,
+          fallbackMode: true
+        })
+      });
+
+      if (dockerResponse.ok) {
+        const dockerResult = await dockerResponse.json();
+        
+        const updatedEnv = {
+          ...newEnv,
+          status: 'running' as const,
+          containerId: dockerResult.containerId,
+          previewUrl: `http://localhost:${newEnv.port}`
+        };
+        
+        setEnvironments(prev => prev.map(env => 
+          env.id === newEnv.id ? updatedEnv : env
+        ));
+        
+        setActiveEnvironment(updatedEnv);
+        await loadFileTree(updatedEnv.id);
+        await createTerminalSession(updatedEnv.id);
+        
+        return updatedEnv;
+      }
+    } catch (dockerError) {
+      console.warn('Docker fallback failed, creating offline environment');
     }
 
     // Final fallback - create offline/mock environment
     const offlineEnv = createOfflineEnvironment(newEnv, template);
-    setEnvironments(prev => prev.map(env => env.id === newEnv.id ? offlineEnv : env));
+    setEnvironments(prev => prev.map(env => 
+      env.id === newEnv.id ? offlineEnv : env
+    ));
     setActiveEnvironment(offlineEnv);
+    
     return offlineEnv;
   };
 
@@ -474,70 +482,10 @@ const DevSandbox: React.FC = () => {
     };
   };
 
-  // ==================== NIXOS WORKSPACE OPERATIONS ====================
-  
-  const loadNixosWorkspaces = async () => {
-    try {
-      const response = await fetch('http://localhost:5000/api/v1/workspaces');
-      const result = await response.json();
-      
-      if (result.success) {
-        setNixosWorkspaces(result.workspaces.map((ws: any) => ({
-          id: ws.name,
-          name: ws.name,
-          status: ws.state === 'running' ? 'running' : 
-                 ws.state === 'shut off' ? 'stopped' : 'error',
-          memoryMB: ws.memory || 1024,
-          vcpus: ws.vcpus || 2,
-          createdAt: ws.created_at || new Date().toISOString(),
-          lastAccessed: ws.last_accessed || new Date().toISOString()
-        })));
-      }
-    } catch (error) {
-      console.error('Error loading NixOS workspaces:', error);
-    }
+  const createEnvironment = async (type: string, name: string, template?: string) => {
+    // Always use local environment creation with fallbacks
+    return await createLocalEnvironment(type, name, template);
   };
-
-  const createNixosWorkspace = async (name: string, memoryMB: number = 1024, vcpus: number = 2) => {
-    try {
-      const response = await fetch('http://localhost:5000/api/v1/workspaces', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, memory_mb: memoryMB, vcpus })
-      });
-      
-      const result = await response.json();
-      if (result.success) {
-        await loadNixosWorkspaces();
-        return result.workspace_id;
-      } else {
-        throw new Error(result.error);
-      }
-    } catch (error) {
-      console.error('Error creating NixOS workspace:', error);
-      throw error;
-    }
-  };
-
-  const startNixosWorkspace = async (workspaceId: string) => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/v1/workspaces/${workspaceId}/start`, {
-        method: 'POST'
-      });
-      
-      const result = await response.json();
-      if (result.success) {
-        await loadNixosWorkspaces();
-      } else {
-        throw new Error(result.error);
-      }
-    } catch (error) {
-      console.error('Error starting NixOS workspace:', error);
-      throw error;
-    }
-  };
-
-  // ==================== FILE SYSTEM OPERATIONS ====================
 
   const stopEnvironment = async (environmentId: string) => {
     try {
@@ -711,7 +659,7 @@ const DevSandbox: React.FC = () => {
   const setupTerminalWebSocket = (_sessionId: string) => {
     // Initialize Socket.IO connection if not already established
     if (!socketRef.current) {
-      socketRef.current = io('http://localhost:5000');
+      socketRef.current = io('http://localhost:8000');
       
       socketRef.current.on('connect', () => {
         console.log('Connected to terminal server');
@@ -1278,7 +1226,7 @@ const DevSandbox: React.FC = () => {
       {showEnvironmentCreator && (
         <EnvironmentCreator
           onClose={() => setShowEnvironmentCreator(false)}
-          onCreate={createLocalEnvironment}
+          onCreate={createEnvironment}
         />
       )}
     </div>
@@ -1332,14 +1280,14 @@ const FileTreeNode: React.FC<FileTreeNodeProps> = ({ node, onFileClick, onCreate
 
 interface EnvironmentCreatorProps {
   onClose: () => void;
-  onCreate: (type: string, name: string, template?: string, deploymentMode?: 'local' | 'cloud' | 'nixos') => void;
+  onCreate: (type: string, name: string, template?: string) => void;
 }
 
 const EnvironmentCreator: React.FC<EnvironmentCreatorProps> = ({ onClose, onCreate }) => {
   const [envType, setEnvType] = useState('react');
   const [envName, setEnvName] = useState('');
   const [template, setTemplate] = useState('');
-  const [deploymentMode, setDeploymentMode] = useState<'local' | 'cloud' | 'nixos'>('local');
+  const [deploymentMode, setDeploymentMode] = useState<'local' | 'docker' | 'cloud'>('local');
   const [isCreating, setIsCreating] = useState(false);
 
   const templates = {
@@ -1358,18 +1306,18 @@ const EnvironmentCreator: React.FC<EnvironmentCreatorProps> = ({ onClose, onCrea
       cons: ['Limited isolation', 'Requires local dependencies']
     },
     {
+      mode: 'docker' as const,
+      title: '🐳 Docker Container',
+      description: 'Isolated environment with Docker',
+      pros: ['Full isolation', 'Consistent environments', 'Easy cleanup'],
+      cons: ['Requires Docker', 'Slightly slower']
+    },
+    {
       mode: 'cloud' as const,
       title: '☁️ Cloud Environment',
       description: 'GitHub Codespaces or StackBlitz',
       pros: ['Accessible anywhere', 'Powerful cloud resources', 'No local setup'],
       cons: ['Requires internet', 'May have usage limits']
-    },
-    {
-      mode: 'nixos' as const,
-      title: '❄️ NixOS Virtual Machine',
-      description: 'Reproducible NixOS VM environment',
-      pros: ['Fully reproducible', 'Isolated VM', 'SSH access', 'Persistent workspace'],
-      cons: ['Requires NixOS backend', 'VM startup time', 'Resource intensive']
     }
   ];
 
@@ -1377,7 +1325,7 @@ const EnvironmentCreator: React.FC<EnvironmentCreatorProps> = ({ onClose, onCrea
     if (envName.trim()) {
       setIsCreating(true);
       try {
-        await onCreate(envType, envName.trim(), template, deploymentMode);
+        await onCreate(envType, envName.trim(), template);
         onClose();
       } catch (error) {
         console.error('Failed to create environment:', error);

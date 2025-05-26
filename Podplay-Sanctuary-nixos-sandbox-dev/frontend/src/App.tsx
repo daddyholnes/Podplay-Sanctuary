@@ -152,9 +152,9 @@ const BackendConnectionManager: React.FC<{
   useEffect(() => {
     // Auto-detect backend on startup
     const urls = [
-      'http://localhost:5000',
-      API_BASE_URL,
-      'http://127.0.0.1:5000'
+      'http://localhost:8000',
+      'API_BASE_URL',
+      'http://127.0.0.1:8000'
     ];
 
     const tryUrls = async () => {
@@ -209,7 +209,7 @@ const BackendConnectionManager: React.FC<{
               type="url"
               value={backendUrl}
               onChange={(e) => setBackendUrl(e.target.value)}
-              placeholder="http://localhost:5000"
+              placeholder="http://localhost:8000"
             />
           </label>
           <button onClick={() => checkBackendConnection(backendUrl)}>
