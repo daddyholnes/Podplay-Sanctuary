@@ -2907,9 +2907,11 @@ if __name__ == '__main__':
     print("📊 API endpoints ready for DevSandbox, Mama Bear, and Vertex Garden")
     print("🔧 Press Ctrl+C to stop the server\n")
     
+    # Allow port override via environment variable
+    port = int(os.environ.get('SANCTUARY_PORT', 5001))
     app.run(
         host='0.0.0.0',
-        port=5000,
+        port=port,
         debug=True,
         threaded=True
     )
