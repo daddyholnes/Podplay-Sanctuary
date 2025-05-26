@@ -252,34 +252,16 @@ if __name__ == '__main__':
     finally:
         if executor:
             executor.close()
-```
 
-**Explanation of `ssh_executor.py`:**
+"""
+SSH Executor Module
 
-*   **Configuration:** Reads SSH username and private key path from environment variables.
-*   **`SSHExecutorError`:** Custom exception class.
-*   **`SSHExecutor` Class:**
-    *   **`__init__` & `_connect()`:** Establishes an SSH connection using `paramiko`.
-        *   Uses key-based authentication (RSA key assumed, can be extended for Ed25519 etc.).
-        *   `AutoAddPolicy` is used for host keys; for production, loading known host keys is safer.
-    *   **`transfer_file()`:** Uploads a local file to the remote VM using `scp.SCPClient`.
-    *   **`retrieve_file()`:** Downloads a remote file from the VM using `scp.SCPClient`. Includes basic error handling for empty/missing files.
-    *   **`execute_command()`:**
-        *   Executes a given command string on the remote VM.
-        *   **Crucially, it prepends the user's command with the `timeout` utility** (e.g., `timeout --kill-after={timeout+5}s {timeout_duration}s {user_command}`). This ensures the command execution within the VM is time-limited. The `--kill-after` provides a grace period before sending SIGKILL if SIGTERM (default for `timeout`) isn't effective.
-        *   Uses `client.exec_command()` which has its own channel-level timeout. This acts as a safety net for the SSH operation itself.
-        *   Reads `stdout`, `stderr`, and retrieves the `exit_status`.
-        *   Checks for specific exit codes from the `timeout` utility (124 for timeout, 137 if killed) and augments `stderr` if so.
-    *   **`close()`:** Closes the SSH connection.
-*   **Example Usage (`if __name__ == '__main__':`)**:
-    *   Provides a way to test the `SSHExecutor` directly if a test VM's IP and SSH key are configured via environment variables (`NIXOS_TEST_VM_IP`, `NIXOS_VM_SSH_KEY_PATH`).
-    *   Includes tests for file transfer, command execution, and command timeout.
-    *   **Note:** This direct test block requires a running VM accessible via SSH with the configured user and public key.
+This module provides SSH functionality for executing commands and transferring files to remote VMs.
+It's designed to work with NixOS VMs and includes features like command timeouts and file transfers.
 
-**Dependencies to add to `requirements.txt` (or equivalent):**
-
-*   `libvirt-python`
-*   `paramiko`
-*   `scp`
-
-This `ssh_executor.py` module, combined with `vm_manager.py`, provides the core building blocks for interacting with the NixOS VMs. The next step will be to create an orchestration layer that uses these two modules to manage the end-to-end code execution lifecycle.
+Key Features:
+- SSH connection management with key-based authentication
+- File transfer capabilities (upload/download)
+- Command execution with timeouts
+- Error handling and logging
+"""

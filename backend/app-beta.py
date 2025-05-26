@@ -11,83 +11,14 @@ Enhanced with:
 - Together.ai for VM sandbox capabilities
 """
 
+# Load environment variables at the very beginning to ensure they're available
+# for all imports that might need them
 import os
-import sys
-import logging
 from dotenv import load_dotenv
 
-# --- Dotenv loading (ensure this is at the very top) ---
+# Prioritize .env.local for development secrets, then fall back to .env
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env.local'))
 load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
-# --- End Dotenv loading ---
-
-# --- Configure logging for the sanctuary FIRST ---
-logging.basicConfig(
-    level=logging.INFO,  # Default level, can be overridden by env var later in main block
-    format='🐻 Mama Bear: %(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('mama_bear.log'),  # Ensure this path is writable
-        logging.StreamHandler(sys.stdout)
-    ]
-)
-logger = logging.getLogger(__name__)  # Get the logger for this module
-# --- End Logger Setup ---
-
-# --- Standard Library Imports (alphabetical order) ---
-import asyncio
-import atexit
-from contextlib import contextmanager
-from dataclasses import dataclass, asdict
-from datetime import datetime, timedelta
-from enum import Enum
-import json
-import sqlite3
-import subprocess
-import threading
-import time
-from typing import Dict, List, Optional, Any, Tuple, Union
-import uuid  # For job/workspace IDs
-# --- End Standard Library Imports ---
-
-# --- External Dependency Imports (alphabetical order) ---
-from flask import Flask, request, jsonify, render_template, send_from_directory, Response, make_response
-from flask_socketio import SocketIO, emit, join_room, leave_room, Namespace
-from flask_cors import CORS
-import requests
-# --- End External Dependency Imports ---
-
-# --- Capability Imports with Error Handling ---
-# Mem0.ai for memory and RAG
-try:
-    from mem0 import MemoryClient
-    MEM0_AVAILABLE = True
-except ImportError:
-    MEM0_AVAILABLE = False
-    MemoryClient = None
-    logger.warning("Mem0.ai client not available. Some features will be disabled.")
-
-# Together.ai for VM sandbox
-try:
-    import together
-    TOGETHER_AVAILABLE = True
-except ImportError:
-    TOGETHER_AVAILABLE = False
-    together = None
-    logger.warning("Together.ai client not available. VM sandbox features will be disabled.")
-
-# NixOS Infrastructure Imports
-try:
-    from nixos_sandbox_orchestrator import NixOSSandboxOrchestrator, Job
-    from vm_manager import LibvirtManager, VMManagerError
-    from scout_logger import ScoutLogManager
-    from ssh_bridge import VMSSHBridge, SSHBridgeError
-    NIXOS_INFRASTRUCTURE_AVAILABLE = True
-    logger.info("Successfully imported NixOS infrastructure modules.")
-except ImportError as e:
-    NIXOS_INFRASTRUCTURE_AVAILABLE = False
-    NixOSSandboxOrchestrator = Job = LibvirtManager = VMManagerError = None
-    ScoutLogManager = VMSSHBridge = SSHBridgeError = None
-    logger.warning(f"NixOS infrastructure core modules not available or import error: {e}", exc_info=True)
 
 import asyncio
 import json
@@ -98,17 +29,17 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import requests
 from dataclasses import dataclass, asdict
+import together
 from enum import Enum
 import sqlite3
 from contextlib import contextmanager
 import threading
 import time
-import atexit
-import uuid
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room, leave_room
+from dotenv import load_dotenv
 
 # Enhanced Mama Bear Capabilities
 try:
@@ -117,48 +48,6 @@ try:
 except ImportError:
     MEM0_AVAILABLE = False
     MemoryClient = None
-
-# --- NixOS Infrastructure Imports ---
-try:
-    from nixos_sandbox_orchestrator import NixOSSandboxOrchestrator, Job
-    from vm_manager import LibvirtManager, VMManagerError
-    from scout_logger import ScoutLogManager
-    from ssh_bridge import VMSSHBridge, SSHBridgeError
-    NIXOS_INFRASTRUCTURE_AVAILABLE = True
-    logger.info("Successfully imported NixOS infrastructure modules.")
-except ImportError as e:
-    NIXOS_INFRASTRUCTURE_AVAILABLE = False
-    logger.warning(f"NixOS infrastructure core modules not available or import error: {e}", exc_info=True)
-
-# Initialize Flask app and SocketIO
-app = Flask(__name__)
-
-# Enable CORS for all routes with proper preflight handling
-cors = CORS(app, resources={
-    r"/*": {
-        "origins": ["http://localhost:5173", "http://127.0.0.1:5173"],
-        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-        "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
-        "expose_headers": ["Content-Type", "X-Total-Count"],
-        "supports_credentials": True,
-        "max_age": 600  # 10 minutes
-    }
-})
-
-# Add CORS headers to all responses
-# Remove after_request CORS code and rely on Flask-CORS
-
-from flask_cors import CORS
-
-CORS(app, origins=["http://localhost:5173"], supports_credentials=True)
-
-@app.route('/api/mama-bear/chat', methods=['POST'])
-def chat():
-    pass  # TODO: Implement POST logic here
-
-# All custom after_request and OPTIONS handlers removed. CORS is now handled globally and automatically.
-
-socketio = SocketIO(app, cors_allowed_origins="*")
 
 try:
     import together
@@ -1188,49 +1077,47 @@ if MEM0_CHAT_AVAILABLE and mem0_chat_manager:
 logger.info("🐻 Mama Bear Sanctuary - All systems initialized!")
 
 # ==================== NIXOS VM INFRASTRUCTURE SETUP ====================
+
+# Initialize NixOS Ephemeral Sandbox Orchestrator
 nixos_ephemeral_orchestrator = None
+if NIXOS_INFRASTRUCTURE_AVAILABLE and os.getenv("ENABLE_NIXOS_SANDBOX", "false").lower() == "true":
+    try:
+        nixos_ephemeral_orchestrator = NixOSSandboxOrchestrator()
+        logger.info("🚀 NixOS Ephemeral Sandbox Orchestrator initialized and enabled.")
+        
+        def shutdown_ephemeral_orchestrator():
+            if nixos_ephemeral_orchestrator:
+                logger.info("Flask app exiting, shutting down NixOS Ephemeral Orchestrator...")
+                nixos_ephemeral_orchestrator.shutdown()
+        import atexit
+        atexit.register(shutdown_ephemeral_orchestrator)
+    except Exception as e:
+        logger.error(f"Failed to initialize NixOS Ephemeral Sandbox Orchestrator: {e}")
+        nixos_ephemeral_orchestrator = None
+else:
+    logger.info("NixOS Ephemeral Sandbox is disabled via ENABLE_NIXOS_SANDBOX environment variable.")
+
+# Initialize Libvirt Workspace Manager
 libvirt_workspace_manager = None
+if NIXOS_INFRASTRUCTURE_AVAILABLE and os.getenv("ENABLE_WORKSPACE_MANAGER", "false").lower() == "true":
+    try:
+        libvirt_workspace_manager = LibvirtManager()
+        logger.info("🛠️ Libvirt Workspace Manager initialized and enabled.")
+        
+        def close_libvirt_workspace_connection():
+            if libvirt_workspace_manager:
+                logger.info("Flask app exiting, closing Libvirt Workspace Manager connection...")
+                libvirt_workspace_manager.close_connection()
+        import atexit
+        atexit.register(close_libvirt_workspace_connection)
+    except Exception as e:
+        logger.error(f"Failed to initialize Libvirt Workspace Manager: {e}")
+        libvirt_workspace_manager = None
+else:
+    logger.info("Libvirt Workspace Manager is disabled via ENABLE_WORKSPACE_MANAGER environment variable.")
+
+# Initialize Scout Agent Logger
 scout_log_manager = None
-active_ssh_bridges: Dict[str, VMSSHBridge] = {}  # For WebSocket SSH bridge
-
-if NIXOS_INFRASTRUCTURE_AVAILABLE:
-    # Initialize NixOS Ephemeral Sandbox Orchestrator
-    if os.getenv("ENABLE_NIXOS_SANDBOX", "false").lower() == "true":
-        try:
-            nixos_ephemeral_orchestrator = NixOSSandboxOrchestrator()
-            logger.info("🚀 NixOS Ephemeral Sandbox Orchestrator initialized and enabled.")
-            atexit.register(nixos_ephemeral_orchestrator.shutdown)
-        except Exception as e:
-            logger.error(f"Failed to initialize NixOS Ephemeral Sandbox Orchestrator: {e}", exc_info=True)
-            nixos_ephemeral_orchestrator = None  # Ensure it's None if init fails
-    else:
-        logger.info("NixOS Ephemeral Sandbox disabled by ENABLE_NIXOS_SANDBOX environment variable.")
-
-    # Initialize Libvirt Workspace Manager - Make it non-blocking
-    libvirt_workspace_manager = None
-    if os.getenv("ENABLE_WORKSPACE_MANAGER", "false").lower() == "true":
-        try:
-            libvirt_workspace_manager = LibvirtManager()
-            logger.info("🛠️  Libvirt Workspace Manager initialized and enabled.")
-            atexit.register(libvirt_workspace_manager.close_connection)
-        except Exception as e:
-            logger.warning(f"⚠️  Libvirt Workspace Manager is disabled due to: {str(e)}")
-            logger.info("⚠️  Some VM-related features will be unavailable, but the core application will continue to run.")
-            libvirt_workspace_manager = None
-    else:
-        logger.info("ℹ️  Libvirt Workspace Manager is disabled by ENABLE_WORKSPACE_MANAGER environment variable.")
-
-    # Initialize Scout Agent Logger
-    if os.getenv("ENABLE_SCOUT_LOGGER", "false").lower() == "true":
-        try:
-            scout_log_manager = ScoutLogManager()  # Uses SCOUT_LOGS_DIR from its own module's config
-            logger.info("📜 Scout Agent Log Manager initialized and enabled.")
-            atexit.register(scout_log_manager.close_all_dbs)
-        except Exception as e:
-            logger.error(f"Failed to initialize Scout Log Manager: {e}", exc_info=True)
-            scout_log_manager = None  # Ensure it's None if init fails
-    else:
-        logger.info("Scout Agent Log Manager disabled by ENABLE_SCOUT_LOGGER environment variable.")
 if NIXOS_INFRASTRUCTURE_AVAILABLE and os.getenv("ENABLE_SCOUT_LOGGER", "false").lower() == "true":
     try:
         scout_log_manager = ScoutLogManager()
@@ -1422,345 +1309,55 @@ def stop_workspace(workspace_id):
         else:
             return jsonify({"success": False, "error": "Failed to stop workspace"}), 500
     except Exception as e:
+        logger.error(f"Error stopping workspace: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 # ==================== SCOUT AGENT MONITORING API ENDPOINTS ====================
 
-@app.route('/api/v1/scout_agent/status', methods=['GET'])
+@app.route('/api/v1/scout/status', methods=['GET'])
 def get_scout_status():
     """Get Scout Agent status and logs"""
     if not scout_log_manager:
-        return jsonify({
-            "success": False,
-            "error": "Scout Agent logger is not enabled or available."
-        }), 503
+        return jsonify({"success": False, "error": "Scout Agent monitoring not available."}), 503
 
     try:
-        status = scout_log_manager.get_status()
+        # Get status for default project
+        project_logger = scout_log_manager.get_project_logger("default")
+        status = project_logger.get_project_status_summary()
         return jsonify({"success": True, "status": status})
     except Exception as e:
-        logger.error(f"Error getting Scout Agent status: {e}")
+        logger.error(f"Error getting scout status: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/v1/scout_agent/logs', methods=['GET'])
+@app.route('/api/v1/scout/logs', methods=['GET'])
 def get_scout_logs():
     """Get Scout Agent logs"""
     if not scout_log_manager:
-        return jsonify({
-            "success": False,
-            "error": "Scout Agent logger is not enabled or available."
-        }), 503
+        return jsonify({"success": False, "error": "Scout Agent monitoring not available."}), 503
 
     try:
-        logs = scout_log_manager.get_recent_logs()
-        return jsonify({"success": True, "logs": logs})
+        limit = request.args.get('limit', 50, type=int)
+        project_id = request.args.get('project_id', 'default')
+        
+        # Get project logger and retrieve logs
+        project_logger = scout_log_manager.get_project_logger(project_id)
+        logs = project_logger.get_logs(limit=limit)
+        
+        return jsonify({"success": True, "logs": logs, "project_id": project_id})
     except Exception as e:
-        logger.error(f"Error getting Scout Agent logs: {e}")
+        logger.error(f"Error getting scout logs: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-# ==================== WebSocket SSH Bridge ====================
-
-@socketio.on('connect', namespace='/terminal_ws')
-def terminal_ws_connect():
-    """Handle new WebSocket connection to terminal"""
-    logger.info(f"WebSocket client connected: {request.sid} to /terminal_ws namespace.")
-    emit('terminal_ready_ack', {'message': 'Connection established to /terminal_ws. Please send workspace ID to join a specific terminal.'}, room=request.sid)
-
-@socketio.on('join_workspace_terminal', namespace='/terminal_ws')
-def terminal_ws_join_workspace(data):
-    """Join a workspace terminal session"""
-    workspace_id = data.get('workspace_id')
-    logger.info(f"Client {request.sid} attempting to join workspace terminal for: {workspace_id}")
-
-    if not workspace_id:
-        logger.warning(f"Client {request.sid} did not provide workspace_id for join_workspace_terminal.")
-        emit('terminal_error', {'error': 'Workspace ID is required to join terminal.'}, room=request.sid)
-        return
-
-    if not libvirt_workspace_manager:
-        logger.error(f"Libvirt Workspace Manager not available for client {request.sid} request for workspace {workspace_id}.")
-        emit('terminal_error', {'error': 'Workspace manager service is not available on the server.'}, room=request.sid)
-        return
-
-    try:
-        details = libvirt_workspace_manager.get_domain_details(workspace_id)
-        if not details:
-            logger.warning(f"Workspace {workspace_id} not found for client {request.sid}.")
-            emit('terminal_error', {'error': f'Workspace {workspace_id} not found.'}, room=request.sid)
-            return
-        if not details.get('ip_address'):
-            logger.warning(f"IP address for workspace {workspace_id} not available (client {request.sid}). VM might be off or agent issues.")
-            emit('terminal_error', {'error': f'IP address for workspace {workspace_id} not available. Is the workspace running?'}, room=request.sid)
-            return
-        if not details.get('status') == 'running':
-            logger.warning(f"Workspace {workspace_id} is not running (client {request.sid}). Current status: {details.get('status')}")
-            emit('terminal_error', {'error': f'Workspace {workspace_id} is not currently running.'}, room=request.sid)
-            return
-
-        # Create and store the SSH bridge instance
-        bridge = VMSSHBridge(host_ip=details['ip_address'])
-        active_ssh_bridges[request.sid] = bridge
-        
-        def emit_output_for_sid(sid, current_bridge_instance, ws_id_for_log):
-            logger.info(f"Starting output emit thread for SID: {sid}, Workspace: {ws_id_for_log}")
-            try:
-                while current_bridge_instance.is_active():
-                    output = current_bridge_instance.get_output(timeout=0.1)
-                    if output is None:
-                        logger.info(f"Bridge stream explicitly ended for SID: {sid}, Workspace: {ws_id_for_log}")
-                        socketio.emit('terminal_closed', {'message': 'SSH session ended.'}, namespace='/terminal_ws', room=sid)
-                        break 
-                    if output:
-                        socketio.emit('terminal_out', {'output': output}, namespace='/terminal_ws', room=sid)
-                    
-                    if not current_bridge_instance.is_active():
-                        logger.info(f"Bridge became inactive for SID: {sid}, Workspace: {ws_id_for_log}. Exiting emit loop.")
-                        socketio.emit('terminal_closed', {'message': 'SSH bridge became inactive.'}, namespace='/terminal_ws', room=sid)
-                        break
-                    socketio.sleep(0.02)
-                
-                if not output and current_bridge_instance.is_active():
-                    logger.warning(f"Emit loop for SID {sid} exited while bridge still claims active.")
-                elif not current_bridge_instance.is_active() and output is not None:
-                    logger.info(f"Bridge for SID {sid} became inactive, ensuring terminal_closed is emitted.")
-                    socketio.emit('terminal_closed', {'message': 'SSH bridge was closed.'}, namespace='/terminal_ws', room=sid)
-
-            except Exception as e_thread:
-                logger.error(f"Exception in terminal output thread for SID {sid}, Workspace {ws_id_for_log}: {e_thread}", exc_info=True)
-                try:
-                    socketio.emit('terminal_error', {'error': f'Terminal bridge output error: {str(e_thread)}'}, namespace='/terminal_ws', room=sid)
-                except Exception as e_emit_err:
-                    logger.error(f"Failed to emit terminal_error to SID {sid} (client likely disconnected): {e_emit_err}")
-            finally:
-                if sid in active_ssh_bridges:
-                    logger.info(f"Output thread for SID {sid} (Workspace {ws_id_for_log}) is terminating. Cleaning up bridge.")
-                    active_ssh_bridges[sid].close()
-                    del active_ssh_bridges[sid]
-                else:
-                    logger.info(f"Output thread for SID {sid} (Workspace {ws_id_for_log}) ended, bridge already cleaned up.")
-
-        socketio.start_background_task(emit_output_for_sid, request.sid, bridge, workspace_id)
-        emit('terminal_ready', {'message': f'SSH bridge to workspace {workspace_id} is ready.'}, room=request.sid)
-        logger.info(f"SSH Bridge created and output thread started for client {request.sid} to workspace {workspace_id}")
-
-    except SSHBridgeError as e:
-        logger.error(f"Failed to create SSH bridge for workspace {workspace_id} (Client SID: {request.sid}): {e}", exc_info=True)
-        emit('terminal_error', {'error': f'Failed to connect to workspace terminal: {str(e)}'}, room=request.sid)
-    except VMManagerError as e:
-        logger.error(f"VMManagerError for workspace {workspace_id} (Client SID: {request.sid}): {e}", exc_info=True)
-        emit('terminal_error', {'error': f'Workspace error: {str(e)}'}, room=request.sid)
-    except Exception as e:
-        logger.error(f"Unexpected error during 'join_workspace_terminal' for {workspace_id} (Client SID: {request.sid}): {e}", exc_info=True)
-        emit('terminal_error', {'error': 'An unexpected server error occurred while setting up the terminal.'}, room=request.sid)
-
-@socketio.on('terminal_in', namespace='/terminal_ws')
-def terminal_ws_input(data):
-    """Handle terminal input from WebSocket client"""
-    sid = request.sid
-    bridge = active_ssh_bridges.get(sid)
-    terminal_input_data = data.get('input')
-
-    if bridge and bridge.is_active():
-        if terminal_input_data is not None:
-            try:
-                bridge.send_input(terminal_input_data)
-            except SSHBridgeError as e:
-                logger.error(f"SSHBridgeError on send_input for SID {sid}: {e}")
-                emit('terminal_error', {'error': f'Error sending input to terminal: {str(e)}'}, room=sid)
-                if sid in active_ssh_bridges:
-                    active_ssh_bridges[sid].close()
-                    del active_ssh_bridges[sid]
-    elif not bridge:
-        logger.warning(f"terminal_in event from {sid}: No active SSH bridge found for this session.")
-        emit('terminal_error', {'error': 'No active SSH session. Please try rejoining.'}, room=sid)
-
-@socketio.on('terminal_resize', namespace='/terminal_ws')
-def terminal_ws_resize(data):
-    """Handle terminal resize event"""
-    sid = request.sid
-    bridge = active_ssh_bridges.get(sid)
-    if bridge and bridge.is_active():
-        cols = data.get('cols')
-        rows = data.get('rows')
-        if isinstance(cols, int) and isinstance(rows, int):
-            try:
-                bridge.resize_pty(cols=cols, rows=rows)
-            except SSHBridgeError as e:
-                logger.error(f"SSHBridgeError on resize_pty for SID {sid}: {e}")
-                emit('terminal_error', {'error': f'Error resizing terminal: {str(e)}'}, room=sid)
-            except Exception as e_resize:
-                logger.error(f"Unexpected error on resize_pty for SID {sid}: {e_resize}", exc_info=True)
-                emit('terminal_error', {'error': f'Unexpected error resizing terminal: {str(e_resize)}'}, room=sid)
-        else:
-            logger.warning(f"Invalid resize parameters from {sid}: cols={cols}, rows={rows}")
-            emit('terminal_error', {'error': 'Invalid resize parameters (cols and rows must be integers).'}, room=sid)
-    elif not bridge:
-        logger.warning(f"terminal_resize event from {sid}: No active SSH bridge.")
-        emit('terminal_error', {'error': 'No active SSH session for resize.'}, room=sid)
-
-@socketio.on('disconnect', namespace='/terminal_ws')
-def terminal_ws_disconnect():
-    """Handle WebSocket disconnection"""
-    sid = request.sid
-    bridge = active_ssh_bridges.pop(sid, None)
-    if bridge:
-        logger.info(f"WebSocket client {sid} disconnected from /terminal_ws. Closing associated SSH bridge.")
-        bridge.close()
-    else:
-        logger.info(f"WebSocket client {sid} disconnected from /terminal_ws. No active SSH bridge found for this SID.")
-
-# ==================== API ENDPOINTS ====================
-
-# MCP Management Endpoints
-@app.route('/api/mcp/manage', methods=['GET'])
-def get_mcp_servers():
-    """Get list of MCP servers"""
-    try:
-        # Return a mock response for now
-        return jsonify({
-            "servers": [
-                {
-                    "id": "filesystem",
-                    "name": "File System",
-                    "description": "Access to local file system",
-                    "status": "active"
-                },
-                {
-                    "id": "git",
-                    "name": "Git",
-                    "description": "Git version control integration",
-                    "status": "active"
-                }
-            ]
-        }), 200
-    except Exception as e:
-        logger.error(f"Error getting MCP servers: {e}")
-        return jsonify({"error": "Failed to get MCP servers"}), 500
-
-@app.route('/api/mcp/discover', methods=['GET'])
-def discover_mcp_servers():
-    """Discover available MCP servers"""
-    try:
-        project_type = request.args.get('project_type', 'general')
-        # Return a mock response for now
-        return jsonify({
-            "servers": [
-                {
-                    "id": "postgresql",
-                    "name": "PostgreSQL",
-                    "description": "PostgreSQL database server",
-                    "category": "database",
-                    "recommended": project_type in ["web_development", "data_analysis"]
-                },
-                {
-                    "id": "playwright",
-                    "name": "Playwright",
-                    "description": "Browser automation for testing",
-                    "category": "testing",
-                    "recommended": project_type in ["web_development"]
-                }
-            ]
-        }), 200
-    except Exception as e:
-        logger.error(f"Error discovering MCP servers: {e}")
-        return jsonify({"error": "Failed to discover MCP servers"}), 500
-
-# Root endpoint for health checks
-@app.route('/', methods=['GET'])
-def health_check():
-    """Health check endpoint"""
-    return jsonify({
-        "status": "ok",
-        "service": "Podplay Backend",
-        "version": "1.0.0"
-    }), 200
-
-# Mama Bear Endpoints
-@app.route('/api/mama-bear/briefing', methods=['GET'])
-def get_daily_briefing():
-    """Get Mama Bear's daily briefing"""
-    try:
-        # Create a mock briefing for now
-        briefing = {
-            "date": datetime.utcnow().isoformat(),
-            "new_mcp_tools": [],
-            "updated_models": [],
-            "project_priorities": ["Set up your first project", "Explore MCP tools", "Configure your environment"],
-            "recommendations": ["Start with a simple project to explore the features"],
-            "system_status": {
-                "status": "healthy",
-                "message": "All systems operational"
-            }
-        }
-        return jsonify(briefing), 200
-    except Exception as e:
-        logger.error(f"Error generating briefing: {e}")
-        return jsonify({"error": "Failed to generate briefing"}), 500
-
-@app.route('/api/vertex-garden/chat-history', methods=['GET'])
-def get_chat_history():
-    """Get chat history"""
-    # Return empty array for now
-    return jsonify([]), 200
-
-@app.route('/api/vertex-garden/session/<session_id>/messages', methods=['GET'])
-def get_session_messages(session_id):
-    """Get messages for a specific session"""
-    # Return empty array for now
-    return jsonify([]), 200
-
-@app.route('/api/vertex-garden/chat', methods=['POST'])
-def chat():
-    """Handle chat messages"""
-    try:
-        data = request.get_json()
-        message = data.get('message', '')
-        
-        # Simple echo response for now
-        response = {
-            "response": f"I received your message: {message}",
-            "timestamp": datetime.utcnow().isoformat()
-        }
-        return jsonify(response), 200
-    except Exception as e:
-        logger.error(f"Error processing chat: {e}")
-        return jsonify({"error": "Failed to process chat"}), 500
-
-# ==================== MAIN APP START ====================
+# Start the Flask application
 if __name__ == '__main__':
-    # Set global logging level based on environment variable
-    log_level_str = os.getenv("LOG_LEVEL", "INFO").upper()
-    # Validate log level string
-    if log_level_str not in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]:
-        log_level_str = "INFO"  # Default to INFO if invalid
-        logger.warning(f"Invalid LOG_LEVEL '{os.getenv('LOG_LEVEL', 'INFO')}', defaulting to INFO.")
+    print("\n🚀 Starting Podplay Backend Server...")
+    print(f"🌐 Server will be available at: http://localhost:5000")
+    print("📊 API endpoints ready for DevSandbox, Mama Bear, and Vertex Garden")
+    print("🔧 Press Ctrl+C to stop the server\n")
     
-    logging.getLogger().setLevel(log_level_str)  # Set for root logger
-    # If you want Flask's own logger to also be at this level
-    app.logger.setLevel(log_level_str)
-
-    logger.info(f"Global logging level set to: {log_level_str}")
-    logger.info("🚀 Starting Podplay Backend Server with NixOS Capabilities...")
-    logger.info(f"🔧 NixOS Ephemeral Sandbox Orchestrator: {'Initialized and Enabled' if nixos_ephemeral_orchestrator else 'Disabled / Not Initialized (check ENABLE_NIXOS_SANDBOX env var and import logs)'}")
-    logger.info(f"🔧 Libvirt Workspace Manager: {'Initialized and Enabled' if libvirt_workspace_manager else 'Disabled / Not Initialized (check ENABLE_WORKSPACE_MANAGER env var and import logs)'}")
-    logger.info(f"🔧 Scout Agent Log Manager: {'Initialized and Enabled' if scout_log_manager else 'Disabled / Not Initialized (check ENABLE_SCOUT_LOGGER env var and import logs)'}")
-    
-    flask_debug_mode = os.getenv("FLASK_DEBUG", "True").lower() == "true"
-    api_host = os.getenv("API_HOST", "0.0.0.0")
-    api_port = int(os.environ.get('API_PORT', '5000'))  # Default to 5000 to match frontend
-
-    logger.info(f"Flask Debug Mode: {flask_debug_mode}, Host: {api_host}, Port: {api_port}")
-    
-    # Use socketio.run for development server with WebSocket support.
-    # For production, a proper WSGI server like Gunicorn with eventlet or gevent worker is needed.
-    try:
-        socketio.run(app, 
-                    host=api_host, 
-                    port=api_port, 
-                    debug=flask_debug_mode, 
-                    use_reloader=flask_debug_mode,  # Be cautious with reloader if background threads/processes don't clean up well
-                    allow_unsafe_werkzeug=True  # Needed for Werkzeug >= 2.3 with SocketIO dev server reloader
-                   )
-    except Exception as e_main:
-        logger.critical(f"Failed to start Flask-SocketIO server: {e_main}", exc_info=True)
-        sys.exit(1)
+    app.run(
+        host='0.0.0.0',
+        port=5000,
+        debug=True,
+        threaded=True
+    )

@@ -29,3 +29,5 @@ pytest==7.4.2
 pytest-flask==1.2.0
 black==23.9.1
 flake8==6.0.0
+Flask-SocketIO==5.3.6
+tinydb==4.8.2

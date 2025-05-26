@@ -8,8 +8,8 @@ from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass, field, asdict
 from typing import Dict, Optional, Any, Tuple
 
-from .vm_manager import LibvirtManager, VMManagerError
-from .ssh_executor import SSHExecutor, SSHExecutorError
+from vm_manager import LibvirtManager, VMManagerError
+from ssh_executor import SSHExecutor, SSHExecutorError
 
 logger = logging.getLogger(__name__)
 

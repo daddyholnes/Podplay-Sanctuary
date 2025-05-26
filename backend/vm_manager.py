@@ -31,14 +31,25 @@ class VMManagerError(Exception):
 
 class LibvirtManager:
     def __init__(self, connection_uri="qemu:///system"):
+        self.conn = None
         try:
             self.conn = libvirt.open(connection_uri)
+            if self.conn is None:
+                error_msg = "Failed to open connection to libvirt: Connection returned None"
+                logger.error(error_msg)
+                raise VMManagerError(error_msg)
+            logger.info("Successfully connected to libvirt")
+            
         except libvirt.libvirtError as e:
-            logger.error(f"Failed to connect to libvirt: {e}")
-            raise VMManagerError(f"Failed to connect to libvirt: {e}")
-        if self.conn is None: # Should be redundant if open() fails, but good practice
-            logger.error("Failed to open connection to libvirt, self.conn is None.")
-            raise VMManagerError("Failed to open connection to libvirt, self.conn is None.")
+            error_msg = f"Libvirt connection error (permission or service issue): {str(e)}. " \
+                      f"Please ensure the libvirt daemon is running and your user has proper permissions. " \
+                      f"You may need to add your user to the 'libvirt' group and restart the service."
+            logger.warning(error_msg)
+            raise VMManagerError(error_msg) from e
+        except Exception as e:
+            error_msg = f"Unexpected error connecting to libvirt: {str(e)}"
+            logger.error(error_msg, exc_info=True)
+            raise VMManagerError(error_msg) from e
 
     def _create_qcow2_image(self, image_name: str, base_image_path: Optional[str] = None, size: Optional[str] = None, target_dir: str = EPHEMERAL_VM_IMAGES_DIR) -> str:
         """
