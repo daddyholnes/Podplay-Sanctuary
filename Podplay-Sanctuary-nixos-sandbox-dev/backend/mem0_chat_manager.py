@@ -346,55 +346,5 @@ class Mem0ChatManager:
             print(f"Error saving to Mem0: {str(e)}")
             return None
 
-    async def get_all_memories(self, user_id: str = None) -> Dict[str, Any]:
-        """Get all memories for a user"""
-        try:
-            if not user_id:
-                user_id = self.base_user_id
-            
-            # Get all memories for the user
-            memories = self.client.get_all(user_id=user_id)
-            
-            return {
-                "success": True,
-                "memories": memories,
-                "count": len(memories) if memories else 0
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "memories": [],
-                "count": 0
-            }
-    
-    async def search_memories(self, query: str, user_id: str = None, limit: int = 10) -> Dict[str, Any]:
-        """Search memories using a query"""
-        try:
-            if not user_id:
-                user_id = self.base_user_id
-            
-            # Search memories using Mem0's search functionality
-            results = self.client.search(
-                query=query,
-                user_id=user_id,
-                limit=limit
-            )
-            
-            return {
-                "success": True,
-                "results": results,
-                "query": query,
-                "count": len(results) if results else 0
-            }
-        except Exception as e:
-            return {
-                "success": False,
-                "error": str(e),
-                "results": [],
-                "query": query,
-                "count": 0
-            }
-
 # Global instance
 mem0_chat_manager = Mem0ChatManager()
