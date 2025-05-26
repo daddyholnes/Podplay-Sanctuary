@@ -80,6 +80,14 @@ except ImportError:
     MEM0_CHAT_AVAILABLE = False
     mem0_chat_manager = None
 
+# NixOS Provider Detection Integration
+try:
+    from nixos_provider_detector import DevSandboxProviderDetector
+    NIXOS_PROVIDER_DETECTOR_AVAILABLE = True
+except ImportError:
+    NIXOS_PROVIDER_DETECTOR_AVAILABLE = False
+    DevSandboxProviderDetector = None
+
 # Configure logging for the sanctuary first
 logging.basicConfig(
     level=logging.INFO,
@@ -90,6 +98,17 @@ logging.basicConfig(
     ]
 )
 logger = logging.getLogger(__name__)
+
+# NixOS VM Infrastructure Imports (after logger is available)
+try:
+    from nixos_sandbox_orchestrator import NixOSSandboxOrchestrator, Job as EphemeralJob
+    from vm_manager import LibvirtManager, VMManagerError
+    from scout_logger import ScoutLogManager
+    from ssh_bridge import VMSSHBridge, SSHBridgeError
+    NIXOS_INFRASTRUCTURE_AVAILABLE = True
+except ImportError as e:
+    NIXOS_INFRASTRUCTURE_AVAILABLE = False
+    logger.warning(f"NixOS infrastructure not available: {e}")
 
 # Import agentic capabilities
 try:
@@ -605,11 +624,24 @@ class MamaBearAgent:
             system_status=system_status
         )
         
-        # Store briefing in database
+        # Store briefing in database with proper enum serialization
+        def serialize_briefing(briefing_obj):
+            """Serialize briefing with proper enum handling"""
+            briefing_dict = asdict(briefing_obj)
+            # Convert MCPCategory enum values to strings in new_mcp_tools
+            for tool in briefing_dict.get('new_mcp_tools', []):
+                if 'category' in tool and hasattr(tool['category'], 'value'):
+                    tool['category'] = tool['category'].value
+                elif 'category' in tool and tool['category']:
+                    tool['category'] = str(tool['category'])
+                else:
+                    tool['category'] = "uncategorized"
+            return briefing_dict
+        
         with self.db.get_connection() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO daily_briefings (date, briefing_data) VALUES (?, ?)",
-                (today, json.dumps(asdict(briefing)))
+                (today, json.dumps(serialize_briefing(briefing)))
             )
             conn.commit()
         
@@ -1041,6 +1073,15 @@ if DEV_SANDBOX_AVAILABLE and DevSandboxManager:
     except Exception as e:
         logger.warning(f"DevSandbox not available: {e}")
 
+# Initialize NixOS Provider Detector
+provider_detector = None
+if NIXOS_PROVIDER_DETECTOR_AVAILABLE and DevSandboxProviderDetector:
+    try:
+        provider_detector = DevSandboxProviderDetector()
+        logger.info("🔍 NixOS Provider Detector initialized")
+    except Exception as e:
+        logger.warning(f"NixOS Provider Detector not available: {e}")
+
 # Initialize Mem0 Chat Manager for global access
 mem0_manager = None
 if MEM0_CHAT_AVAILABLE and mem0_chat_manager:
@@ -1052,1852 +1093,276 @@ if MEM0_CHAT_AVAILABLE and mem0_chat_manager:
 
 logger.info("🐻 Mama Bear Sanctuary - All systems initialized!")
 
-# ==================== CORE SERVER ENDPOINTS ====================
+# ==================== NIXOS VM INFRASTRUCTURE SETUP ====================
 
-@app.route('/', methods=['GET'])
-def server_health_check():
-    """Server health check endpoint"""
+# Initialize NixOS Ephemeral Sandbox Orchestrator
+nixos_ephemeral_orchestrator = None
+if NIXOS_INFRASTRUCTURE_AVAILABLE and os.getenv("ENABLE_NIXOS_SANDBOX", "false").lower() == "true":
     try:
-        return jsonify({
-            "success": True,
-            "status": "🐻 Mama Bear's Sanctuary is operational",
-            "agent": "Enhanced Mama Bear v2.5",
-            "philosophy": "🏠 Creating calm, empowered development sanctuaries",
-            "systems": {
-                "mama_bear": ENHANCED_MAMA_AVAILABLE,
-                "mem0_chat": MEM0_CHAT_AVAILABLE,
-                "dev_sandbox": DEV_SANDBOX_AVAILABLE,
-                "agentic_dev": AGENTIC_DEV_AVAILABLE
-            },
-            "timestamp": datetime.now().isoformat()
-        })
+        nixos_ephemeral_orchestrator = NixOSSandboxOrchestrator()
+        logger.info("🚀 NixOS Ephemeral Sandbox Orchestrator initialized and enabled.")
+        
+        def shutdown_ephemeral_orchestrator():
+            if nixos_ephemeral_orchestrator:
+                logger.info("Flask app exiting, shutting down NixOS Ephemeral Orchestrator...")
+                nixos_ephemeral_orchestrator.shutdown()
+        import atexit
+        atexit.register(shutdown_ephemeral_orchestrator)
     except Exception as e:
-        logger.error(f"Error in health check: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        logger.error(f"Failed to initialize NixOS Ephemeral Sandbox Orchestrator: {e}")
+        nixos_ephemeral_orchestrator = None
+else:
+    logger.info("NixOS Ephemeral Sandbox is disabled via ENABLE_NIXOS_SANDBOX environment variable.")
 
-@app.route('/api/mcp/search', methods=['GET'])
-def search_mcp_servers():
-    """Search MCP marketplace for servers"""
+# Initialize Libvirt Workspace Manager
+libvirt_workspace_manager = None
+if NIXOS_INFRASTRUCTURE_AVAILABLE and os.getenv("ENABLE_WORKSPACE_MANAGER", "false").lower() == "true":
     try:
-        query = request.args.get('query', '')
-        category = request.args.get('category')
-        official_only = request.args.get('official_only', 'false').lower() == 'true'
+        libvirt_workspace_manager = LibvirtManager()
+        logger.info("🛠️ Libvirt Workspace Manager initialized and enabled.")
         
-        if not marketplace:
-            return jsonify({
-                "success": False,
-                "error": "MCP marketplace not available",
-                "servers": []
-            }), 503
-        
-        servers = marketplace.search_servers(query, category, official_only)
-        
-        return jsonify({
-            "success": True,
-            "servers": servers,
-            "query": query,
-            "total": len(servers)
-        })
+        def close_libvirt_workspace_connection():
+            if libvirt_workspace_manager:
+                logger.info("Flask app exiting, closing Libvirt Workspace Manager connection...")
+                libvirt_workspace_manager.close_connection()
+        import atexit
+        atexit.register(close_libvirt_workspace_connection)
     except Exception as e:
-        logger.error(f"Error searching MCP servers: {e}")
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "servers": []
-        }), 500
+        logger.error(f"Failed to initialize Libvirt Workspace Manager: {e}")
+        libvirt_workspace_manager = None
+else:
+    logger.info("Libvirt Workspace Manager is disabled via ENABLE_WORKSPACE_MANAGER environment variable.")
 
-@app.route('/api/vertex/code/execute', methods=['POST'])
-def execute_python_code():
-    """Execute Python code safely in a sandboxed environment"""
+# Initialize Scout Agent Logger
+scout_log_manager = None
+if NIXOS_INFRASTRUCTURE_AVAILABLE and os.getenv("ENABLE_SCOUT_LOGGER", "false").lower() == "true":
+    try:
+        scout_log_manager = ScoutLogManager()
+        logger.info("📜 Scout Agent Log Manager initialized and enabled.")
+        
+        def close_scout_log_dbs():
+            if scout_log_manager:
+                logger.info("Flask app exiting, closing Scout Log Manager DBs...")
+                scout_log_manager.close_all_dbs()
+        import atexit
+        atexit.register(close_scout_log_dbs)
+    except Exception as e:
+        logger.error(f"Failed to initialize Scout Log Manager: {e}")
+        scout_log_manager = None
+else:
+    logger.info("Scout Agent Log Manager is disabled via ENABLE_SCOUT_LOGGER environment variable.")
+
+# ==================== NIXOS VM SANDBOX API ENDPOINTS ====================
+
+@app.route('/api/v1/execute_python_nixos', methods=['POST'])
+def execute_python_nixos_vm():
+    """Execute Python code in a NixOS VM ephemeral sandbox"""
+    if not nixos_ephemeral_orchestrator:
+        return jsonify({
+            "success": False, 
+            "error": "NixOS ephemeral sandboxing service is not enabled or available."
+        }), 503
+
     try:
         data = request.get_json()
-        code = data.get('code', '')
-        language = data.get('language', 'python')
-        
-        if not code:
-            return jsonify({"success": False, "error": "No code provided"}), 400
-        
-        if language != 'python':
-            return jsonify({
-                "success": False,
-                "error": f"Language {language} not supported. Only Python is currently supported."
-            }), 400
-        
-        # Basic security check - prevent dangerous operations
-        dangerous_keywords = ['import os', 'import sys', 'subprocess', 'eval(', 'exec(', '__import__', 'open(']
-        for keyword in dangerous_keywords:
-            if keyword in code:
-                return jsonify({
-                    "success": False,
-                    "error": f"Code contains potentially dangerous operation: {keyword}"
-                }), 400
-        
-        # Execute code in a restricted environment
-        import io
-        import contextlib
-        from datetime import datetime
-        
-        output_buffer = io.StringIO()
-        error_buffer = io.StringIO()
-        
-        # Create a safe execution environment
-        safe_globals = {
-            '__builtins__': {
-                'print': print,
-                'len': len,
-                'str': str,
-                'int': int,
-                'float': float,
-                'bool': bool,
-                'list': list,
-                'dict': dict,
-                'tuple': tuple,
-                'set': set,
-                'range': range,
-                'enumerate': enumerate,
-                'zip': zip,
-                'map': map,
-                'filter': filter,
-                'sum': sum,
-                'max': max,
-                'min': min,
-                'abs': abs,
-                'round': round,
-                'sorted': sorted,
-                'reversed': reversed
-            }
-        }
-        
-        try:
-            with contextlib.redirect_stdout(output_buffer), contextlib.redirect_stderr(error_buffer):
-                exec(code, safe_globals)
-            
-            output = output_buffer.getvalue()
-            error = error_buffer.getvalue()
-            
-            return jsonify({
-                "success": True,
-                "output": output,
-                "error": error,
-                "code": code,
-                "language": language,
-                "timestamp": datetime.now().isoformat()
-            })
-        
-        except Exception as exec_error:
-            return jsonify({
-                "success": False,
-                "output": output_buffer.getvalue(),
-                "error": str(exec_error),
-                "code": code,
-                "language": language
-            }), 400
-    
-    except Exception as e:
-        logger.error(f"Error executing code: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        if not data:
+            return jsonify({"success": False, "error": "Invalid JSON payload"}), 400
 
-@app.route('/api/vertex-garden/execute-code', methods=['POST'])
-def execute_python_code_vertex_garden():
-    """Execute Python code safely in Vertex Garden context"""
-    try:
-        data = request.get_json()
-        code = data.get('code', '')
-        language = data.get('language', 'python')
-        session_id = data.get('session_id', '')
-        
-        if not code:
-            return jsonify({"success": False, "error": "No code provided"}), 400
-        
-        if language != 'python':
-            return jsonify({
-                "success": False,
-                "error": f"Language {language} not supported. Only Python is currently supported."
-            }), 400
-        
-        # Basic security check - prevent dangerous operations
-        dangerous_keywords = ['import os', 'import sys', 'subprocess', 'eval(', 'exec(', '__import__', 'open(']
-        for keyword in dangerous_keywords:
-            if keyword in code:
-                return jsonify({
-                    "success": False,
-                    "error": f"Code contains potentially dangerous operation: {keyword}"
-                }), 400
-        
-        # Execute code in a restricted environment
-        import io
-        import contextlib
-        from datetime import datetime
-        
-        output_buffer = io.StringIO()
-        error_buffer = io.StringIO()
-        
-        # Create a safe execution environment
-        safe_globals = {
-            '__builtins__': {
-                'print': print,
-                'len': len,
-                'str': str,
-                'int': int,
-                'float': float,
-                'bool': bool,
-                'list': list,
-                'dict': dict,
-                'tuple': tuple,
-                'set': set,
-                'range': range,
-                'enumerate': enumerate,
-                'zip': zip,
-                'map': map,
-                'filter': filter,
-                'sum': sum,
-                'max': max,
-                'min': min,
-                'abs': abs,
-                'round': round,
-                'sorted': sorted,
-                'reversed': reversed
-            }
-        }
-        
-        try:
-            with contextlib.redirect_stdout(output_buffer), contextlib.redirect_stderr(error_buffer):
-                exec(code, safe_globals)
-            
-            output = output_buffer.getvalue()
-            error = error_buffer.getvalue()
-            
-            return jsonify({
-                "success": True,
-                "output": output,
-                "error": error,
-                "code": code,
-                "language": language,
-                "session_id": session_id,
-                "timestamp": datetime.now().isoformat()
-            })
-        
-        except Exception as exec_error:
-            return jsonify({
-                "success": False,
-                "output": output_buffer.getvalue(),
-                "error": str(exec_error),
-                "code": code,
-                "language": language,
-                "session_id": session_id
-            }), 400
-    
-    except Exception as e:
-        logger.error(f"Error executing code in vertex garden: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/vertex-garden/chat', methods=['POST'])
-def vertex_garden_chat():
-    """Chat with Vertex Garden AI models with persistent memory"""
-    try:
-        data = request.get_json()
-        message = data.get('message')
-        user_id = data.get('user_id', 'nathan')
-        session_id = data.get('session_id')
-        model_id = data.get('model_id', 'gemini-2.0-flash-exp')
-        context = data.get('context', {})
-        
-        if not message:
-            return jsonify({"success": False, "error": "Message is required"}), 400
-        
-        # Generate session ID if not provided
-        if not session_id:
-            session_id = f"vertex_session_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{user_id}"
-        
-        # Use enhanced Vertex AI Mama Bear for chat
-        if enhanced_vertex_mama:
-            response_data = enhanced_vertex_mama.vertex_garden_chat(
-                message, session_id, context, user_id, model_id
-            )
-            return jsonify(response_data)
-        else:
-            # Fallback response
-            return jsonify({
-                "success": True,
-                "response": f"🤖 Vertex Garden Chat (Fallback Mode)\n\nReceived: {message}\n\nVertex AI integration not available. Please configure your credentials.",
-                "session_id": session_id,
-                "model_id": model_id,
-                "user_id": user_id,
-                "tokens_used": 0,
-                "timestamp": datetime.now().isoformat()
-            })
-            
-    except Exception as e:
-        logger.error(f"Error in Vertex Garden chat: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/vertex-garden/chat-history', methods=['GET'])
-def vertex_garden_chat_history():
-    """Get chat history for Vertex Garden"""
-    try:
-        user_id = request.args.get('user_id', 'nathan')
-        
-        # Try to get chat history from Mem0
-        if mem0_manager:
-            try:
-                memories = mem0_manager.get_all_memories(user_id)
-                
-                # Group memories by session
-                sessions = {}
-                for memory in memories:
-                    session_id = memory.get('metadata', {}).get('session_id', 'default')
-                    if session_id not in sessions:
-                        sessions[session_id] = {
-                            'id': session_id,
-                            'user_id': user_id,
-                            'created_at': memory.get('created_at'),
-                            'updated_at': memory.get('updated_at'),
-                            'messages': []
-                        }
-                    
-                    sessions[session_id]['messages'].append({
-                        'id': memory.get('id'),
-                        'content': memory.get('memory'),
-                        'timestamp': memory.get('created_at')
-                    })
-                
-                return jsonify({
-                    "success": True,
-                    "sessions": list(sessions.values()),
-                    "total_sessions": len(sessions)
-                })
-                
-            except Exception as mem_error:
-                logger.warning(f"Mem0 history retrieval failed: {mem_error}")
-        
-        # Fallback to empty history
-        return jsonify({
-            "success": True,
-            "sessions": [],
-            "total_sessions": 0,
-            "message": "No chat history available"
-        })
-        
-    except Exception as e:
-        logger.error(f"Error getting chat history: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/vertex-garden/session/<session_id>/messages', methods=['GET'])
-def get_session_messages(session_id):
-    """Get messages for a specific session"""
-    try:
-        user_id = request.args.get('user_id', 'nathan')
-        
-        # Try to get session messages from Mem0
-        if mem0_manager:
-            try:
-                memories = mem0_manager.search_memories(
-                    f"session:{session_id}", 
-                    user_id=user_id,
-                    limit=100
-                )
-                
-                messages = []
-                for memory in memories:
-                    if memory.get('metadata', {}).get('session_id') == session_id:
-                        messages.append({
-                            'id': memory.get('id'),
-                            'content': memory.get('memory'),
-                            'role': memory.get('metadata', {}).get('role', 'user'),
-                            'timestamp': memory.get('created_at'),
-                            'model_id': memory.get('metadata', {}).get('model_id')
-                        })
-                
-                # Sort by timestamp
-                messages.sort(key=lambda x: x.get('timestamp', ''))
-                
-                return jsonify({
-                    "success": True,
-                    "session_id": session_id,
-                    "messages": messages,
-                    "total_messages": len(messages)
-                })
-                
-            except Exception as mem_error:
-                logger.warning(f"Mem0 session retrieval failed: {mem_error}")
-        
-        # Fallback to empty messages
-        return jsonify({
-            "success": True,
-            "session_id": session_id,
-            "messages": [],
-            "total_messages": 0,
-            "message": "No messages found for this session"
-        })
-        
-    except Exception as e:
-        logger.error(f"Error getting session messages: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-# ==================== AGENTIC DEVSANDBOX ENDPOINTS ====================
-
-@app.route('/api/dev-sandbox/<env_id>/suggestions', methods=['GET'])
-def get_contextual_suggestions(env_id):
-    """Get contextual suggestions for the development environment"""
-    try:
-        if not dev_sandbox_manager:
-            return jsonify({"success": False, "error": "DevSandbox not available"}), 503
-        
-        if not agentic_dev_assistant:
-            return jsonify({
-                "success": True,
-                "suggestions": [
-                    "Initialize project structure",
-                    "Set up development dependencies",
-                    "Configure build tools",
-                    "Add testing framework",
-                    "Create documentation"
-                ]
-            })
-        
-        # Get environment details
-        env_result = asyncio.run(dev_sandbox_manager.get_environment(env_id))
-        if not env_result.get('success'):
-            return jsonify({"success": False, "error": "Environment not found"}), 404
-        
-        environment = env_result.get('environment')
-        if not environment:
-            return jsonify({"success": False, "error": "Environment data not found"}), 404
-        
-        # Get contextual suggestions
-        suggestions = asyncio.run(agentic_dev_assistant.get_contextual_suggestions(environment))
-        
-        return jsonify({
-            "success": True,
-            "suggestions": suggestions,
-            "environment_type": environment.get('type') if environment else None,
-            "provider": environment.get('provider') if environment else None
-        })
-        
-    except Exception as e:
-        logger.error(f"Error getting suggestions: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/dev-sandbox/<env_id>/chat', methods=['POST'])
-def chat_with_mama_bear(env_id):
-    """Chat with Mama Bear about the development environment"""
-    try:
-        if not enhanced_vertex_mama:
-            return jsonify({
-                "success": False,
-                "error": "Mama Bear not available",
-                "response": "🐻 Sorry, I need Vertex AI configuration to chat about development environments."
-            }), 503
-        
-        data = request.get_json()
-        message = data.get('message', '')
-        
-        if not message:
-            return jsonify({"success": False, "error": "Message is required"}), 400
-        
-        # Get environment context
-        env_result = asyncio.run(dev_sandbox_manager.get_environment(env_id)) if dev_sandbox_manager else None
-        environment_context = env_result.get('environment') if env_result and env_result.get('success') else {}
-        
-        # Build context for Mama Bear
-        context = {
-            "environment_id": env_id,
-            "environment": environment_context,
-            "chat_type": "dev_sandbox"
-        }
-        
-        # Get response from Mama Bear
-        response_data = enhanced_vertex_mama.mama_bear_chat(
-            message, 
-            chat_history=None, 
-            context=context, 
-            user_id="nathan"
-        )
-        
-        return jsonify({
-            "success": response_data.get('success', True),
-            "response": response_data.get('response', "🐻 I'm here to help with your development environment!"),
-            "environment_id": env_id,
-            "mama_bear_available": True,
-            "agentic_available": AGENTIC_DEV_AVAILABLE
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in Mama Bear dev chat: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/mcp/discover', methods=['GET'])
-def discover_mcp_servers():
-    """Discover trending and recommended MCP servers"""
-    try:
-        trending = marketplace.get_trending_servers(10)
-        project_type = request.args.get('project_type', 'web_development')
-        recommendations = marketplace.get_recommendations_for_project(project_type)
-        
-        return jsonify({
-            "success": True,
-            "trending": trending,
-            "recommendations": recommendations,
-            "project_type": project_type
-        })
-    except Exception as e:
-        logger.error(f"Error discovering MCP servers: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/mcp/categories', methods=['GET'])
-def get_mcp_categories():
-    """Get all MCP server categories"""
-    categories = [
-        {"value": category.value, "label": category.value.replace('_', ' ').title()}
-        for category in MCPCategory
-    ]
-    
-    return jsonify({
-        "success": True,
-        "categories": categories
-    })
-
-@app.route('/api/mcp/install', methods=['POST'])
-def install_mcp_server():
-    """Install an MCP server (Mama Bear manages this)"""
-    try:
-        data = request.get_json()
-        server_name = data.get('server_name')
-        
-        if not server_name:
-            return jsonify({"success": False, "error": "Server name required"}), 400
-        
-        # Simulate installation process
-        with db.get_connection() as conn:
-            conn.execute(
-                "UPDATE mcp_servers SET is_installed = 1, installation_status = 'installed' WHERE name = ?",
-                (server_name,)
-            )
-            conn.commit()
-        
-        # Mama Bear learns from this installation
-        mama_bear.learn_from_interaction(
-            "mcp_installation",
-            f"Installed {server_name}",
-            f"Nathan prefers {server_name} for enhanced capabilities"
-        )
-        
-        logger.info(f"🔧 Mama Bear installed MCP server: {server_name}")
-        
-        return jsonify({
-            "success": True,
-            "message": f"🐻 Mama Bear successfully installed {server_name}",
-            "server_name": server_name
-        })
-    except Exception as e:
-        logger.error(f"Error installing MCP server: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/mcp/manage', methods=['GET'])
-def manage_mcp_servers():
-    """Get installed MCP servers for management"""
-    try:
-        with db.get_connection() as conn:
-            cursor = conn.execute("SELECT * FROM mcp_servers WHERE is_installed = 1")
-            installed_servers = []
-            
-            for row in cursor.fetchall():
-                server_dict = dict(row)
-                server_dict['capabilities'] = json.loads(server_dict['capabilities'])
-                server_dict['dependencies'] = json.loads(server_dict['dependencies'])
-                server_dict['configuration_schema'] = json.loads(server_dict['configuration_schema'])
-                server_dict['tags'] = json.loads(server_dict['tags'])
-                installed_servers.append(server_dict)
-        
-        return jsonify({
-            "success": True,
-            "installed_servers": installed_servers,
-            "total_installed": len(installed_servers)
-        })
-    except Exception as e:
-        logger.error(f"Error managing MCP servers: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/mama-bear/learn', methods=['POST'])
-def mama_bear_learn():
-    """Endpoint for Mama Bear to learn from interactions"""
-    try:
-        data = request.get_json()
-        interaction_type = data.get('interaction_type')
-        context = data.get('context')
-        insight = data.get('insight')
-        
-        mama_bear.learn_from_interaction(interaction_type, context, insight)
-        
-        return jsonify({
-            "success": True,
-            "message": "🧠 Mama Bear has learned from this interaction"
-        })
-    except Exception as e:
-        logger.error(f"Error in Mama Bear learning: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/mama-bear/briefing', methods=['GET'])
-def mama_bear_briefing():
-    """Get Mama Bear's daily briefing"""
-    try:
-        # Generate daily briefing using mama bear agent
-        briefing = mama_bear.generate_daily_briefing()
-        
-        return jsonify({
-            "success": True,
-            "briefing": {
-                "id": briefing.id,
-                "date": briefing.date,
-                "summary": briefing.summary,
-                "new_tools": [
-                    {
-                        "name": tool.name,
-                        "description": tool.description,
-                        "category": tool.category,
-                        "installation_command": tool.installation_command,
-                        "is_official": tool.is_official
-                    } for tool in briefing.new_tools
-                ],
-                "updated_models": briefing.updated_models,
-                "project_priorities": [
-                    {
-                        "id": priority.id,
-                        "title": priority.title,
-                        "description": priority.description,
-                        "priority": priority.priority,
-                        "status": priority.status,
-                        "created_at": priority.created_at
-                    } for priority in briefing.project_priorities
-                ],
-                "insights": briefing.insights,
-                "recommendations": briefing.recommendations
-            },
-            "mama_bear_message": "🐻 Good morning! Here's your daily briefing to keep your sanctuary organized and productive.",
-            "timestamp": datetime.now().isoformat()
-        })
-        
-    except Exception as e:
-        logger.error(f"Error generating briefing: {e}")
-        return jsonify({
-            "success": False,
-            "error": str(e),
-            "fallback_message": "🐻 Sorry, I couldn't generate your briefing right now. Let me know if you need help with anything else!"
-        }), 500
-
-@app.route('/api/mama-bear/chat', methods=['POST'])
-def mama_bear_chat():
-    """Chat with Mama Bear - the lead developer agent (Enhanced with Vertex AI)"""
-    try:
-        data = request.get_json()
-        message = data.get('message')
-        user_id = data.get('user_id', 'nathan')
-        context = data.get('context', {})
-        
-        if not message:
-            return jsonify({"success": False, "error": "Message is required"}), 400
-        
-        # Try enhanced Vertex AI Mama Bear first
-        if enhanced_vertex_mama:
-            response_data = enhanced_vertex_mama.mama_bear_chat(
-                message, None, context, user_id
-            )
-            
-            # Add enhanced response metadata
-            response_data.update({
-                "enhanced": True,
-                "vertex_ai": True,
-                "agent": "Enhanced Mama Bear Gem"
-            })
-            
-            return jsonify(response_data)
-        else:
-            # Use Together.ai enhanced mama bear
-            response = enhanced_mama_bear.respond(message, user_id)
-            
-            # Check if Together.ai is actually working
-            has_together_ai = enhanced_mama_bear.together_client is not None
-            
-            return jsonify({
-                "success": True,
-                "response": response,
-                "enhanced": has_together_ai,
-                "vertex_ai": False,
-                "together_ai": has_together_ai,
-                "agent": "Enhanced Mama Bear with Together.ai" if has_together_ai else "Basic Mama Bear",
-                "message": "🐻 Using Together.ai integration" if has_together_ai else "🐻 Using basic mode - Together.ai not configured",
-                "timestamp": datetime.now().isoformat()
-            })
-            
-    except Exception as e:
-        logger.error(f"Error in Mama Bear chat: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/projects/priorities', methods=['GET', 'POST'])
-def manage_project_priorities():
-    """Manage project priorities"""
-    if request.method == 'GET':
-        try:
-            with db.get_connection() as conn:
-                cursor = conn.execute("SELECT * FROM project_priorities ORDER BY priority_level")
-                priorities = [dict(row) for row in cursor.fetchall()]
-            
-            return jsonify({
-                "success": True,
-                "priorities": priorities
-            })
-        except Exception as e:
-            logger.error(f"Error getting priorities: {e}")
-            return jsonify({"success": False, "error": str(e)}), 500
-    
-    elif request.method == 'POST':
-        try:
-            data = request.get_json()
-            project_name = data.get('project_name')
-            priority_level = data.get('priority_level', 1)
-            description = data.get('description', '')
-            
-            with db.get_connection() as conn:
-                conn.execute(
-                    "INSERT INTO project_priorities (project_name, priority_level, description) VALUES (?, ?, ?)",
-                    (project_name, priority_level, description)
-                )
-                conn.commit()
-            
-            return jsonify({
-                "success": True,
-                "message": f"🎯 Added priority: {project_name}"
-            })
-        except Exception as e:
-            logger.error(f"Error adding priority: {e}")
-            return jsonify({"success": False, "error": str(e)}), 500
-
-# ==================== VERTEX AI CHAT ENDPOINTS ====================
-
-@app.route('/api/vertex/models', methods=['GET'])
-def get_vertex_models():
-    """Get all available Vertex AI models"""
-    try:
-        # Try to get models from enhanced_vertex_mama first
-        if enhanced_vertex_mama:
-            models_info = enhanced_vertex_mama.list_models()
-            return jsonify(models_info)
-        
-        # Fallback: Return a static list of popular models
-        fallback_models = [
-            {
-                "name": "Gemini 2.5 Flash (002)",
-                "display_name": "Latest Gemini 2.5 Flash model with enhanced capabilities",
-                "type": "generative",
-                "capabilities": ["text", "multimodal", "fast", "latest"],
-                "pricing": "$0.04/1K tokens",
-                "is_mama_bear": True
-            },
-            {
-                "name": "Gemini Experimental 1206", 
-                "display_name": "Latest experimental Gemini model",
-                "type": "generative",
-                "capabilities": ["text", "multimodal", "experimental"],
-                "pricing": "$0.05/1K tokens",
-                "is_mama_bear": True
-            },
-            {
-                "name": "Claude 3.5 Sonnet",
-                "display_name": "Advanced reasoning and coding capabilities",
-                "type": "generative",
-                "capabilities": ["text", "reasoning", "coding", "analysis"],
-                "pricing": "$0.15/1K tokens"
-            },
-            {
-                "name": "GPT-4o",
-                "display_name": "OpenAI's flagship multimodal model",
-                "type": "generative", 
-                "capabilities": ["text", "vision", "reasoning"],
-                "pricing": "$0.15/1K tokens"
-            }
-        ]
-        
-        return jsonify({
-            "success": True,
-            "models": fallback_models,
-            "total_models": len(fallback_models),
-            "message": "🐻 Using fallback model list - full Vertex AI integration not configured",
-            "mama_bear_models": [
-                model["name"] for model in fallback_models 
-                if model.get("is_mama_bear", False)
-            ]
-        })
-        
-    except Exception as e:
-        logger.error(f"Error getting Vertex models: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/vertex/chat', methods=['POST'])
-def vertex_chat():
-    """Chat with Mama Bear using Vertex AI (primary endpoint)"""
-    try:
-        data = request.get_json()
-        message = data.get('message')
-        user_id = data.get('user_id', 'nathan')
-        session_id = data.get('session_id')
-        context = data.get('context', {})
-        
-        if not message:
-            return jsonify({"success": False, "error": "Message is required"}), 400
-        
-        if not enhanced_vertex_mama:
-            # Fallback to legacy enhanced mama bear
-            response = enhanced_mama_bear.respond(message, user_id)
-            return jsonify({
-                "success": True,
-                "response": response,
-                "model": "legacy_mama_bear",
-                "fallback": True,
-                "message": "🐻 Using fallback mode - Vertex AI not available",
-                "timestamp": datetime.now().isoformat()
-            })
-        
-        # Use session if provided, otherwise direct chat
-        if session_id:
-            # Check if session exists, create if not
-            if session_id not in enhanced_vertex_mama.chat_sessions:
-                enhanced_vertex_mama.create_chat_session(session_id, "gemini-2.0-flash-exp")
-            
-            response_data = enhanced_vertex_mama.send_message_to_session(session_id, message, user_id)
-        else:
-            # Direct Mama Bear chat
-            response_data = enhanced_vertex_mama.mama_bear_chat(message, None, context, user_id)
-        
-        return jsonify(response_data)
-        
-    except Exception as e:
-        logger.error(f"Error in Vertex chat: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/vertex/chat/session', methods=['POST'])
-def create_vertex_chat_session():
-    """Create a new Vertex AI chat session"""
-    try:
-        data = request.get_json()
-        session_id = data.get('session_id')
-        model_name = data.get('model_name', 'gemini-2.0-flash-exp')
-        system_instruction = data.get('system_instruction')
-        
-        if not session_id:
-            return jsonify({"success": False, "error": "Session ID is required"}), 400
-        
-        if not enhanced_vertex_mama:
-            return jsonify({
-                "success": False,
-                "error": "Enhanced Vertex AI Mama Bear not available"
-            }), 503
-        
-        result = enhanced_vertex_mama.create_chat_session(session_id, model_name, system_instruction)
-        return jsonify(result)
-        
-    except Exception as e:
-        logger.error(f"Error creating chat session: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/vertex/chat/session/<session_id>', methods=['GET'])
-def get_vertex_chat_session(session_id):
-    """Get information about a chat session"""
-    try:
-        if not enhanced_vertex_mama:
-            return jsonify({
-                "success": False,
-                "error": "Enhanced Vertex AI Mama Bear not available"
-            }), 503
-        
-        result = enhanced_vertex_mama.get_session_info(session_id)
-        return jsonify(result)
-        
-    except Exception as e:
-        logger.error(f"Error getting chat session: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/vertex/chat/session/<session_id>/switch-model', methods=['POST'])
-def switch_vertex_model(session_id):
-    """Switch the model for a chat session"""
-    try:
-        data = request.get_json()
-        new_model_name = data.get('model_name')
-        
-        if not new_model_name:
-            return jsonify({"success": False, "error": "Model name is required"}), 400
-        
-        if not enhanced_vertex_mama:
-            return jsonify({
-                "success": False,
-                "error": "Enhanced Vertex AI Mama Bear not available"
-            }), 503
-        
-        result = enhanced_vertex_mama.switch_session_model(session_id, new_model_name)
-        return jsonify(result)
-        
-    except Exception as e:
-        logger.error(f"Error switching model: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/vertex/chat/model', methods=['POST'])
-def chat_with_specific_model():
-    """Chat with a specific Vertex AI model"""
-    try:
-        data = request.get_json()
-        model_name = data.get('model_name')
-        message = data.get('message')
-        chat_history = data.get('chat_history', [])
-        system_instruction = data.get('system_instruction')
-        user_id = data.get('user_id', 'nathan')
-        
-        if not model_name or not message:
-            return jsonify({
-                "success": False,
-                "error": "Model name and message are required"
-            }), 400
-        
-        if not enhanced_vertex_mama:
-            return jsonify({
-                "success": False,
-                "error": "Enhanced Vertex AI Mama Bear not available"
-            }), 503
-        
-        result = enhanced_vertex_mama.chat_with_model(
-            model_name, message, chat_history, system_instruction, user_id
-        )
-        return jsonify(result)
-        
-    except Exception as e:
-        logger.error(f"Error in model-specific chat: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/vertex/code/analyze', methods=['POST'])
-def analyze_code_vertex():
-    """Analyze code using Vertex AI"""
-    try:
-        data = request.get_json()
         code = data.get('code')
         language = data.get('language', 'python')
-        
-        if not code:
-            return jsonify({"success": False, "error": "Code is required"}), 400
-        
-        if not enhanced_vertex_mama:
-            return jsonify({
-                "success": False,
-                "error": "Enhanced Vertex AI Mama Bear not available",
-                "response": "🐻 Code analysis requires Vertex AI integration"
-            }), 503
-        
-        result = enhanced_vertex_mama.analyze_code(code, language)
-        return jsonify(result)
-        
-    except Exception as e:
-        logger.error(f"Error analyzing code: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        timeout_seconds = data.get('timeout_seconds', 30)
+        resource_profile = data.get('resource_profile', 'default')
 
-@app.route('/api/vertex/terminal', methods=['POST'])
-def execute_terminal_command():
-    """Execute terminal command locally (with safety checks)"""
-    try:
-        data = request.get_json()
-        command = data.get('command')
-        working_dir = data.get('working_dir', '/home/woody/Desktop/podplay-build-beta')
+        # Input validation
+        if not code or not isinstance(code, str):
+            return jsonify({"success": False, "error": "Valid 'code' string is required."}), 400
+        if language != 'python':
+            return jsonify({"success": False, "error": "Only 'python' language supported."}), 400
         
-        if not command:
-            return jsonify({"success": False, "error": "Command is required"}), 400
+        try:
+            timeout_seconds = int(timeout_seconds)
+            if not (1 <= timeout_seconds <= 300):
+                raise ValueError()
+        except ValueError:
+            return jsonify({"success": False, "error": "'timeout_seconds' must be int 1-300."}), 400
         
-        # Safety check - only allow safe commands
-        safe_commands = ['ls', 'pwd', 'echo', 'cat', 'head', 'tail', 'grep', 'find', 'ps', 'whoami']
-        command_start = command.split()[0] if command.split() else ""
-        
-        if command_start not in safe_commands:
-            return jsonify({
-                "success": False,
-                "error": f"Command '{command_start}' not allowed for security reasons",
-                "allowed_commands": safe_commands
-            }), 403
-        
-        # Execute command safely
-        import subprocess
-        import os
-        
-        result = subprocess.run(
-            command,
-            shell=True,
-            cwd=working_dir,
-            capture_output=True,
-            text=True,
-            timeout=30  # 30 second timeout
+        job_id = nixos_ephemeral_orchestrator.submit_execution_job(
+            code=code, language=language, timeout=timeout_seconds, resource_profile=resource_profile
         )
-        
         return jsonify({
-            "success": True,
-            "command": command,
-            "working_dir": working_dir,
-            "stdout": result.stdout,
-            "stderr": result.stderr,
-            "return_code": result.returncode,
-            "timestamp": datetime.now().isoformat()
-        })
-        
-    except subprocess.TimeoutExpired:
-        return jsonify({
-            "success": False,
-            "error": "Command timed out after 30 seconds"
-        }), 408
+            "success": True, 
+            "job_id": job_id, 
+            "status": "queued", 
+            "message": "Ephemeral code execution job queued."
+        }), 202
+
     except Exception as e:
-        logger.error(f"Error executing terminal command: {e}")
+        logger.error(f"Error submitting NixOS execution job: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-# ==================== DEV SANDBOX ENDPOINTS ====================
+@app.route('/api/v1/job_status/<job_id>', methods=['GET'])
+def get_job_status(job_id):
+    """Get the status of a NixOS VM execution job"""
+    if not nixos_ephemeral_orchestrator:
+        return jsonify({
+            "success": False, 
+            "error": "NixOS ephemeral sandboxing service is not enabled."
+        }), 503
 
-@app.route('/api/dev-sandbox/create', methods=['POST'])
-def create_dev_environment():
-    """Create a new development environment"""
     try:
-        if not dev_sandbox_manager:
-            return jsonify({
-                "success": False,
-                "error": "DevSandbox not available",
-                "message": "🏗️ DevSandbox system not initialized"
-            }), 503
+        status = nixos_ephemeral_orchestrator.get_job_status(job_id)
+        if status is None:
+            return jsonify({"success": False, "error": "Job not found."}), 404
         
+        return jsonify({"success": True, "job_status": status})
+
+    except Exception as e:
+        logger.error(f"Error getting job status: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500
+
+# ==================== NIXOS WORKSPACE MANAGEMENT API ENDPOINTS ====================
+
+@app.route('/api/v1/workspaces', methods=['POST'])
+def create_workspace():
+    """Create a new persistent NixOS workspace VM"""
+    if not libvirt_workspace_manager:
+        return jsonify({
+            "success": False, 
+            "error": "Workspace manager is not enabled or available."
+        }), 503
+
+    try:
         data = request.get_json()
-        environment = data.get('environment')
-        template = data.get('template')
+        workspace_name = data.get('name', f"workspace_{int(time.time())}")
+        memory_mb = data.get('memory_mb', 1024)
+        vcpus = data.get('vcpus', 2)
         
-        if not environment:
-            return jsonify({"success": False, "error": "Environment config required"}), 400
-        
-        # Create environment using the DevSandbox manager
-        result = asyncio.run(dev_sandbox_manager.create_environment(environment, template))
-        
-        logger.info(f"🏗️ Created development environment: {environment.get('name')}")
+        workspace_id = libvirt_workspace_manager.define_workspace_vm(
+            workspace_name, memory_mb, vcpus
+        )[0].name()  # Returns (domain, disk_path) tuple
         
         return jsonify({
             "success": True,
-            "containerId": result.get('containerId'),
-            "workspaceDir": result.get('workspaceDir'),
-            "ports": result.get('ports'),
-            "message": f"🏗️ Environment {environment.get('name')} created successfully"
-        })
-        
+            "workspace_id": workspace_id,
+            "name": workspace_name,
+            "message": "Workspace VM created successfully"
+        }), 201
+
     except Exception as e:
-        logger.error(f"Error creating dev environment: {e}")
+        logger.error(f"Error creating workspace: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/dev-sandbox/create-local', methods=['POST'])
-def create_local_dev_environment():
-    """Create a new local development environment without Docker"""
+@app.route('/api/v1/workspaces', methods=['GET'])
+def list_workspaces():
+    """List all workspace VMs"""
+    if not libvirt_workspace_manager:
+        return jsonify({"success": False, "error": "Workspace manager not available."}), 503
+
     try:
-        if not dev_sandbox_manager:
-            return jsonify({
-                "success": False,
-                "error": "DevSandbox not available",
-                "message": "🏗️ DevSandbox system not initialized"
-            }), 503
-        
-        data = request.get_json()
-        environment = data.get('environment')
-        template = data.get('template')
-        
-        if not environment:
-            return jsonify({"success": False, "error": "Environment config required"}), 400
-        
-        # Force local fallback creation (no cloud providers)
-        result = asyncio.run(dev_sandbox_manager._create_local_fallback(environment))
-        
-        logger.info(f"🏠 Created local development environment: {environment.get('name')}")
-        
-        return jsonify({
-            "success": True,
-            "environmentId": result.get('environment', {}).get('id'),
-            "workspaceRoot": result.get('environment', {}).get('workspace_dir'),
-            "workspaceDir": result.get('environment', {}).get('workspace_dir'),
-            "url": result.get('environment', {}).get('url'),
-            "message": f"🏠 Local environment {environment.get('name')} created successfully"
-        })
-        
+        workspaces = libvirt_workspace_manager.list_domains_with_metadata("workspace")
+        return jsonify({"success": True, "workspaces": workspaces})
     except Exception as e:
-        logger.error(f"Error creating local dev environment: {e}")
+        logger.error(f"Error listing workspaces: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/dev-sandbox/<env_id>/files', methods=['GET'])
-def get_environment_files(env_id):
-    """Get file tree for environment"""
+@app.route('/api/v1/workspaces/<workspace_id>', methods=['GET'])
+def get_workspace(workspace_id):
+    """Get details of a specific workspace"""
+    if not libvirt_workspace_manager:
+        return jsonify({"success": False, "error": "Workspace manager not available."}), 503
+
     try:
-        if not dev_sandbox_manager:
-            return jsonify({"success": False, "error": "DevSandbox not available"}), 503
+        workspace = libvirt_workspace_manager.get_domain_details(workspace_id)
+        if not workspace:
+            return jsonify({"success": False, "error": "Workspace not found."}), 404
         
-        file_tree = dev_sandbox_manager.get_file_tree(env_id)
-        
-        if file_tree is None:
-            return jsonify({"success": False, "error": "Environment not found"}), 404
-        
-        return jsonify({
-            "success": True,
-            "fileTree": file_tree
-        })
-        
+        return jsonify({"success": True, "workspace": workspace})
     except Exception as e:
-        logger.error(f"Error getting environment files: {e}")
+        logger.error(f"Error getting workspace: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/dev-sandbox/<env_id>/file', methods=['GET', 'POST'])
-def handle_environment_file(env_id):
-    """Read or write file in environment"""
-    try:
-        if not dev_sandbox_manager:
-            return jsonify({"success": False, "error": "DevSandbox not available"}), 503
-        
-        if request.method == 'GET':
-            file_path = request.args.get('path')
-            if not file_path:
-                return jsonify({"success": False, "error": "File path required"}), 400
-            
-            content = dev_sandbox_manager.read_file(env_id, file_path)
-            if content is None:
-                return jsonify({"success": False, "error": "File not found"}), 404
-            
-            return jsonify({
-                "success": True,
-                "content": content
-            })
-        
-        elif request.method == 'POST':
-            data = request.get_json()
-            file_path = data.get('path')
-            content = data.get('content')
-            
-            if not file_path:
-                return jsonify({"success": False, "error": "File path required"}), 400
-            
-            success = dev_sandbox_manager.write_file(env_id, file_path, content or '')
-            
-            return jsonify({
-                "success": success,
-                "message": "File saved successfully" if success else "Failed to save file"
-            })
-        
-    except Exception as e:
-        logger.error(f"Error handling environment file: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+@app.route('/api/v1/workspaces/<workspace_id>', methods=['DELETE'])
+def delete_workspace(workspace_id):
+    """Delete a workspace VM"""
+    if not libvirt_workspace_manager:
+        return jsonify({"success": False, "error": "Workspace manager not available."}), 503
 
-@app.route('/api/dev-sandbox/<env_id>/file/create', methods=['POST'])
-def create_environment_file(env_id):
-    """Create new file or directory in environment"""
     try:
-        if not dev_sandbox_manager:
-            return jsonify({"success": False, "error": "DevSandbox not available"}), 503
-        
-        data = request.get_json()
-        file_path = data.get('path')
-        is_directory = data.get('isDirectory', False)
-        content = data.get('content', '')
-        
-        if not file_path:
-            return jsonify({"success": False, "error": "File path required"}), 400
-        
-        if is_directory:
-            # Create directory
-            success = dev_sandbox_manager.create_directory(env_id, file_path)
+        success = libvirt_workspace_manager.delete_workspace_vm(workspace_id)
+        if success:
+            return jsonify({"success": True, "message": "Workspace deleted successfully"})
         else:
-            # Create file
-            success = dev_sandbox_manager.write_file(env_id, file_path, content)
-        
-        return jsonify({
-            "success": success,
-            "message": f"{'Directory' if is_directory else 'File'} created successfully" if success else "Failed to create"
-        })
-        
+            return jsonify({"success": False, "error": "Failed to delete workspace"}), 500
     except Exception as e:
-        logger.error(f"Error creating environment file: {e}")
+        logger.error(f"Error deleting workspace: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/dev-sandbox/<env_id>/terminal', methods=['POST'])
-def create_terminal_session(env_id):
-    """Create new terminal session for environment"""
-    try:
-        if not dev_sandbox_manager:
-            return jsonify({"success": False, "error": "DevSandbox not available"}), 503
-        
-        session_id = dev_sandbox_manager.create_terminal_session(env_id)
-        
-        if session_id is None:
-            return jsonify({"success": False, "error": "Failed to create terminal session"}), 500
-        
-        return jsonify({
-            "success": True,
-            "sessionId": session_id,
-            "message": "Terminal session created successfully"
-        })
-        
-    except Exception as e:
-        logger.error(f"Error creating terminal session: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+@app.route('/api/v1/workspaces/<workspace_id>/start', methods=['POST'])
+def start_workspace(workspace_id):
+    """Start a workspace VM"""
+    if not libvirt_workspace_manager:
+        return jsonify({"success": False, "error": "Workspace manager not available."}), 503
 
-@app.route('/api/dev-sandbox/execute', methods=['POST'])
-def execute_command_in_sandbox():
-    """Execute command in the development sandbox"""
     try:
-        data = request.get_json()
-        env_id = data.get('env_id')
-        command = data.get('command')
-        
-        if not env_id or not command:
-            return jsonify({"success": False, "error": "env_id and command are required"}), 400
-        
-        if not dev_sandbox_manager:
-            return jsonify({"success": False, "error": "DevSandbox not available"}), 503
-        
-        # Execute command in the specified environment
-        result = dev_sandbox_manager.execute_command(env_id, command)
-        
-        return jsonify({
-            "success": True,
-            "output": result.get('stdout', ''),
-            "error": result.get('stderr', ''),
-            "exit_code": result.get('exit_code', 0)
-        })
-        
-    except Exception as e:
-        logger.error(f"Error executing command in sandbox: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/dev-sandbox/<env_id>/preview/start', methods=['POST'])
-def start_live_preview(env_id):
-    """Start live preview server for environment"""
-    try:
-        if not dev_sandbox_manager:
-            return jsonify({"success": False, "error": "DevSandbox not available"}), 503
-        
-        # Get available port for preview
-        port = dev_sandbox_manager.get_available_port()
-        
-        if port is None:
-            return jsonify({"success": False, "error": "No available ports"}), 500
-        
-        preview_url = f"http://localhost:{port}"
-        
-        return jsonify({
-            "success": True,
-            "previewUrl": preview_url,
-            "port": port,
-            "message": "Live preview started successfully"
-        })
-        
-    except Exception as e:
-        logger.error(f"Error starting live preview: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/dev-sandbox/available-port', methods=['GET'])
-def get_available_port():
-    """Get available port for new environment"""
-    try:
-        if not dev_sandbox_manager:
-            return jsonify({"success": False, "error": "DevSandbox not available"}), 503
-        
-        port = dev_sandbox_manager.get_available_port()
-        
-        return jsonify({
-            "success": True,
-            "port": port or (8000 + (len(dev_sandbox_manager.environments) * 10))
-        })
-        
-    except Exception as e:
-        logger.error(f"Error getting available port: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/dev-sandbox/<env_id>/stop', methods=['POST'])
-def stop_environment(env_id):
-    """Stop development environment"""
-    try:
-        if not dev_sandbox_manager:
-            return jsonify({"success": False, "error": "DevSandbox not available"}), 503
-        
-        success = dev_sandbox_manager.stop_environment(env_id)
-        
-        return jsonify({
-            "success": success,
-            "message": "Environment stopped successfully" if success else "Failed to stop environment"
-        })
-        
-    except Exception as e:
-        logger.error(f"Error stopping environment: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/dev-sandbox/<env_id>', methods=['DELETE'])
-def delete_environment(env_id):
-    """Delete development environment"""
-    try:
-        if not dev_sandbox_manager:
-            return jsonify({"success": False, "error": "DevSandbox not available"}), 503
-        
-        success = dev_sandbox_manager.delete_environment(env_id)
-        
-        return jsonify({
-            "success": success,
-            "message": "Environment deleted successfully" if success else "Failed to delete environment"
-        })
-        
-    except Exception as e:
-        logger.error(f"Error deleting environment: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-# ==================== DEV SANDBOX AGENTIC ENDPOINTS ====================
-
-@app.route('/api/dev-sandbox/<env_id>/assistance', methods=['POST'])
-def get_dev_assistance(env_id):
-    """Get intelligent assistance for a development environment"""
-    try:
-        if not agentic_dev_assistant:
-            return jsonify({
-                "success": False,
-                "response": "🤖 Agentic assistant not available. Please check Mama Bear and Mem0 configuration.",
-                "suggestions": []
-            }), 503
-        
-        data = request.get_json() or {}
-        user_query = data.get('query', '')
-        
-        # Mock environment context - in a real scenario, this would come from the actual environment
-        environment_context = {
-            "id": env_id,
-            "type": data.get('type', 'node'),
-            "name": data.get('name', f'Environment {env_id}'),
-            "status": "running",
-            "workspaceRoot": f"/tmp/podplay_sandbox/{env_id}",
-            "port": 3000
-        }
-        
-        # Get assistance (convert async to sync)
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            assistance = loop.run_until_complete(
-                agentic_dev_assistant.get_intelligent_assistance(environment_context, user_query)
-            )
-            suggestions = loop.run_until_complete(
-                agentic_dev_assistant.get_contextual_suggestions(environment_context)
-            )
-            assistance["suggestions"] = suggestions
-        finally:
-            loop.close()
-        
-        return jsonify(assistance)
-        
-    except Exception as e:
-        logger.error(f"Error getting dev assistance: {e}")
-        return jsonify({
-            "success": False,
-            "response": f"🚫 Error getting assistance: {str(e)}",
-            "suggestions": []
-        }), 500
-
-@app.route('/api/dev-sandbox/<env_id>/suggestions', methods=['GET'])
-def get_dev_suggestions(env_id):
-    """Get contextual suggestions for a development environment"""
-    try:
-        if not agentic_dev_assistant:
-            return jsonify({
-                "success": False,
-                "suggestions": [],
-                "message": "Agentic assistant not available"
-            }), 503
-        
-        # Mock environment context
-        environment_context = {
-            "id": env_id,
-            "type": request.args.get('type', 'node'),
-            "name": request.args.get('name', f'Environment {env_id}'),
-            "status": "running",
-            "workspaceRoot": f"/tmp/podplay_sandbox/{env_id}"
-        }
-        
-        # Get suggestions (convert async to sync)
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            suggestions = loop.run_until_complete(
-                agentic_dev_assistant.get_contextual_suggestions(environment_context)
-            )
-        finally:
-            loop.close()
-        
-        return jsonify({
-            "success": True,
-            "suggestions": suggestions,
-            "environment_id": env_id
-        })
-        
-    except Exception as e:
-        logger.error(f"Error getting suggestions: {e}")
-        return jsonify({
-            "success": False,
-            "suggestions": [],
-            "error": str(e)
-        }), 500
-
-@app.route('/api/dev-sandbox/<env_id>/chat', methods=['POST'])
-def chat_with_mama_bear_dev(env_id):
-    """Chat with Mama Bear about the development environment"""
-    try:
-        if not dev_sandbox_manager:
-            return jsonify({"success": False, "error": "DevSandbox not available"}), 503
-        
-        data = request.get_json()
-        message = data.get('message', '')
-        
-        if not message:
-            return jsonify({"success": False, "error": "Message is required"}), 400
-        
-        # Mock environment context
-        environment_context = {
-            "id": env_id,
-            "type": data.get('type', 'node'),
-            "name": data.get('name', f'Environment {env_id}'),
-            "status": "running",
-            "workspaceRoot": f"/tmp/podplay_sandbox/{env_id}",
-            "task_type": "development_assistance"
-        }
-        
-        # Get response from agentic assistant if available
-        if agentic_dev_assistant:
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                response = loop.run_until_complete(
-                    agentic_dev_assistant.get_intelligent_assistance(environment_context, message)
-                )
-            finally:
-                loop.close()
+        success = libvirt_workspace_manager.start_vm(workspace_id)
+        if success:
+            return jsonify({"success": True, "message": "Workspace started successfully"})
         else:
-            # Fallback response
-            response = {
-                "success": True,
-                "response": f"🐻 I understand you're working on a {environment_context.get('type', 'development')} project. While my AI capabilities are limited without full integration, I can help with general development guidance and project structure suggestions.",
-                "suggestions": [
-                    "Set up proper project structure",
-                    "Configure development environment", 
-                    "Add testing and linting tools",
-                    "Document your project properly"
-                ]
-            }
-        
-        return jsonify({
-            "success": True,
-            "message": response.get('response', ''),
-            "suggestions": response.get('suggestions', []),
-            "context": environment_context,
-            "mama_bear_available": ENHANCED_MAMA_AVAILABLE,
-            "agentic_available": AGENTIC_DEV_AVAILABLE
-        })
-        
+            return jsonify({"success": False, "error": "Failed to start workspace"}), 500
     except Exception as e:
-        logger.error(f"Error in Mama Bear dev chat: {e}")
+        logger.error(f"Error starting workspace: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/dev-sandbox/capabilities', methods=['GET'])
-def get_devsandbox_capabilities():
-    """Get DevSandbox system capabilities and available features"""
-    try:
-        capabilities = {
-            "dev_sandbox_available": DEV_SANDBOX_AVAILABLE,
-            "mama_bear_available": ENHANCED_MAMA_AVAILABLE,
-            "agentic_available": AGENTIC_DEV_AVAILABLE,
-            "mem0_available": MEM0_CHAT_AVAILABLE,
-            "providers": []
-        }
-        
-        # Get available cloud providers if DevSandbox is available
-        if dev_sandbox_manager and hasattr(dev_sandbox_manager, 'providers'):
-            capabilities["providers"] = [
-                name for name, config in dev_sandbox_manager.providers.items()
-                if config.get('available', False)
-            ]
-        
-        return jsonify({
-            "success": True,
-            "capabilities": capabilities,
-            "features": [
-                "Local development environments",
-                "Cloud provider integration",
-                "AI-powered assistance",
-                "Real-time file operations",
-                "Terminal access",
-                "Environment templates"
-            ]
-        })
-        
-    except Exception as e:
-        logger.error(f"Error getting DevSandbox capabilities: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-# ==================== VERTEX GARDEN: MULTIMODAL SUPPORT ====================
+@app.route('/api/v1/workspaces/<workspace_id>/stop', methods=['POST'])
+def stop_workspace(workspace_id):
+    """Stop a workspace VM"""
+    if not libvirt_workspace_manager:
+        return jsonify({"success": False, "error": "Workspace manager not available."}), 503
 
-@app.route('/api/vertex-garden/upload', methods=['POST'])
-def upload_multimodal_file():
-    """Upload files for multimodal AI processing"""
     try:
-        if 'file' not in request.files:
-            return jsonify({"success": False, "error": "No file provided"}), 400
-        
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({"success": False, "error": "Empty filename"}), 400
-        
-        # Create uploads directory if it doesn't exist
-        uploads_dir = os.path.join(os.path.dirname(__file__), 'uploads')
-        os.makedirs(uploads_dir, exist_ok=True)
-        
-        # Generate unique filename
-        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-        filename = f"{timestamp}_{file.filename}"
-        file_path = os.path.join(uploads_dir, filename)
-        
-        # Save file
-        file.save(file_path)
-        
-        # Get file info
-        file_size = os.path.getsize(file_path)
-        file_type = file.content_type or 'application/octet-stream'
-        
-        # Store file metadata in database
-        conn = sqlite3.connect('sanctuary.db')
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            INSERT INTO uploaded_files (filename, original_name, file_path, file_type, file_size, uploaded_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (filename, file.filename, file_path, file_type, file_size, datetime.now().isoformat()))
-        
-        file_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        
-        return jsonify({
-            "success": True,
-            "file_id": file_id,
-            "filename": filename,
-            "original_name": file.filename,
-            "file_type": file_type,
-            "file_size": file_size,
-            "message": "File uploaded successfully"
-        })
-        
+        success = libvirt_workspace_manager.stop_vm(workspace_id, force=False, for_workspace=True)
+        if success:
+            return jsonify({"success": True, "message": "Workspace stopped successfully"})
+        else:
+            return jsonify({"success": False, "error": "Failed to stop workspace"}), 500
     except Exception as e:
-        logger.error(f"Error uploading file: {e}")
+        logger.error(f"Error stopping workspace: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/vertex-garden/files', methods=['GET'])
-def list_uploaded_files():
-    """List all uploaded files"""
-    try:
-        conn = sqlite3.connect('sanctuary.db')
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT file_id, filename, original_name, file_type, file_size, uploaded_at
-            FROM uploaded_files
-            ORDER BY uploaded_at DESC
-        ''')
-        
-        files = []
-        for row in cursor.fetchall():
-            files.append({
-                "file_id": row[0],
-                "filename": row[1],
-                "original_name": row[2],
-                "file_type": row[3],
-                "file_size": row[4],
-                "uploaded_at": row[5]
-            })
-        
-        conn.close()
-        
-        return jsonify({
-            "success": True,
-            "files": files
-        })
-        
-    except Exception as e:
-        logger.error(f"Error listing files: {e}")
-        return jsonify({"success": False, "error": str(e)}),  500
+# ==================== SCOUT AGENT MONITORING API ENDPOINTS ====================
 
-@app.route('/api/vertex-garden/files/<int:file_id>', methods=['GET'])
-def get_file(file_id):
-    """Get uploaded file by ID"""
+@app.route('/api/v1/scout/status', methods=['GET'])
+def get_scout_status():
+    """Get Scout Agent status and logs"""
+    if not scout_log_manager:
+        return jsonify({"success": False, "error": "Scout Agent monitoring not available."}), 503
+
     try:
-        conn = sqlite3.connect('sanctuary.db')
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            SELECT filename, original_name, file_path, file_type
-            FROM uploaded_files
-            WHERE file_id = ?
-        ''', (file_id,))
-        
-        result = cursor.fetchone()
-        conn.close()
-        
-        if not result:
-            return jsonify({"success": False, "error": "File not found"}), 404
-        
-        filename, original_name, file_path, file_type = result
-        
-        # Serve the file
-        uploads_dir = os.path.join(os.path.dirname(__file__), 'uploads')
-        return send_from_directory(uploads_dir, filename, as_attachment=True, 
-                                 download_name=original_name, mimetype=file_type)
-        
+        # Get status for default project
+        project_logger = scout_log_manager.get_project_logger("default")
+        status = project_logger.get_project_status_summary()
+        return jsonify({"success": True, "status": status})
     except Exception as e:
-        logger.error(f"Error getting file: {e}")
+        logger.error(f"Error getting scout status: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/vertex-garden/files/<int:file_id>', methods=['DELETE'])
-def delete_file(file_id):
-    """Delete uploaded file"""
+@app.route('/api/v1/scout/logs', methods=['GET'])
+def get_scout_logs():
+    """Get Scout Agent logs"""
+    if not scout_log_manager:
+        return jsonify({"success": False, "error": "Scout Agent monitoring not available."}), 503
+
     try:
-        conn = sqlite3.connect('sanctuary.db')
-        cursor = conn.cursor()
+        limit = request.args.get('limit', 50, type=int)
+        project_id = request.args.get('project_id', 'default')
         
-        # Get file path before deletion
-        cursor.execute('SELECT file_path FROM uploaded_files WHERE file_id = ?', (file_id,))
-        result = cursor.fetchone()
+        # Get project logger and retrieve logs
+        project_logger = scout_log_manager.get_project_logger(project_id)
+logs = project_logger.get_logs(limit=limit)
         
-        if not result:
-            conn.close()
-            return jsonify({"success": False, "error": "File not found"}), 404
-        
-        file_path = result[0]
-        
-        # Delete from database
-        cursor.execute('DELETE FROM uploaded_files WHERE file_id = ?', (file_id,))
-        conn.commit()
-        conn.close()
-        
-        # Delete physical file
-        if os.path.exists(file_path):
-            os.remove(file_path)
-        
-        return jsonify({
-            "success": True,
-            "message": "File deleted successfully"
-        })
-        
+        return jsonify({"success": True, "logs": logs, "project_id": project_id})
     except Exception as e:
-        logger.error(f"Error deleting file: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/vertex-garden/chat/multimodal', methods=['POST'])
-def multimodal_chat():
-    """Enhanced chat endpoint with multimodal support"""
-    try:
-        data = request.get_json()
-        model_id = data.get('model_id', 'mama-bear-gemini-25')
-        message = data.get('message', '')
-        file_ids = data.get('file_ids', [])
-        session_id = data.get('session_id')
-        
-        # Load uploaded files if any
-        attached_files = []
-        if file_ids:
-            conn = sqlite3.connect('sanctuary.db')
-            cursor = conn.cursor()
-            
-            for file_id in file_ids:
-                cursor.execute('''
-                    SELECT filename, original_name, file_path, file_type
-                    FROM uploaded_files
-                    WHERE file_id = ?
-                ''', (file_id,))
-                
-                result = cursor.fetchone()
-                if result:
-                    attached_files.append({
-                        "file_id": file_id,
-                        "filename": result[0],
-                        "original_name": result[1],
-                        "file_path": result[2],
-                        "file_type": result[3]
-                    })
-            
-            conn.close()
-        
-        # For now, return enhanced response with file awareness
-        # TODO: Integrate with actual multimodal models
-        response_content = f"""I've received your message: "{message}"
-
-"""
-        
-        if attached_files:
-            response_content += f"I can see you've attached {len(attached_files)} file(s):\n"
-            for file_info in attached_files:
-                response_content += f"- {file_info['original_name']} ({file_info['file_type']})\n"
-            response_content += "\nMultimodal processing capabilities are being developed. For now, I can acknowledge file uploads and prepare for future multimodal integration.\n"
-        
-        response_content += "\n🌟 This is the Vertex Garden Multi-Model Chat interface - your gateway to 20+ cutting-edge AI models!"
-        
-        return jsonify({
-            "success": True,
-            "response": response_content,
-            "model_id": model_id,
-            "session_id": session_id,
-            "attached_files": attached_files,
-            "tokens_used": len(message.split()) + len(response_content.split()),
-            "cost": 0.001,
-            "metadata": {
-                "multimodal": True,
-                "files_processed": len(attached_files)
-            }
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in multimodal chat: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-# ==================== AUDIO/VIDEO RECORDING ENDPOINTS ====================
-
-@app.route('/api/vertex-garden/audio/record', methods=['POST'])
-def start_audio_recording():
-    """Start audio recording session"""
-    try:
-        # For now, return placeholder response
-        # TODO: Implement WebRTC or similar for browser audio recording
-        session_id = f"audio_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
-        
-        return jsonify({
-            "success": True,
-            "session_id": session_id,
-            "message": "Audio recording session started",
-            "note": "Client-side recording implementation needed"
-        })
-        
-    except Exception as e:
-        logger.error(f"Error starting audio recording: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/vertex-garden/audio/upload', methods=['POST'])
-def upload_audio_recording():
-    """Upload recorded audio for processing"""
-    try:
-        if 'audio' not in request.files:
-            return jsonify({"success": False, "error": "No audio file provided"}), 400
-        
-        audio_file = request.files['audio']
-        session_id = request.form.get('session_id', f"audio_{datetime.now().strftime('%Y%m%d_%H%M%S')}")
-        
-        # Create audio uploads directory
-        audio_dir = os.path.join(os.path.dirname(__file__), 'uploads', 'audio')
-        os.makedirs(audio_dir, exist_ok=True)
-        
-        # Save audio file
-        filename = f"{session_id}.webm"
-        file_path = os.path.join(audio_dir, filename)
-        audio_file.save(file_path)
-        
-        # Store in database
-        conn = sqlite3.connect('sanctuary.db')
-        cursor = conn.cursor()
-        
-        cursor.execute('''
-            INSERT INTO uploaded_files (filename, original_name, file_path, file_type, file_size, uploaded_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (filename, f"audio_recording_{session_id}", file_path, 'audio/webm', 
-              os.path.getsize(file_path), datetime.now().isoformat()))
-        
-        file_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        
-        return jsonify({
-            "success": True,
-            "file_id": file_id,
-            "session_id": session_id,
-            "filename": filename,
-            "message": "Audio uploaded successfully"
-        })
-        
-    except Exception as e:
-        logger.error(f"Error uploading audio: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-# ==================== MCP SANCTUARY: MODEL & SERVICE DISCOVERY ====================
-
-@app.route('/api/mcp/resources', methods=['GET'])
-def mcp_resources():
-    """Return available AI models for the MCP UI (stubbed for now)."""
-    models = [
-        {
-            'id': 'mama-bear-gemini-25',
-            'name': 'Mama Bear (Gemini 2.5)',
-            'provider': 'VertexAI',
-            'description': 'Mama Bear: Gemini 2.5, lead developer agent',
-            'capabilities': ['text', 'code', 'reasoning'],
-            'status': 'active',
-        },
-        {
-            'id': 'gpt-4o',
-            'name': 'GPT-4o',
-            'provider': 'OpenAI',
-            'description': 'GPT-4o with vision and advanced reasoning',
-            'capabilities': ['text', 'vision', 'code', 'reasoning'],
-            'status': 'active',
-        }
-        # Add more models as needed
-    ]
-    return jsonify({'success': True, 'models': models})
-
-@app.route('/api/mcp/services', methods=['GET'])
-def mcp_services():
-    """Return available MCP services (stubbed for now)."""
-    services = [
-        {
-            'id': 'code-review',
-            'name': 'Code Review',
-            'description': 'Automated code review and suggestions',
-            'status': 'available',
-        },
-        {
-            'id': 'mcp-help',
-            'name': 'MCP Help',
-            'description': 'Guidance on using MCP tools',
-            'status': 'available',
-        }
-        # Add more services as needed
-    ]
-    return jsonify({'success': True, 'services': services})
-
-# ==================== GOOGLE DRIVE INTEGRATION (PLANNED) ====================
-
-@app.route('/api/vertex-garden/drive/auth', methods=['GET'])
-def google_drive_auth():
-    """Initiate Google Drive OAuth flow"""
-    try:
-        # TODO: Implement Google Drive OAuth
-        return jsonify({
-            "success": False,
-            "message": "Google Drive integration planned for future release",
-            "auth_url": None
-        })
-        
-    except Exception as e:
-        logger.error(f"Error with Google Drive auth: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route('/api/vertex-garden/drive/files', methods=['GET'])
-def list_drive_files():
-    """List Google Drive files"""
-    try:
-        # TODO: Implement Google Drive file listing
-        return jsonify({
-            "success": False,
-            "message": "Google Drive integration planned for future release",
-            "files": []
-        })
-        
-    except Exception as e:
-        logger.error(f"Error listing Drive files: {e}")
+        logger.error(f"Error getting scout logs: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
 # Start the Flask application
