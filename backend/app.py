@@ -29,12 +29,18 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import requests
 from dataclasses import dataclass, asdict
-import together
+import together # type: ignore
 from enum import Enum
 import sqlite3
 from contextlib import contextmanager
 import threading
 import time
+import multiprocessing
+try:
+    import resource # For setting resource limits (Unix-specific)
+    RESOURCE_MODULE_AVAILABLE = True
+except ImportError:
+    RESOURCE_MODULE_AVAILABLE = False
 
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
@@ -1073,7 +1079,321 @@ def server_health_check():
         })
     except Exception as e:
         logger.error(f"Error in health check: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        return jsonify({"success": False, "error": "An unexpected error occurred. Please try again later."}), 500
+
+# ==================== PYTHON CODE EXECUTION UTILITY ====================
+
+# Updated list of dangerous keywords. This is a basic check and not a substitute for proper sandboxing.
+DANGEROUS_KEYWORDS = [
+    'import os', 'import sys', 'subprocess', 'eval(', 'exec(', '__import__', 'open(',
+    'socket', 'urllib', 'requests', 'ctypes', 'shutil', 'pickle', 'getattr', 'setattr',
+    'delattr', 'globals()', 'locals()', 'vars()', 'compile(', 'dir()', 'help()'
+    # Keywords like 'dir()' and 'help()' can be used for introspection to find ways to bypass sandboxes.
+]
+
+# Allowed built-ins for RestrictedPython. Start with a minimal set.
+# 'print' is handled by the _print_ collector mechanism in RestrictedPython, so it's not needed here.
+ALLOWED_BUILTINS = {
+    # 'print': print, # Removed: print is handled by _print_ collector
+    'len': len,
+    'str': str,
+    'int': int,
+    'float': float,
+    'bool': bool,
+    'list': list,
+    'dict': dict,
+    'tuple': tuple,
+    'set': set,
+    'range': range,
+    'enumerate': enumerate,
+    'zip': zip,
+    'map': map,
+    'filter': filter,
+    'sum': sum,
+    'max': max,
+    'min': min,
+    'abs': abs,
+    'round': round,
+    'sorted': sorted,
+    'reversed': reversed,
+    'None': None,
+    'True': True,
+    'False': False,
+    # Commonly used math functions (can be expanded if needed)
+    # For more extensive math, consider providing a safe 'math' module object
+    # from RestrictedPython.Utilities.utility_builtins
+}
+
+def _execute_python_code_shared(code: str, language: str, session_id: Optional[str] = None) -> tuple[dict, int]:
+    """
+    Shared utility function to execute Python code.
+    This function is intended to be enhanced with proper sandboxing.
+    """
+    if not code:
+        return {"success": False, "error": "No code provided"}, 400
+
+    if language != 'python':
+        return {
+            "success": False,
+            "error": f"Language {language} not supported. Only Python is currently supported."
+        }, 400
+
+    # Basic security check - prevent dangerous operations (initial layer)
+    for keyword in DANGEROUS_KEYWORDS:
+        if keyword in code:
+            logger.warning(f"Potentially dangerous keyword '{keyword}' detected in code snippet.")
+            return {
+                "success": False,
+                "error": "Code contains potentially dangerous operations. Execution denied."
+                # Removed: f"Code contains potentially dangerous operation: {keyword}" to avoid leaking keyword
+            }, 400
+
+    import io
+    import contextlib
+    from datetime import datetime
+    from RestrictedPython import compile_restricted, safe_globals
+    from RestrictedPython.PrintCollector import PrintCollector
+
+    output_buffer = io.StringIO()
+    error_buffer = io.StringIO() # For capturing stderr if RestrictedPython doesn't handle it directly
+
+    # RestrictedPython execution
+    restricted_globals = dict(safe_globals) # Start with RestrictedPython's safe_globals
+    restricted_globals['__builtins__'] = ALLOWED_BUILTINS
+    restricted_globals['_print_'] = PrintCollector # Use PrintCollector for capturing print statements
+    restricted_globals['_getiter_'] = iter # Needed for loops
+    # REMOVED: restricted_globals['_getattr_'] = getattr # This was incorrect; safe_globals provides a safe _getattr_
+    
+    # Add any other safe utility functions or modules here if needed
+    # e.g., from RestrictedPython.Utilities import utility_builtins
+    # restricted_globals.update(utility_builtins)
+
+    # --- Timeout and Resource Limit Notice ---
+    # RestrictedPython primarily restricts access to Python features. It does NOT inherently
+    # protect against extremely long-running computations (e.g., infinite loops) or
+    # excessive memory consumption directly within the `exec` call.
+    #
+    # For robust protection against such scenarios (DoS attacks):
+    # 1. Timeouts: Execute the `exec(byte_code, ...)` call in a separate
+    #    process (e.g., using `multiprocessing.Process`). The main process can then
+    #    wait for the worker process with a timeout (`process.join(timeout_seconds)`)
+    #    and terminate it (`process.terminate()`) if it exceeds the time limit.
+    # 2. Memory Limits: Resource limits (e.g., `resource.setrlimit` on POSIX systems)
+    #    should be set in the separate worker process before executing the code.
+    #    Alternatively, containerization (e.g., Docker) can provide stricter resource controls.
+    #
+    # Implementing full process-based sandboxing with timeouts and memory limits
+    # is a more significant architectural change and is recommended for production systems.
+    # The `execution_timeout_seconds` variable below is placeholder for such logic.
+    
+    # --- Configuration for Process-based Execution ---
+    EXECUTION_TIMEOUT_SECONDS = 5  # Timeout for the child process
+    # Memory limit in bytes (e.g., 100MB). RLIMIT_AS is often virtual memory.
+    # Actual resident memory can be lower. Be cautious with this limit.
+    MEMORY_LIMIT_BYTES = 100 * 1024 * 1024 # 100 MB
+    # CPU time limit in seconds (soft limit for RLIMIT_CPU)
+    CPU_TIME_LIMIT_SECONDS = 2 
+
+
+    result_queue = multiprocessing.Queue()
+    process_name = f"python_executor_{os.getpid()}" # Give the process a somewhat unique name for logging
+
+    process = multiprocessing.Process(
+        target=_execute_restricted_code_in_process,
+        name=process_name,
+        args=(code, result_queue, MEMORY_LIMIT_BYTES, CPU_TIME_LIMIT_SECONDS)
+    )
+
+    try:
+        process.start()
+        logger.info(f"Started process {process.pid} ({process_name}) for code execution.")
+        
+        # Wait for the process to finish or timeout
+        try:
+            # Get result from queue with timeout. This also helps ensure queue doesn't block indefinitely.
+            result_from_child = result_queue.get(timeout=EXECUTION_TIMEOUT_SECONDS + 1) # Add a small buffer for queue ops
+        except multiprocessing.queues.Empty: # Python 3.7+ uses multiprocessing.queues.Empty
+            # This means the process likely timed out via process.join() logic or was killed by OS.
+            logger.warning(f"Process {process.pid} ({process_name}) did not place a result in the queue within timeout.")
+            # Check if process is still alive; if so, it's a true timeout by join.
+            if process.is_alive():
+                process.terminate() # Send SIGTERM
+                process.join(timeout=1) # Wait a bit for termination
+                if process.is_alive():
+                    process.kill() # Send SIGKILL if still alive
+                    logger.warning(f"Process {process.pid} ({process_name}) force-killed after failing to terminate.")
+                else:
+                    logger.info(f"Process {process.pid} ({process_name}) terminated due to timeout.")
+
+            error_response = {
+                "success": False, "error": "Code execution timed out or was terminated due to resource limits.",
+                "code": code, "language": language, "output": ""
+            }
+            if session_id: error_response["session_id"] = session_id
+            return error_response, 408 # Request Timeout
+        
+        # If we got a result, join the process to ensure it's cleaned up.
+        # The process should have already exited if it put something in the queue.
+        process.join(timeout=1) # Short timeout, should be exited already.
+        if process.is_alive(): # Should not happen if queue.get succeeded and process exited normally
+            logger.warning(f"Process {process.pid} ({process_name}) still alive after reporting result. Terminating.")
+            process.terminate()
+            process.join(timeout=1)
+            if process.is_alive(): process.kill()
+
+
+        # Add session_id to the result if it was provided
+        if session_id is not None and "session_id" not in result_from_child:
+             result_from_child["session_id"] = session_id
+        
+        # Ensure standard fields are present, even if child process failed unexpectedly before setting them
+        result_from_child.setdefault("success", False)
+        result_from_child.setdefault("output", "")
+        result_from_child.setdefault("error", "An unknown error occurred in the execution process.")
+        result_from_child.setdefault("code", code)
+        result_from_child.setdefault("language", language)
+        result_from_child.setdefault("timestamp", datetime.now().isoformat())
+
+        return result_from_child, 200 if result_from_child["success"] else 400
+
+    except Exception as e:
+        logger.error(f"Error managing subprocess for code execution: {e}. Code: {code[:200]}", exc_info=True)
+        if process.is_alive():
+            process.terminate()
+            process.join(timeout=1)
+            if process.is_alive(): process.kill()
+        
+        error_response = {
+            "success": False, "error": "An internal server error occurred while trying to execute code.",
+            "code": code, "language": language,
+        }
+        if session_id: error_response["session_id"] = session_id
+        return error_response, 500
+    finally:
+        result_queue.close()
+        result_queue.join_thread() # Ensure queue feeder thread is cleaned up
+
+
+def _execute_restricted_code_in_process(code: str, result_queue: multiprocessing.Queue, memory_limit_bytes: int, cpu_time_limit_seconds: int):
+    """
+    Target function to execute code with RestrictedPython in a separate process.
+    Sets resource limits before execution.
+    Puts a result dictionary into result_queue.
+    """
+    import io
+    import contextlib
+    from datetime import datetime
+    import os # Already imported at top, but good for clarity in child process context
+    
+    # Ensure RestrictedPython and its components are imported *within* the child process
+    from RestrictedPython import compile_restricted, PrintCollector
+    # Import Python-based guards directly to avoid C-extension issues with multiprocessing 'spawn'
+    from AccessControl.ZopeGuards import safer_getattr 
+    from RestrictedPython.Guards import guarded_getitem # This is generally a Python implementation
+    from RestrictedPython.Guards import guarded_iter_unpack_sequence, guarded_unpack_sequence, full_write_guard
+
+    # Set resource limits (Unix-specific)
+    if RESOURCE_MODULE_AVAILABLE and os.name == 'posix':
+        try:
+            # Memory limit (RLIMIT_AS is virtual memory, which is the closest general limit)
+            # Soft limit, hard limit
+            resource.setrlimit(resource.RLIMIT_AS, (memory_limit_bytes, memory_limit_bytes))
+            # CPU time limit (soft limit). The process will get SIGXCPU.
+            resource.setrlimit(resource.RLIMIT_CPU, (cpu_time_limit_seconds, cpu_time_limit_seconds))
+            logger.info(f"Process {os.getpid()}: Set memory limit to {memory_limit_bytes} bytes, CPU time to {cpu_time_limit_seconds}s.")
+        except Exception as e:
+            logger.warning(f"Process {os.getpid()}: Failed to set resource limits: {e}", exc_info=True)
+    elif os.name != 'posix':
+        logger.warning(f"Process {os.getpid()}: Resource limits (memory, CPU time) are not enforced on this platform ({os.name}).")
+
+    output_buffer = io.StringIO()
+    error_buffer = io.StringIO()
+    
+    # Manually construct the globals dictionary for exec using explicitly imported Python guards.
+    # This is to ensure stability in multiprocessing 'spawn' environments where C-extension based
+    # guards from RestrictedPython.safe_globals might not initialize correctly.
+    restricted_globals_for_exec = {
+        '_getattr_': safer_getattr, # From AccessControl.ZopeGuards (Python-based)
+        '_getitem_': guarded_getitem, # From RestrictedPython.Guards (Python-based)
+        '_print_': PrintCollector(),
+        '_getiter_': iter, 
+        '_iter_unpack_sequence_': guarded_iter_unpack_sequence,
+        '_unpack_sequence_': guarded_unpack_sequence,
+        '_write_': full_write_guard(), 
+        '__builtins__': ALLOWED_BUILTINS,
+    }
+    
+    # For debugging, log the keys to ensure they are what we expect.
+    logger.info(f"Process {os.getpid()}: Globals for exec (first level keys): {list(restricted_globals_for_exec.keys())}")
+    if '__builtins__' in restricted_globals_for_exec:
+        logger.info(f"Process {os.getpid()}: Builtins for exec: {list(restricted_globals_for_exec['__builtins__'].keys())}")
+    if '_getattr_' not in restricted_globals_for_exec:
+        logger.error(f"CRITICAL ALARM: Process {os.getpid()}: _getattr_ is NOT in restricted_globals_for_exec!")
+    if '_getitem_' not in restricted_globals_for_exec:
+        logger.error(f"CRITICAL ALARM: Process {os.getpid()}: _getitem_ is NOT in restricted_globals_for_exec!")
+
+    
+    process_pid = os.getpid()
+    return_data = { # Initialize with defaults
+        "success": False, "output": "", "error": "Execution did not complete as expected.",
+        "code": code, "language": "python", "timestamp": datetime.now().isoformat()
+    }
+
+    try:
+        byte_code = compile_restricted(code, filename='<user_code_in_process>', mode='exec')
+        
+        with contextlib.redirect_stdout(output_buffer), contextlib.redirect_stderr(error_buffer):
+            exec(byte_code, restricted_globals_for_exec) # Use the manually constructed globals
+
+        output_from_print_collector = restricted_globals_for_exec['_print_'].printed_text
+        output_from_stdout = output_buffer.getvalue()
+        captured_error_output = error_buffer.getvalue()
+
+        final_output = output_from_print_collector
+        if output_from_stdout and output_from_stdout not in final_output:
+            final_output += output_from_stdout
+        
+        final_error = captured_error_output
+
+        return_data.update({
+            "success": not bool(final_error),
+            "output": final_output,
+            "error": final_error,
+        })
+        
+        if final_error:
+             logger.warning(f"Process {process_pid}: Code execution resulted in stderr output. Error: {final_error[:200]}")
+             return_data["error"] = "Code execution produced output on stderr."
+
+    except SyntaxError as se:
+        logger.warning(f"Process {process_pid}: Syntax error: {se.msg} (line {se.lineno}). Code: {code[:100]}", exc_info=True)
+        return_data["error"] = f"Syntax error in submitted code: {se.msg} (line {se.lineno})"
+    except NameError as ne:
+        logger.warning(f"Process {process_pid}: NameError: {ne}. Code: {code[:100]}", exc_info=True)
+        return_data["error"] = f"Execution error: Name '{ne.name}' is not defined or access is restricted."
+    except TypeError as te:
+        logger.warning(f"Process {process_pid}: TypeError: {te}. Code: {code[:100]}", exc_info=True)
+        return_data["error"] = f"Execution error: A type error occurred. This might be due to restricted operations. ({te})"
+    except MemoryError: # Explicitly catch MemoryError if resource limits are exceeded
+        logger.error(f"Process {process_pid}: MemoryError during code execution. Likely exceeded memory limit. Code: {code[:100]}", exc_info=True)
+        return_data["error"] = "Code execution failed due to excessive memory usage."
+        return_data["output"] = restricted_globals.get('_print_', PrintCollector).printed_text + output_buffer.getvalue() # Partial output
+    except Exception as exec_error:
+        # Check if it's due to CPU limit exceeded (SIGXCPU often results in generic exception)
+        # This is a heuristic; specific signal handling might be needed for more precise detection.
+        if "CPU time limit exceeded" in str(exec_error) or "signal 24" in str(exec_error):
+            logger.error(f"Process {process_pid}: CPU time limit likely exceeded. Error: {exec_error}. Code: {code[:100]}", exc_info=True)
+            return_data["error"] = "Code execution failed due to exceeding CPU time limits."
+        else:
+            logger.error(f"Process {process_pid}: Unexpected error during restricted code execution: {exec_error}. Code: {code[:100]}", exc_info=True)
+            return_data["error"] = "A critical error occurred during code execution in the subprocess."
+        return_data["output"] = restricted_globals.get('_print_', PrintCollector).printed_text + output_buffer.getvalue() # Partial output
+    finally:
+        try:
+            result_queue.put(return_data)
+        except Exception as q_err:
+            # Log if putting to queue fails, parent process will likely timeout on queue.get()
+            logger.error(f"Process {process_pid}: Failed to put result into queue: {q_err}", exc_info=True)
 
 @app.route('/api/mcp/search', methods=['GET'])
 def search_mcp_servers():
@@ -1108,188 +1428,47 @@ def search_mcp_servers():
 
 @app.route('/api/vertex/code/execute', methods=['POST'])
 def execute_python_code():
-    """Execute Python code safely in a sandboxed environment"""
+    """
+    Execute Python code safely using the shared utility.
+    This endpoint is kept for compatibility but could be merged with 
+    /api/vertex-garden/execute-code if session_id handling is harmonized.
+    """
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "error": "Invalid JSON payload"}), 400
+            
         code = data.get('code', '')
         language = data.get('language', 'python')
         
-        if not code:
-            return jsonify({"success": False, "error": "No code provided"}), 400
-        
-        if language != 'python':
-            return jsonify({
-                "success": False,
-                "error": f"Language {language} not supported. Only Python is currently supported."
-            }), 400
-        
-        # Basic security check - prevent dangerous operations
-        dangerous_keywords = ['import os', 'import sys', 'subprocess', 'eval(', 'exec(', '__import__', 'open(']
-        for keyword in dangerous_keywords:
-            if keyword in code:
-                return jsonify({
-                    "success": False,
-                    "error": f"Code contains potentially dangerous operation: {keyword}"
-                }), 400
-        
-        # Execute code in a restricted environment
-        import io
-        import contextlib
-        from datetime import datetime
-        
-        output_buffer = io.StringIO()
-        error_buffer = io.StringIO()
-        
-        # Create a safe execution environment
-        safe_globals = {
-            '__builtins__': {
-                'print': print,
-                'len': len,
-                'str': str,
-                'int': int,
-                'float': float,
-                'bool': bool,
-                'list': list,
-                'dict': dict,
-                'tuple': tuple,
-                'set': set,
-                'range': range,
-                'enumerate': enumerate,
-                'zip': zip,
-                'map': map,
-                'filter': filter,
-                'sum': sum,
-                'max': max,
-                'min': min,
-                'abs': abs,
-                'round': round,
-                'sorted': sorted,
-                'reversed': reversed
-            }
-        }
-        
-        try:
-            with contextlib.redirect_stdout(output_buffer), contextlib.redirect_stderr(error_buffer):
-                exec(code, safe_globals)
-            
-            output = output_buffer.getvalue()
-            error = error_buffer.getvalue()
-            
-            return jsonify({
-                "success": True,
-                "output": output,
-                "error": error,
-                "code": code,
-                "language": language,
-                "timestamp": datetime.now().isoformat()
-            })
-        
-        except Exception as exec_error:
-            return jsonify({
-                "success": False,
-                "output": output_buffer.getvalue(),
-                "error": str(exec_error),
-                "code": code,
-                "language": language
-            }), 400
+        response_data, status_code = _execute_python_code_shared(code, language)
+        return jsonify(response_data), status_code
     
     except Exception as e:
-        logger.error(f"Error executing code: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        logger.error(f"Error in execute_python_code endpoint: {e}", exc_info=True)
+        return jsonify({"success": False, "error": "An unexpected server error occurred."}), 500
 
 @app.route('/api/vertex-garden/execute-code', methods=['POST'])
 def execute_python_code_vertex_garden():
-    """Execute Python code safely in Vertex Garden context"""
+    """
+    Execute Python code safely in Vertex Garden context using the shared utility.
+    Includes session_id in the response.
+    """
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "error": "Invalid JSON payload"}), 400
+
         code = data.get('code', '')
         language = data.get('language', 'python')
-        session_id = data.get('session_id', '')
+        session_id = data.get('session_id') # session_id is optional for the shared function
         
-        if not code:
-            return jsonify({"success": False, "error": "No code provided"}), 400
-        
-        if language != 'python':
-            return jsonify({
-                "success": False,
-                "error": f"Language {language} not supported. Only Python is currently supported."
-            }), 400
-        
-        # Basic security check - prevent dangerous operations
-        dangerous_keywords = ['import os', 'import sys', 'subprocess', 'eval(', 'exec(', '__import__', 'open(']
-        for keyword in dangerous_keywords:
-            if keyword in code:
-                return jsonify({
-                    "success": False,
-                    "error": f"Code contains potentially dangerous operation: {keyword}"
-                }), 400
-        
-        # Execute code in a restricted environment
-        import io
-        import contextlib
-        from datetime import datetime
-        
-        output_buffer = io.StringIO()
-        error_buffer = io.StringIO()
-        
-        # Create a safe execution environment
-        safe_globals = {
-            '__builtins__': {
-                'print': print,
-                'len': len,
-                'str': str,
-                'int': int,
-                'float': float,
-                'bool': bool,
-                'list': list,
-                'dict': dict,
-                'tuple': tuple,
-                'set': set,
-                'range': range,
-                'enumerate': enumerate,
-                'zip': zip,
-                'map': map,
-                'filter': filter,
-                'sum': sum,
-                'max': max,
-                'min': min,
-                'abs': abs,
-                'round': round,
-                'sorted': sorted,
-                'reversed': reversed
-            }
-        }
-        
-        try:
-            with contextlib.redirect_stdout(output_buffer), contextlib.redirect_stderr(error_buffer):
-                exec(code, safe_globals)
-            
-            output = output_buffer.getvalue()
-            error = error_buffer.getvalue()
-            
-            return jsonify({
-                "success": True,
-                "output": output,
-                "error": error,
-                "code": code,
-                "language": language,
-                "session_id": session_id,
-                "timestamp": datetime.now().isoformat()
-            })
-        
-        except Exception as exec_error:
-            return jsonify({
-                "success": False,
-                "output": output_buffer.getvalue(),
-                "error": str(exec_error),
-                "code": code,
-                "language": language,
-                "session_id": session_id
-            }), 400
-    
+        response_data, status_code = _execute_python_code_shared(code, language, session_id=session_id)
+        return jsonify(response_data), status_code
+
     except Exception as e:
-        logger.error(f"Error executing code in vertex garden: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        logger.error(f"Error in execute_python_code_vertex_garden endpoint: {e}", exc_info=True)
+        return jsonify({"success": False, "error": "An unexpected server error occurred."}), 500
 
 @app.route('/api/vertex-garden/chat', methods=['POST'])
 def vertex_garden_chat():
@@ -2046,9 +2225,16 @@ def execute_terminal_command():
             "success": False,
             "error": "Command timed out after 30 seconds"
         }), 408
+    except subprocess.TimeoutExpired:
+        logger.warning(f"Command '{command}' timed out. Working dir: {working_dir}")
+        return jsonify({
+            "success": False,
+            "error": "Command timed out after 30 seconds",
+            "command": command
+        }), 408
     except Exception as e:
-        logger.error(f"Error executing terminal command: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        logger.error(f"Error executing terminal command: {command}. Error: {e}", exc_info=True)
+        return jsonify({"success": False, "error": "An error occurred while executing the command."}), 500
 
 # ==================== DEV SANDBOX ENDPOINTS ====================
 
@@ -2897,12 +3083,354 @@ def list_drive_files():
         })
         
     except Exception as e:
-        logger.error(f"Error listing Drive files: {e}")
-        return jsonify({"success": False, "error": str(e)}), 500
+        logger.error(f"Error listing Drive files: {e}", exc_info=True)
+        return jsonify({"success": False, "error": "An unexpected error occurred."}), 500
+
+# ==================== NIXOS SANDBOX ORCHESTRATOR SETUP (EPHEMERAL EXECUTION) ====================
+from .nixos_sandbox_orchestrator import NixOSSandboxOrchestrator, Job as EphemeralJob # Alias Job to avoid conflict
+import atexit
+
+nixos_ephemeral_orchestrator = None
+if os.getenv("ENABLE_NIXOS_SANDBOX", "false").lower() == "true":
+    try:
+        nixos_ephemeral_orchestrator = NixOSSandboxOrchestrator() # This is for ephemeral code execution
+        logger.info("🚀 NixOS Ephemeral Sandbox Orchestrator initialized and enabled.")
+        
+        def shutdown_ephemeral_orchestrator():
+            if nixos_ephemeral_orchestrator:
+                logger.info("Flask app exiting, shutting down NixOS Ephemeral Orchestrator...")
+                nixos_ephemeral_orchestrator.shutdown()
+        atexit.register(shutdown_ephemeral_orchestrator)
+
+    except Exception as e_orch:
+        logger.error(f"Failed to initialize NixOS Ephemeral Sandbox Orchestrator: {e_orch}", exc_info=True)
+        nixos_ephemeral_orchestrator = None
+else:
+    logger.info("NixOS Ephemeral Sandbox is disabled via ENABLE_NIXOS_SANDBOX environment variable.")
+
+# ==================== WORKSPACE VM MANAGER SETUP ====================
+from .vm_manager import LibvirtManager, VMManagerError
+libvirt_workspace_manager = None
+if os.getenv("ENABLE_WORKSPACE_MANAGER", "false").lower() == "true":
+    try:
+        libvirt_workspace_manager = LibvirtManager()
+        logger.info("🛠️ Libvirt Workspace Manager initialized and enabled.")
+        
+        def close_libvirt_workspace_connection():
+            if libvirt_workspace_manager:
+                logger.info("Flask app exiting, closing Libvirt Workspace Manager connection...")
+                libvirt_workspace_manager.close_connection()
+        atexit.register(close_libvirt_workspace_connection)
+    except Exception as e_lvm:
+        logger.error(f"Failed to initialize Libvirt Workspace Manager: {e_lvm}", exc_info=True)
+        libvirt_workspace_manager = None
+else:
+    logger.info("Libvirt Workspace Manager is disabled via ENABLE_WORKSPACE_MANAGER environment variable.")
+
+# ==================== SCOUT AGENT LOGGER SETUP ====================
+from .scout_logger import ScoutLogManager
+scout_log_manager = None
+if os.getenv("ENABLE_SCOUT_LOGGER", "false").lower() == "true":
+    try:
+        scout_log_manager = ScoutLogManager()
+        logger.info("📜 Scout Agent Log Manager initialized and enabled.")
+        
+        def close_scout_log_dbs():
+            if scout_log_manager:
+                logger.info("Flask app exiting, closing Scout Log Manager DBs...")
+                scout_log_manager.close_all_dbs()
+        atexit.register(close_scout_log_dbs)
+    except Exception as e_slm:
+        logger.error(f"Failed to initialize Scout Log Manager: {e_slm}", exc_info=True)
+        scout_log_manager = None
+else:
+    logger.info("Scout Agent Log Manager is disabled via ENABLE_SCOUT_LOGGER environment variable.")
+
+# ==================== SSH BRIDGE SETUP (CONCEPTUAL) ====================
+# Actual WebSocket implementation needs Flask-SocketIO integration
+# from .ssh_bridge import VMSSHBridge, SSHBridgeError
+# active_ssh_bridges: Dict[str, VMSSHBridge] = {} # Store bridges by sid or workspace_id+sid
+
+# Placeholder for where Flask-SocketIO would be initialized if not already:
+# if not hasattr(app, 'extensions') or 'socketio' not in app.extensions:
+#     socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+# else:
+#     socketio = app.extensions['socketio']
+
+
+# ==================== NIXOS EPHEMERAL SANDBOX API ENDPOINTS ====================
+
+@app.route('/api/v1/execute_python_nixos', methods=['POST'])
+def execute_python_nixos_vm():
+    # This uses the ephemeral orchestrator
+    if not nixos_ephemeral_orchestrator:
+        return jsonify({
+            "success": False, 
+            "error": "NixOS ephemeral sandboxing service is not enabled or available."
+        }), 503
+    if not nixos_orchestrator:
+        return jsonify({
+            "success": False, 
+            "error": "NixOS sandboxing service is not enabled or available."
+        }), 503
+
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "error": "Invalid JSON payload"}), 400
+
+        code = data.get('code')
+        language = data.get('language', 'python') # Default to python
+        timeout_seconds = data.get('timeout_seconds', 30) # Default execution timeout
+        # ... (input validation as before, ensure it's thorough) ...
+        code = data.get('code')
+        language = data.get('language', 'python') 
+        timeout_seconds = data.get('timeout_seconds', 30) 
+        resource_profile = data.get('resource_profile', 'default')
+
+        if not code or not isinstance(code, str): return jsonify({"success": False, "error": "Valid 'code' string is required."}), 400
+        if language != 'python': return jsonify({"success": False, "error": "Only 'python' language supported."}), 400
+        try:
+            timeout_seconds = int(timeout_seconds)
+            if not (1 <= timeout_seconds <= 300): raise ValueError()
+        except ValueError: return jsonify({"success": False, "error": "'timeout_seconds' must be int 1-300."}), 400
+        
+        job_id = nixos_ephemeral_orchestrator.submit_execution_job(
+            code=code, language=language, timeout=timeout_seconds, resource_profile=resource_profile
+        )
+        return jsonify({"success": True, "job_id": job_id, "status": "queued", "message": "Ephemeral code execution job queued."}), 202
+    except Exception as e:
+        logger.error(f"Error in /execute_python_nixos endpoint: {e}", exc_info=True)
+        return jsonify({"success": False, "error": "Server error submitting job."}), 500
+
+@app.route('/api/v1/execution_result/<job_id>', methods=['GET'])
+def get_nixos_execution_result(job_id: str):
+    # This uses the ephemeral orchestrator
+    if not nixos_ephemeral_orchestrator:
+        return jsonify({"success": False, "error": "NixOS ephemeral sandboxing service not available."}), 503
+    try:
+        job_details = nixos_ephemeral_orchestrator.get_job_details(job_id)
+        if not job_details: return jsonify({"success": False, "error": "Job not found."}), 404
+        
+        serializable_details = job_details.copy()
+        serializable_details.pop('future', None)
+        # Assuming JobResult is already a dict or asdict() was called by Job.to_dict()
+        return jsonify({"success": True, "job": serializable_details})
+    except Exception as e:
+        logger.error(f"Error in /execution_result/{job_id} endpoint: {e}", exc_info=True)
+        return jsonify({"success": False, "error": "Server error fetching job results."}), 500
+
+# ==================== WORKSPACE VM API ENDPOINTS ====================
+
+@app.route('/api/v1/workspaces', methods=['POST'])
+def create_workspace_vm_endpoint():
+    if not libvirt_workspace_manager:
+        return jsonify({"success": False, "error": "Workspace manager not available."}), 503
+    try:
+        data = request.get_json() or {}
+        workspace_id = data.get('workspace_id', f"ws-{uuid.uuid4().hex[:8]}")
+        memory_mb = data.get('memory_mb', DEFAULT_WORKSPACE_MEMORY_MB)
+        vcpus = data.get('vcpus', DEFAULT_WORKSPACE_VCPUS)
+
+        domain, disk_path = libvirt_workspace_manager.define_workspace_vm(workspace_id, memory_mb, vcpus)
+        libvirt_workspace_manager.start_vm(domain)
+        details = libvirt_workspace_manager.get_domain_details(workspace_id)
+        logger.info(f"Workspace VM {workspace_id} created and started. Disk: {disk_path}")
+        return jsonify({"success": True, "message": "Workspace VM created and starting.", "workspace": details}), 201
+    except (VMManagerError, libvirt.libvirtError) as e:
+        logger.error(f"Failed to create workspace VM: {e}", exc_info=True)
+        return jsonify({"success": False, "error": f"Failed to create workspace: {str(e)}"}), 500
+    except Exception as e_global:
+        logger.error(f"Unexpected error creating workspace VM: {e_global}", exc_info=True)
+        return jsonify({"success": False, "error": "Unexpected server error."}), 500
+
+
+@app.route('/api/v1/workspaces', methods=['GET'])
+def list_workspace_vms_endpoint():
+    if not libvirt_workspace_manager:
+        return jsonify({"success": False, "error": "Workspace manager not available."}), 503
+    try:
+        workspaces = libvirt_workspace_manager.list_domains_with_metadata(domain_type_filter="workspace")
+        return jsonify({"success": True, "workspaces": workspaces})
+    except (VMManagerError, libvirt.libvirtError) as e:
+        logger.error(f"Failed to list workspaces: {e}", exc_info=True)
+        return jsonify({"success": False, "error": f"Failed to list workspaces: {str(e)}"}), 500
+
+@app.route('/api/v1/workspaces/<workspace_id>', methods=['GET'])
+def get_workspace_vm_details_endpoint(workspace_id: str):
+    if not libvirt_workspace_manager:
+        return jsonify({"success": False, "error": "Workspace manager not available."}), 503
+    try:
+        details = libvirt_workspace_manager.get_domain_details(workspace_id)
+        if not details:
+            return jsonify({"success": False, "error": "Workspace not found."}), 404
+        if details.get("vm_type") != "workspace":
+            return jsonify({"success": False, "error": f"VM {workspace_id} is not a workspace type."}), 400
+        
+        # Add WebSocket URL for terminal (conceptual)
+        details["terminal_websocket_url"] = f"wss://{request.host}/ws/workspaces/{workspace_id}/terminal" # Adjust scheme/host as needed
+        return jsonify({"success": True, "workspace": details})
+    except (VMManagerError, libvirt.libvirtError) as e:
+        logger.error(f"Failed to get workspace details for {workspace_id}: {e}", exc_info=True)
+        return jsonify({"success": False, "error": f"Failed to get workspace details: {str(e)}"}), 500
+
+@app.route('/api/v1/workspaces/<workspace_id>', methods=['DELETE'])
+def delete_workspace_vm_endpoint(workspace_id: str):
+    if not libvirt_workspace_manager:
+        return jsonify({"success": False, "error": "Workspace manager not available."}), 503
+    try:
+        libvirt_workspace_manager.delete_workspace_vm(workspace_id)
+        return jsonify({"success": True, "message": f"Workspace {workspace_id} deleted."})
+    except (VMManagerError, libvirt.libvirtError) as e:
+        logger.error(f"Failed to delete workspace {workspace_id}: {e}", exc_info=True)
+        return jsonify({"success": False, "error": f"Failed to delete workspace: {str(e)}"}), 500
+
+@app.route('/api/v1/workspaces/<workspace_id>/start', methods=['POST'])
+def start_workspace_vm_endpoint(workspace_id: str):
+    if not libvirt_workspace_manager: return jsonify({"s":0, "e":"WS manager unavailable"}), 503
+    try:
+        libvirt_workspace_manager.start_vm(workspace_id)
+        return jsonify({"success": True, "message": f"Workspace {workspace_id} start initiated."})
+    except (VMManagerError, libvirt.libvirtError) as e: return jsonify({"s":0, "e":str(e)}),500
+
+@app.route('/api/v1/workspaces/<workspace_id>/stop', methods=['POST'])
+def stop_workspace_vm_endpoint(workspace_id: str):
+    if not libvirt_workspace_manager: return jsonify({"s":0, "e":"WS manager unavailable"}), 503
+    try:
+        libvirt_workspace_manager.stop_vm(workspace_id, for_workspace=True)
+        return jsonify({"success": True, "message": f"Workspace {workspace_id} stop initiated."})
+    except (VMManagerError, libvirt.libvirtError) as e: return jsonify({"s":0, "e":str(e)}),500
+
+
+# ==================== SCOUT AGENT API ENDPOINTS ====================
+
+@app.route('/api/v1/scout_agent/projects/<project_id>/status', methods=['GET'])
+def get_scout_project_status_endpoint(project_id: str):
+    if not scout_log_manager:
+        return jsonify({"success": False, "error": "Scout logger not available."}), 503
+    try:
+        project_logger = scout_log_manager.get_project_logger(project_id)
+        summary = project_logger.get_project_status_summary()
+        return jsonify({"success": True, "project_status": summary})
+    except Exception as e:
+        logger.error(f"Error getting scout project status for {project_id}: {e}", exc_info=True)
+        return jsonify({"success": False, "error": "Failed to retrieve project status."}), 500
+
+@app.route('/api/v1/scout_agent/projects/<project_id>/intervene', methods=['POST'])
+def scout_project_intervene_endpoint(project_id: str):
+    if not scout_log_manager:
+        return jsonify({"success": False, "error": "Scout logger not available."}), 503
+    try:
+        data = request.get_json()
+        if not data or 'command' not in data:
+            return jsonify({"success": False, "error": "Intervention 'command' is required."}), 400
+        
+        command = data.get('command')
+        parameters = data.get('parameters', {})
+        
+        project_logger = scout_log_manager.get_project_logger(project_id)
+        project_logger.log_entry(
+            message=f"User intervention received: {command}",
+            agent_action="user_intervention",
+            parameters={"command": command, "details": parameters},
+            status_update="intervention_received" # Or more specific if command implies state change
+        )
+        # Here, you might also trigger actual agent logic based on the command.
+        # For now, it's just logged.
+        return jsonify({"success": True, "message": f"Intervention '{command}' logged for project {project_id}."})
+    except Exception as e:
+        logger.error(f"Error processing intervention for {project_id}: {e}", exc_info=True)
+        return jsonify({"success": False, "error": "Failed to process intervention."}), 500
+
+
+# ==================== WebSocket SSH Bridge (Basic Structure) ====================
+# This requires Flask-SocketIO (socketio object assumed to be initialized from app start)
+# from .ssh_bridge import VMSSHBridge # Already imported conceptually
+# active_ssh_bridges: Dict[str, VMSSHBridge] = {} # session_id -> bridge_instance
+
+# @socketio.on('connect', namespace='/terminal_ws')
+# def terminal_ws_connect():
+#     workspace_id = request.args.get('workspaceId') # Or passed via auth/headers
+#     user_session_id = request.sid
+#     logger.info(f"SocketIO client {user_session_id} connecting to /terminal_ws for workspace {workspace_id}")
+    
+#     if not libvirt_workspace_manager or not workspace_id:
+#         logger.error(f"TerminalWS: Workspace manager not available or no workspace ID for SID {user_session_id}")
+#         emit('terminal_error', {'error': 'Required parameters missing or service unavailable.'}, room=user_session_id)
+#         return False # Reject connection
+
+#     try:
+#         ws_details = libvirt_workspace_manager.get_domain_details(workspace_id)
+#         if not ws_details or not ws_details.get('ip_address') or ws_details.get('status') != 'running':
+#             logger.error(f"TerminalWS: Workspace {workspace_id} not found, not running, or no IP for SID {user_session_id}.")
+#             emit('terminal_error', {'error': 'Workspace not available or not running.'}, room=user_session_id)
+#             return False
+        
+#         bridge = VMSSHBridge(host_ip=ws_details['ip_address'])
+#         active_ssh_bridges[user_session_id] = bridge
+        
+#         # Start a thread/greenlet to forward output from bridge to client for this session
+#         def forward_output():
+#             while bridge.is_active() or not bridge.output_queue.empty():
+#                 output = bridge.get_output(timeout=0.1) # Non-blocking get
+#                 if output is None: break # End of stream
+#                 if output:
+#                     socketio.emit('terminal_out', {'output': output}, room=user_session_id, namespace='/terminal_ws')
+#                 socketio.sleep(0.01) # Yield for other greenlets
+#             logger.info(f"TerminalWS: Output forwarding thread stopped for SID {user_session_id}")
+#             # Ensure final cleanup if bridge becomes inactive
+#             if user_session_id in active_ssh_bridges: # Check if not already cleaned by disconnect
+#                 active_ssh_bridges.pop(user_session_id, None).close()
+
+
+#         socketio.start_background_task(target=forward_output)
+#         emit('terminal_ready', {'message': 'SSH bridge connected.'}, room=user_session_id)
+#         logger.info(f"TerminalWS: SSH Bridge ready for SID {user_session_id} to workspace {workspace_id}")
+#         return True
+
+#     except Exception as e:
+#         logger.error(f"TerminalWS: Error connecting bridge for SID {user_session_id}, workspace {workspace_id}: {e}", exc_info=True)
+#         emit('terminal_error', {'error': f'Failed to establish terminal session: {str(e)}'}, room=user_session_id)
+#         return False
+
+
+# @socketio.on('terminal_in', namespace='/terminal_ws')
+# def terminal_ws_data(data):
+#     user_session_id = request.sid
+#     bridge = active_ssh_bridges.get(user_session_id)
+#     if bridge and isinstance(data, dict) and 'input' in data:
+#         bridge.send_input(data['input'])
+#     elif not bridge:
+#         logger.warning(f"TerminalWS: No active bridge for SID {user_session_id} on 'terminal_in'")
+#         emit('terminal_error', {'error': 'No active session. Please reconnect.'}, room=user_session_id)
+
+
+# @socketio.on('terminal_resize', namespace='/terminal_ws')
+# def terminal_ws_resize(data):
+#     user_session_id = request.sid
+#     bridge = active_ssh_bridges.get(user_session_id)
+#     if bridge and isinstance(data, dict):
+#         cols = data.get('cols', 80)
+#         rows = data.get('rows', 24)
+#         bridge.resize_pty(cols, rows)
+#         logger.info(f"TerminalWS: Resized PTY for SID {user_session_id} to cols={cols}, rows={rows}")
+
+# @socketio.on('disconnect', namespace='/terminal_ws')
+# def terminal_ws_disconnect():
+#     user_session_id = request.sid
+#     bridge = active_ssh_bridges.pop(user_session_id, None)
+#     if bridge:
+#         bridge.close()
+#     logger.info(f"SocketIO client {user_session_id} disconnected from /terminal_ws")
+
 
 # Start the Flask application
 if __name__ == '__main__':
-    print("\n🚀 Starting Podplay Backend Server...")
+    # Ensure .env is loaded if running directly
+    load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env.local'))
+    load_dotenv(os.path.join(os.path.dirname(os.path.dirname(__file__)), '.env'))
+    
+    logger.info("\n🚀 Starting Podplay Backend Server with NixOS Sandbox features...")
     print(f"🌐 Server will be available at: http://localhost:5000")
     print("📊 API endpoints ready for DevSandbox, Mama Bear, and Vertex Garden")
     print("🔧 Press Ctrl+C to stop the server\n")
