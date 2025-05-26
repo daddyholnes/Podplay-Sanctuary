@@ -1425,3 +1425,143 @@
 .resizing .resize-handle.horizontal {
   border-top-color: #58a6ff;
 }
+
+/* ==================== CLOUD BROWSER INTEGRATION ==================== */
+
+.cloud-browser-toggle-btn {
+  background: linear-gradient(135deg, #1e6f3d 0%, #2ea043 100%);
+  border: 1px solid #238636;
+  color: white;
+  padding: 8px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cloud-browser-toggle-btn:hover {
+  background: linear-gradient(135deg, #2ea043 0%, #3fb950 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(46, 160, 67, 0.3);
+}
+
+.cloud-browser-toggle-btn.active {
+  background: linear-gradient(135deg, #3fb950 0%, #56d364 100%);
+  box-shadow: 0 2px 8px rgba(86, 211, 100, 0.4);
+}
+
+.cloud-browser-panel {
+  display: flex;
+  flex-direction: column;
+  background: #0d1117;
+  border-left: 1px solid #30363d;
+  height: 100%;
+}
+
+.cloud-browser-panel .panel-header {
+  background: #161b22;
+  border-bottom: 1px solid #30363d;
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.cloud-browser-panel .panel-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #58a6ff;
+}
+
+.cloud-browser-controls {
+  display: flex;
+  gap: 8px;
+}
+
+.cloud-browser-controls button {
+  background: #21262d;
+  border: 1px solid #30363d;
+  color: #e6edf3;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s ease;
+}
+
+.cloud-browser-controls button:hover {
+  background: #30363d;
+  border-color: #58a6ff;
+}
+
+.cloud-browser-controls button.active {
+  background: #1f6feb;
+  border-color: #58a6ff;
+  color: white;
+}
+
+.dev-sandbox-browser {
+  flex: 1;
+  background: #0d1117;
+  border: none;
+}
+
+/* Cloud Browser in DevSandbox specific overrides */
+.cloud-browser-panel .cloud-browser {
+  border-radius: 0;
+  box-shadow: none;
+  background: #0d1117;
+}
+
+.cloud-browser-panel .cloud-browser-window {
+  background: #0d1117;
+}
+
+.cloud-browser-panel .cloud-browser-controls {
+  background: #161b22;
+}
+
+.cloud-browser-panel .url-input {
+  background: #0d1117;
+  border-color: #30363d;
+  color: #e6edf3;
+}
+
+.cloud-browser-panel .url-input:focus {
+  border-color: #58a6ff;
+  box-shadow: 0 0 0 2px rgba(88, 166, 255, 0.2);
+}
+
+/* ==================== RESPONSIVE CLOUD BROWSER ==================== */
+
+@media (max-width: 1200px) {
+  .cloud-browser-panel {
+    min-width: 300px;
+  }
+  
+  .cloud-browser-toggle-btn {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .cloud-browser-panel {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 1000;
+    border-left: none;
+  }
+  
+  .cloud-browser-toggle-btn {
+    order: 1;
+  }
+}

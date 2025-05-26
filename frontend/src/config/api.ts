@@ -2,10 +2,10 @@
 // This file centralizes API URLs to make switching between development and production easier
 
 // Backend API base URL
-export const API_BASE_URL = 'http://localhost:8000';
+export const API_BASE_URL = 'http://localhost:5000';
 
 // Socket.io connection URL
-export const SOCKET_URL = 'http://localhost:8000';
+export const SOCKET_URL = 'http://localhost:5000';
 
 // Helper to build full API URLs
 export const buildApiUrl = (endpoint: string) => {
