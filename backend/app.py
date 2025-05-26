@@ -737,7 +737,8 @@ class MamaBearAgent:
         
         self.last_briefing_date = today
         logger.info(f"🌅 Enhanced daily briefing generated for {today}")
-        return briefing
+        # Return the serialized dictionary instead of the object
+        return serialize_briefing(briefing)
     
     def learn_from_interaction(self, interaction_type: str, context: str, insight: str):
         """Enhanced Mama Bear learning with persistent memory"""
@@ -1363,7 +1364,7 @@ def get_job_status(job_id):
 
 # ==================== NIXOS WORKSPACE MANAGEMENT API ENDPOINTS ====================
 
-@app.route('/api/v1/workspaces', methods=['POST'])
+@app.route('/api/nixos/workspaces', methods=['POST'])
 def create_workspace():
     """Create a new persistent NixOS workspace VM"""
     if not libvirt_workspace_manager:
@@ -1393,7 +1394,7 @@ def create_workspace():
         logger.error(f"Error creating workspace: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/v1/workspaces', methods=['GET'])
+@app.route('/api/nixos/workspaces', methods=['GET'])
 def list_workspaces():
     """List all workspace VMs"""
     if not libvirt_workspace_manager:
@@ -1406,7 +1407,7 @@ def list_workspaces():
         logger.error(f"Error listing workspaces: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/v1/workspaces/<workspace_id>', methods=['GET'])
+@app.route('/api/nixos/workspaces/<workspace_id>', methods=['GET'])
 def get_workspace(workspace_id):
     """Get details of a specific workspace"""
     if not libvirt_workspace_manager:
@@ -1422,7 +1423,7 @@ def get_workspace(workspace_id):
         logger.error(f"Error getting workspace: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/v1/workspaces/<workspace_id>', methods=['DELETE'])
+@app.route('/api/nixos/workspaces/<workspace_id>', methods=['DELETE'])
 def delete_workspace(workspace_id):
     """Delete a workspace VM"""
     if not libvirt_workspace_manager:
@@ -1438,7 +1439,7 @@ def delete_workspace(workspace_id):
         logger.error(f"Error deleting workspace: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/v1/workspaces/<workspace_id>/start', methods=['POST'])
+@app.route('/api/nixos/workspaces/<workspace_id>/start', methods=['POST'])
 def start_workspace(workspace_id):
     """Start a workspace VM"""
     if not libvirt_workspace_manager:
@@ -1454,7 +1455,7 @@ def start_workspace(workspace_id):
         logger.error(f"Error starting workspace: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
-@app.route('/api/v1/workspaces/<workspace_id>/stop', methods=['POST'])
+@app.route('/api/nixos/workspaces/<workspace_id>/stop', methods=['POST'])
 def stop_workspace(workspace_id):
     """Stop a workspace VM"""
     if not libvirt_workspace_manager:
@@ -1502,6 +1503,47 @@ def get_scout_logs():
     except Exception as e:
         logger.error(f"Error getting Scout Agent logs: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/scout/projects/<project_id>', methods=['GET'])
+def get_scout_project_details(project_id):
+    """Get details for a specific Scout project."""
+    try:
+        # Check if scout_log_manager is available
+        # Although we'll use mock data for project-specific details for now,
+        # this check is kept for future enhancements if scout_log_manager gets project-specific methods.
+        if scout_log_manager:
+            # Placeholder for future: If scout_log_manager could fetch project-specific data
+            # For now, we assume it cannot, so we proceed to mock data.
+            # Example:
+            # if hasattr(scout_log_manager, 'get_project_status') and hasattr(scout_log_manager, 'get_project_logs'):
+            #     status = scout_log_manager.get_project_status(project_id)
+            #     logs = scout_log_manager.get_project_logs(project_id)
+            #     project_data = {
+            #         "id": project_id,
+            #         "name": f"Project {project_id}", # Or fetched name
+            #         "status": status or "fetched_status_or_default",
+            #         "logs": logs or "fetched_logs_or_default",
+            #         "details": "Live data from Scout Log Manager."
+            #     }
+            #     return jsonify({"success": True, "project": project_data}), 200
+            pass # Fall through to mock data as per current understanding
+
+        # Fallback to Mock Response
+        mock_project_data = {
+            "id": project_id,
+            "name": f"Project {project_id}",
+            "status": "mock_status_monitoring_active",
+            "logs": [
+                {"timestamp": datetime.utcnow().isoformat() + "Z", "message": "Mock log: System nominal."},
+                {"timestamp": (datetime.utcnow() + timedelta(seconds=5)).isoformat() + "Z", "message": "Mock log: Activity detected."}
+            ],
+            "details": "This is mock data. Live project-specific data retrieval is pending full Scout Agent integration."
+        }
+        return jsonify({"success": True, "project": mock_project_data}), 200
+
+    except Exception as e:
+        logger.error(f"Error in /api/scout/projects/{project_id}: {e}", exc_info=True)
+        return jsonify({"success": False, "error": "Failed to retrieve project data."}), 500
 
 # ==================== WebSocket SSH Bridge ====================
 
@@ -1710,6 +1752,42 @@ def discover_mcp_servers():
         logger.error(f"Error discovering MCP servers: {e}")
         return jsonify({"error": "Failed to discover MCP servers"}), 500
 
+@app.route('/api/mcp/search', methods=['GET'])
+def search_mcp_servers_route():
+    try:
+        query = request.args.get('query', '')
+        category = request.args.get('category', None)
+        official_only_str = request.args.get('official_only', 'false').lower()
+        official_only = official_only_str == 'true'
+
+        # The marketplace instance is globally available
+        servers = marketplace.search_servers(
+            query=query, 
+            category=category, 
+            official_only=official_only
+        )
+        # The search_servers method already returns a list of dicts suitable for JSON
+        return jsonify({"success": True, "servers": servers}), 200
+    except Exception as e:
+        logger.error(f"Error in /api/mcp/search: {e}", exc_info=True)
+        return jsonify({"success": False, "error": "Failed to search MCP servers."}), 500
+
+@app.route('/api/mcp/categories', methods=['GET'])
+def get_mcp_categories_route():
+    try:
+        categories_list = []
+        # MCPCategory enum is globally available
+        for category_enum_member in MCPCategory:
+            categories_list.append({
+                "value": category_enum_member.value,
+                # Use .name for the enum member name, then format it
+                "label": category_enum_member.name.replace('_', ' ').title() 
+            })
+        return jsonify({"success": True, "categories": categories_list}), 200
+    except Exception as e:
+        logger.error(f"Error in /api/mcp/categories: {e}", exc_info=True)
+        return jsonify({"success": False, "error": "Failed to retrieve MCP categories."}), 500
+
 # Root endpoint for health checks
 @app.route('/', methods=['GET'])
 def health_check():
@@ -1725,22 +1803,17 @@ def health_check():
 def get_daily_briefing():
     """Get Mama Bear's daily briefing"""
     try:
-        # Create a mock briefing for now
-        briefing = {
-            "date": datetime.utcnow().isoformat(),
-            "new_mcp_tools": [],
-            "updated_models": [],
-            "project_priorities": ["Set up your first project", "Explore MCP tools", "Configure your environment"],
-            "recommendations": ["Start with a simple project to explore the features"],
-            "system_status": {
-                "status": "healthy",
-                "message": "All systems operational"
-            }
-        }
-        return jsonify(briefing), 200
+        # This call now generates, stores, and returns the serializable briefing dictionary
+        briefing_data_serializable = mama_bear.generate_daily_briefing()
+
+        if not briefing_data_serializable:
+            logger.error("Failed to generate briefing data.")
+            return jsonify({"success": False, "error": "Failed to generate briefing data."}), 500
+
+        return jsonify({"success": True, "briefing": briefing_data_serializable}), 200
     except Exception as e:
-        logger.error(f"Error generating briefing: {e}")
-        return jsonify({"error": "Failed to generate briefing"}), 500
+        logger.error(f"Error in get_daily_briefing: {e}", exc_info=True)
+        return jsonify({"success": False, "error": "Failed to generate daily briefing due to an internal error."}), 500
 
 @app.route('/api/vertex-garden/chat-history', methods=['GET'])
 def get_chat_history():
@@ -1770,6 +1843,21 @@ def vertex_garden_chat():
     except Exception as e:
         logger.error(f"Error processing chat: {e}")
         return jsonify({"error": "Failed to process chat"}), 500
+
+# ==================== DEFAULT NAMESPACE SOCKET.IO DIAGNOSTIC HANDLERS ====================
+# These handlers are for the default namespace ('/') often used by generic Socket.IO clients
+# or for initial handshake before switching to a specific namespace.
+
+@socketio.on('connect', namespace='/') # Or simply @socketio.on('connect')
+def handle_default_connect():
+    # request and logger are already available globally in this file
+    logger.info(f"CLIENT_DEFAULT_CONNECT: Client {request.sid} connected to default namespace.")
+    # Optionally, emit a confirmation back to the client
+    # emit('default_ns_confirmation', {'sid': request.sid, 'message': 'Successfully connected to default namespace.'}, room=request.sid)
+
+@socketio.on('disconnect', namespace='/') # Or simply @socketio.on('disconnect')
+def handle_default_disconnect():
+    logger.info(f"CLIENT_DEFAULT_DISCONNECT: Client {request.sid} disconnected from default namespace.")
 
 # ==================== MAIN APP START ====================
 if __name__ == '__main__':

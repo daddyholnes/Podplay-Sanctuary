@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { API_ENDPOINTS, buildApiUrl, buildDynamicApiUrl } from '../../config/api';
+import { API_ENDPOINTS, buildApiUrl, buildDynamicApiUrl, SOCKET_URL } from '../../config/api';
 import WorkspaceListComponent from './WorkspaceListComponent';
 import WorkspaceCreationModal from './WorkspaceCreationModal';
 import WebTerminalComponent from './WebTerminalComponent'; // Will be used by WorkspaceItem
@@ -25,6 +25,8 @@ const WorkspacesView: React.FC = () => {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState<boolean>(false);
   
   const [selectedWorkspaceForTerminal, setSelectedWorkspaceForTerminal] = useState<NixOSWorkspace | null>(null);
+  // Add a new state for the base socket URL to pass to WebTerminalComponent
+  // No, SOCKET_URL can be passed directly.
 
   const fetchWorkspaces = useCallback(async () => {
     setIsLoading(true);
@@ -155,12 +157,10 @@ const WorkspacesView: React.FC = () => {
           setIsLoading(false);
           return;
         }
-        // Create enhanced workspace object with terminal_websocket_url
-        const enhancedWorkspace = {
-          ...data.workspace,
-          terminal_websocket_url: buildDynamicApiUrl(API_ENDPOINTS.NIXOS_WORKSPACES.TERMINAL_WEBSOCKET, { id: workspaceId })
-        } as NixOSWorkspace;
-        setSelectedWorkspaceForTerminal(enhancedWorkspace);
+        // Workspace data is successfully fetched.
+        // We don't need to construct the full websocket URL here anymore.
+        // WebTerminalComponent will do that with baseSocketUrl + namespace + workspaceId.
+        setSelectedWorkspaceForTerminal(data.workspace as NixOSWorkspace); // data.workspace should conform to NixOSWorkspace
       } else {
         throw new Error(data.error || "Could not get workspace details for terminal.");
       }
@@ -210,10 +210,10 @@ const WorkspacesView: React.FC = () => {
         />
       )}
       
-      {selectedWorkspaceForTerminal && selectedWorkspaceForTerminal.terminal_websocket_url && (
+      {selectedWorkspaceForTerminal && (
         <WebTerminalComponent
           workspaceId={selectedWorkspaceForTerminal.id}
-          websocketUrl={selectedWorkspaceForTerminal.terminal_websocket_url}
+          baseSocketUrl={SOCKET_URL} // Pass the base URL from config
           isOpen={!!selectedWorkspaceForTerminal}
           onClose={handleCloseTerminal}
         />

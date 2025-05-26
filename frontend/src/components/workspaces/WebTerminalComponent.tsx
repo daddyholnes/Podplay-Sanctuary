@@ -6,14 +6,14 @@ import io, { Socket } from 'socket.io-client';
 
 interface WebTerminalComponentProps {
   workspaceId: string;
-  websocketUrl: string; // This should be the base WebSocket URL like ws://localhost:5001
+  baseSocketUrl: string; // This is the base URL like http://localhost:5000
   isOpen: boolean;
   onClose: () => void;
 }
 
 const WebTerminalComponent: React.FC<WebTerminalComponentProps> = ({
   workspaceId,
-  websocketUrl, // e.g., ws://localhost:5001
+  baseSocketUrl, // e.g., http://localhost:5000
   isOpen,
   onClose,
 }) => {
@@ -26,7 +26,7 @@ const WebTerminalComponent: React.FC<WebTerminalComponentProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const connectToTerminal = useCallback(() => {
-    if (!terminalRef.current || !workspaceId || !websocketUrl) {
+    if (!terminalRef.current || !workspaceId || !baseSocketUrl) {
       console.error("WebTerminalComponent: Missing refs or props for connection.");
       return;
     }
@@ -35,7 +35,8 @@ const WebTerminalComponent: React.FC<WebTerminalComponentProps> = ({
     if (socketInstanceRef.current) socketInstanceRef.current.disconnect();
     if (xtermInstanceRef.current) xtermInstanceRef.current.dispose();
     
-    console.log(`WebTerminalComponent: Initializing for workspace ${workspaceId} at ${websocketUrl}`);
+    const fullWebsocketUrl = `${baseSocketUrl.startsWith('http') ? baseSocketUrl.replace(/^http/, 'ws') : baseSocketUrl}/terminal_ws`;
+    console.log(`WebTerminalComponent: Initializing for workspace ${workspaceId} at ${fullWebsocketUrl} (base: ${baseSocketUrl})`);
 
     const term = new Terminal({
       cursorBlink: true,
@@ -66,11 +67,14 @@ const WebTerminalComponent: React.FC<WebTerminalComponentProps> = ({
     }
 
 
-    // The namespace is /terminal_ws
-    const socket = io(websocketUrl, {
+    // The namespace is /terminal_ws, appended to the baseSocketUrl
+    // Ensure baseSocketUrl is correctly formatted (e.g. http://localhost:5000)
+    // The io client will handle ws/wss protocol negotiation based on the page's protocol or the URL.
+    const socket = io(baseSocketUrl + '/terminal_ws', { // Connect to the specific namespace path
       path: '/socket.io', // Default for Flask-SocketIO
       transports: ['websocket'],
       reconnectionAttempts: 3,
+      // Note: 'namespace' option is not needed here as it's part of the URL path.
     });
     socketInstanceRef.current = socket;
 
@@ -150,7 +154,7 @@ const WebTerminalComponent: React.FC<WebTerminalComponentProps> = ({
         socketInstanceRef.current.emit('terminal_resize', { cols, rows });
       }
     });
-  }, [workspaceId, websocketUrl]); // Dependencies for re-establishing connection if these change
+  }, [workspaceId, baseSocketUrl]); // Dependencies for re-establishing connection if these change
 
   useEffect(() => {
     if (isOpen) {
