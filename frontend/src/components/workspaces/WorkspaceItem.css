@@ -1,0 +1,145 @@
+.workspaceItem {
+    background-color: #ffffff; /* White background for each item */
+    border: 1px solid #d0d9d4; /* Softer border, consistent with header */
+    border-radius: 8px;
+    padding: 15px 20px;
+    margin-bottom: 15px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.05);
+    transition: box-shadow 0.2s ease-in-out;
+}
+
+.workspaceItem:hover {
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.08);
+}
+
+.workspaceItemHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.workspaceItemHeader h3 {
+    margin: 0;
+    color: #2c3e50; /* Dark blue-gray */
+    font-size: 1.3em;
+}
+
+.workspaceId {
+    font-size: 0.8em;
+    color: #7f8c8d; /* Grayish color */
+    margin-left: 8px;
+}
+
+.statusIndicator {
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 0.8em;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+
+.statusRunning {
+    background-color: #d4efdf; /* Light green */
+    color: #1e8449; /* Darker green */
+    border-left: 4px solid #2ecc71; /* Green accent */
+}
+
+.statusStopped {
+    background-color: #f5b7b1; /* Light red */
+    color: #c0392b; /* Darker red */
+    border-left: 4px solid #e74c3c; /* Red accent */
+}
+
+.statusError {
+    background-color: #fadbd8; /* Lighter red/pink */
+    color: #a93226; /* Dark red */
+    border-left: 4px solid #c0392b; /* Red accent */
+}
+
+.statusUnknown {
+    background-color: #e5e7e9; /* Light gray */
+    color: #566573; /* Darker gray */
+    border-left: 4px solid #bdc3c7; /* Gray accent */
+}
+
+
+.workspaceItemActions {
+    display: flex;
+    flex-wrap: wrap; /* Allow buttons to wrap on smaller screens */
+    gap: 10px; /* Spacing between buttons */
+    margin-bottom: 10px;
+}
+
+/* Using global .button styles defined in WorkspacesView.css */
+/* Add specific button styles if needed */
+
+.buttonWarning {
+    background-color: #f39c12; /* Orange */
+    color: white;
+}
+.buttonWarning:hover {
+    background-color: #d35400; /* Darker orange */
+}
+
+.buttonSuccess {
+    background-color: #2ecc71; /* Green */
+    color: white;
+}
+.buttonSuccess:hover {
+    background-color: #27ae60; /* Darker green */
+}
+
+.buttonDanger {
+    background-color: #e74c3c; /* Red */
+    color: white;
+}
+.buttonDanger:hover {
+    background-color: #c0392b; /* Darker red */
+}
+
+
+.workspaceItemDetails {
+    margin-top: 15px;
+    padding-top: 10px;
+    border-top: 1px dashed #e0e0e0; /* Dashed separator */
+    font-size: 0.9em;
+    color: #555;
+}
+
+.workspaceItemDetails p {
+    margin: 5px 0;
+    line-height: 1.6;
+}
+
+.workspaceItemDetails strong {
+    color: #333;
+}
+
+.sftpDetails {
+    margin-top: 8px;
+    padding: 8px;
+    background-color: #f9f9f9;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    font-size: 0.85em;
+    word-break: break-all; /* Prevent long SFTP string from breaking layout */
+}
+
+.sftpDetails code {
+    font-family: 'Courier New', Courier, monospace;
+    background-color: #eef;
+    padding: 1px 3px;
+    border-radius: 2px;
+}
+
+.terminalContainer {
+    margin-top: 15px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    /* xterm.js will create its own internal structure here */
+    /* Set a specific height or make it responsive */
+    min-height: 300px; 
+    background-color: #000; /* Default terminal background */
+    overflow: hidden; /* Ensure xterm fits within bounds */
+}

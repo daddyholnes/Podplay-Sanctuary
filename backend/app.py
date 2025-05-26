@@ -3087,7 +3087,7 @@ def list_drive_files():
         return jsonify({"success": False, "error": "An unexpected error occurred."}), 500
 
 # ==================== NIXOS SANDBOX ORCHESTRATOR SETUP (EPHEMERAL EXECUTION) ====================
-from .nixos_sandbox_orchestrator import NixOSSandboxOrchestrator, Job as EphemeralJob # Alias Job to avoid conflict
+from nixos_sandbox_orchestrator import NixOSSandboxOrchestrator, Job as EphemeralJob # Alias Job to avoid conflict
 import atexit
 
 nixos_ephemeral_orchestrator = None
@@ -3109,7 +3109,7 @@ else:
     logger.info("NixOS Ephemeral Sandbox is disabled via ENABLE_NIXOS_SANDBOX environment variable.")
 
 # ==================== WORKSPACE VM MANAGER SETUP ====================
-from .vm_manager import LibvirtManager, VMManagerError
+from vm_manager import LibvirtManager, VMManagerError
 libvirt_workspace_manager = None
 if os.getenv("ENABLE_WORKSPACE_MANAGER", "false").lower() == "true":
     try:
@@ -3128,7 +3128,7 @@ else:
     logger.info("Libvirt Workspace Manager is disabled via ENABLE_WORKSPACE_MANAGER environment variable.")
 
 # ==================== SCOUT AGENT LOGGER SETUP ====================
-from .scout_logger import ScoutLogManager
+from scout_logger import ScoutLogManager
 scout_log_manager = None
 if os.getenv("ENABLE_SCOUT_LOGGER", "false").lower() == "true":
     try:
@@ -3148,7 +3148,7 @@ else:
 
 # ==================== SSH BRIDGE SETUP (CONCEPTUAL) ====================
 # Actual WebSocket implementation needs Flask-SocketIO integration
-# from .ssh_bridge import VMSSHBridge, SSHBridgeError
+# from ssh_bridge import VMSSHBridge, SSHBridgeError # Changed to direct import
 # active_ssh_bridges: Dict[str, VMSSHBridge] = {} # Store bridges by sid or workspace_id+sid
 
 # Placeholder for where Flask-SocketIO would be initialized if not already:
@@ -3345,7 +3345,7 @@ def scout_project_intervene_endpoint(project_id: str):
 
 # ==================== WebSocket SSH Bridge (Basic Structure) ====================
 # This requires Flask-SocketIO (socketio object assumed to be initialized from app start)
-# from .ssh_bridge import VMSSHBridge # Already imported conceptually
+# from ssh_bridge import VMSSHBridge # Changed to direct import
 # active_ssh_bridges: Dict[str, VMSSHBridge] = {} # session_id -> bridge_instance
 
 # @socketio.on('connect', namespace='/terminal_ws')

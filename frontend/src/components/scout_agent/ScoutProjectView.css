@@ -1,0 +1,97 @@
+.scoutProjectView {
+    padding: 20px;
+    background-color: #f9f9f9; /* Slightly different background for this view */
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.scoutProjectHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.scoutProjectHeader h2 {
+    color: #333;
+    font-size: 1.8em;
+    margin: 0;
+}
+
+.projectInfo {
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.projectInfo p {
+    margin: 5px 0;
+    font-size: 0.95em;
+    color: #555;
+}
+
+.projectInfo strong {
+    color: #333;
+}
+
+.projectInfo .status-running { color: #27ae60; font-weight: bold; }
+.projectInfo .status-completed { color: #2980b9; font-weight: bold; }
+.projectInfo .status-failed { color: #c0392b; font-weight: bold; }
+.projectInfo .status-paused { color: #f39c12; font-weight: bold; }
+.projectInfo .status-waiting_for_approval { color: #8e44ad; font-weight: bold; }
+.projectInfo .status-unknown { color: #7f8c8d; font-weight: bold; }
+.projectInfo .status-initializing { color: #3498db; font-weight: bold; }
+
+
+.scoutLayout {
+    display: flex;
+    flex-direction: row; /* Default for larger screens */
+    gap: 20px;
+    flex-grow: 1;
+    overflow-y: hidden; /* Prevent double scrollbars if children manage their own scroll */
+}
+
+.planAndControlsColumn {
+    flex: 1; /* Takes up 1 part of the space */
+    min-width: 300px; /* Ensure it doesn't get too squeezed */
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.logViewerColumn {
+    flex: 2; /* Takes up 2 parts of the space, making it wider */
+    min-width: 400px;
+    display: flex; /* To allow ScoutLogViewerComponent to grow */
+    flex-direction: column;
+    background-color: #fff;
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    overflow-y: hidden; /* Let ScoutLogViewerComponent handle its internal scroll */
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .scoutLayout {
+        flex-direction: column;
+        overflow-y: auto; /* Allow main layout to scroll on small screens */
+    }
+    .planAndControlsColumn, .logViewerColumn {
+        flex: none; /* Reset flex grow */
+        min-width: 0; /* Reset min-width */
+    }
+}
+
+/* General button styles are assumed from WorkspacesView.css or a global file */
+/* .button { ... } */
+/* .errorMessage { ... } */
