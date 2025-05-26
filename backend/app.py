@@ -107,7 +107,6 @@ import atexit
 import uuid
 
 from flask import Flask, request, jsonify, send_from_directory
-from flask_cors import CORS
 from flask_socketio import SocketIO, emit, join_room, leave_room
 
 # Enhanced Mama Bear Capabilities
@@ -145,16 +144,7 @@ cors = CORS(app, resources={
     }
 })
 
-# Add CORS headers to all responses
-# Remove after_request CORS code and rely on Flask-CORS
-
-from flask_cors import CORS
-
-CORS(app, origins=["http://localhost:5173"], supports_credentials=True)
-
-@app.route('/api/mama-bear/chat', methods=['POST'])
-def chat():
-    pass  # TODO: Implement POST logic here
+# CORS already configured above
 
 # All custom after_request and OPTIONS handlers removed. CORS is now handled globally and automatically.
 
@@ -1187,6 +1177,61 @@ if MEM0_CHAT_AVAILABLE and mem0_chat_manager:
 
 logger.info("🐻 Mama Bear Sanctuary - All systems initialized!")
 
+# ==================== MAMA BEAR CHAT ENDPOINT ====================
+
+@app.route('/api/mama-bear/chat', methods=['POST'])
+def mama_bear_chat():
+    try:
+        # Get request data
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "error": "No data provided"}), 400
+        
+        message = data.get('message', '')
+        user_id = data.get('user_id', 'anonymous')
+        attachments = data.get('attachments', [])
+        
+        if not message:
+            return jsonify({"success": False, "error": "Message is required"}), 400
+        
+        # Try to use enhanced Vertex AI Mama Bear first (preferred)
+        if enhanced_vertex_mama:
+            try:
+                response = enhanced_vertex_mama.mama_bear_chat(
+                    message=message,
+                    user_id=user_id,
+                    context={"attachments": attachments} if attachments else None
+                )
+                return jsonify(response)
+            except Exception as e:
+                logger.error(f"Enhanced Vertex Mama Bear failed: {e}")
+                # Fall back to enhanced mama bear
+        
+        # Fallback to enhanced mama bear (Together.ai)
+        if enhanced_mama_bear:
+            try:
+                response_text = enhanced_mama_bear.respond(message)
+                return jsonify({
+                    "success": True,
+                    "response": response_text,
+                    "metadata": {"provider": "together_ai", "user_id": user_id}
+                })
+            except Exception as e:
+                logger.error(f"Enhanced Mama Bear failed: {e}")
+        
+        # Ultimate fallback
+        return jsonify({
+            "success": False,
+            "error": "Mama Bear is temporarily unavailable"
+        }), 503
+        
+    except Exception as e:
+        logger.error(f"Chat endpoint error: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Internal server error"
+        }), 500
+
 # ==================== NIXOS VM INFRASTRUCTURE SETUP ====================
 nixos_ephemeral_orchestrator = None
 libvirt_workspace_manager = None
@@ -1710,7 +1755,7 @@ def get_session_messages(session_id):
     return jsonify([]), 200
 
 @app.route('/api/vertex-garden/chat', methods=['POST'])
-def chat():
+def vertex_garden_chat():
     """Handle chat messages"""
     try:
         data = request.get_json()

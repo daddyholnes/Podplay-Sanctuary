@@ -1,0 +1,100 @@
+.scout-project-view {
+  padding: 20px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 20px; /* Space between header, main content, and logs */
+}
+
+.scout-project-header {
+  padding-bottom: 15px;
+  border-bottom: 1px solid var(--border-color-light);
+}
+
+.scout-project-header h3 {
+  margin-top: 0;
+  margin-bottom: 5px;
+  color: var(--text-color-accent); /* Use accent for project title */
+}
+
+.scout-project-header p {
+  margin: 5px 0;
+  font-size: 0.9em;
+  color: var(--text-color-secondary);
+}
+
+.scout-project-header .scout-refresh-toggle {
+    margin-top: 10px;
+    font-size: 0.85em;
+}
+.scout-project-header .scout-refresh-toggle select {
+    margin-left: 5px;
+    padding: 3px;
+    border-radius: 3px;
+    background-color: var(--background-color-base);
+    color: var(--text-color-primary);
+    border: 1px solid var(--border-color-base);
+}
+
+
+.scout-status-running { color: var(--info-color-dark); font-weight: bold; }
+.scout-status-completed { color: var(--success-color-dark); font-weight: bold; }
+.scout-status-failed { color: var(--error-color-dark); font-weight: bold; }
+.scout-status-paused { color: var(--warning-color-dark); font-weight: bold; }
+.scout-status-unknown { color: var(--text-color-secondary); font-weight: bold; }
+
+
+.scout-main-content {
+  display: flex;
+  gap: 20px; /* Space between plan and intervention */
+  flex-wrap: wrap; /* Allow wrapping on smaller screens if needed */
+}
+
+.scout-plan-section {
+  flex: 2; /* Plan takes more space */
+  min-width: 300px; /* Minimum width before wrapping */
+  background-color: var(--background-color-secondary);
+  padding: 15px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color-base);
+}
+
+.scout-intervention-section {
+  flex: 1; /* Intervention takes less space */
+  min-width: 250px;
+  background-color: var(--background-color-secondary);
+  padding: 15px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color-base);
+}
+
+.scout-plan-section h4,
+.scout-intervention-section h4,
+.scout-logs-section h4 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: var(--text-color-primary);
+  border-bottom: 1px solid var(--border-color-light);
+  padding-bottom: 8px;
+}
+
+.scout-logs-section {
+  flex-grow: 1; /* Takes remaining vertical space */
+  background-color: var(--background-color-darker); /* Darker for logs */
+  padding: 15px;
+  border-radius: 6px;
+  border: 1px solid var(--border-color-base);
+  overflow-y: auto; /* Scroll for logs */
+  max-height: 400px; /* Example max height */
+}
+
+.scout-loading,
+.scout-error-message,
+.scout-info {
+    text-align: center;
+    padding: 20px;
+    font-size: 1.1em;
+}
+.scout-error-message {
+    color: var(--error-color-dark);
+}

@@ -1,9 +1,15 @@
-import React, { useState, useEffect } from 'react';
+// filepath: /home/woody/Desktop/podplay-build-beta/frontend/src/App.tsx
+import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
-import './EnhancedChat.css';
-import EnhancedChatInterface from './EnhancedChatInterface';
+import './EnhancedChat.css'; // For EnhancedChatInterface if used
+// Existing views
+import EnhancedChatInterface from './EnhancedChatInterface'; 
 import VertexGardenChat from './VertexGardenChat';
-import DevSandbox from './DevSandbox';
+import DevSandbox from './DevSandbox'; 
+// New Views
+import WorkspacesView from './components/workspaces/WorkspacesView';
+import ScoutProjectView from './components/scout_agent/ScoutProjectView';
+
 import { API_BASE_URL, buildApiUrl, API_ENDPOINTS } from './config/api';
 
 // ==================== ELECTRON INTEGRATION ====================
@@ -593,35 +599,93 @@ const HyperbubbleDiscovery: React.FC = () => {
 
 // ==================== MAIN APP COMPONENT ====================
 
+// Define the possible views for type safety
+type ActiveView = 
+  | 'Sanctuary' 
+  | 'Marketplace' 
+  | 'Discovery' 
+  | 'MamaBear' 
+  | 'VertexChat' 
+  | 'DevSandbox'
+  | 'Workspaces' // New View
+  | 'ScoutAgentProject'; // New View
+
 const App: React.FC = () => {
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
-  const [activeView, setActiveView] = useState<'sanctuary' | 'marketplace' | 'discovery' | 'mama-bear' | 'vertex-chat' | 'dev-sandbox'>('vertex-chat');
+  const [activeView, setActiveView] = useState<ActiveView>('Sanctuary'); 
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [backendOnline, setBackendOnline] = useState(false);
 
-  // Handle backend status changes - we don't need to store the URL anymore as we use the config
-  const handleBackendStatus = (isRunning: boolean) => {
-    // In the future, we could use this to show offline/online status
-    console.log(`Backend status: ${isRunning ? 'online' : 'offline'}`);
+  // For ScoutAgentProject view, we'll need a project ID.
+  // For now, hardcode one for testing. In a real app, this would come from a list/selection.
+  const [currentScoutProjectId, setCurrentScoutProjectId] = useState<string>("test-project-alpha");
+
+  const handleBackendStatus = useCallback((isRunning: boolean) => {
+    setBackendOnline(isRunning);
+    // Potentially fetch briefing only if backend is online
+    if (isRunning && !briefing) {
+      fetchBriefing();
+    }
+  }, [briefing]); // Dependency on briefing to avoid re-fetching if already loaded
+
+  const fetchBriefing = async () => {
+    console.log("Attempting to fetch briefing from:", buildApiUrl(API_ENDPOINTS.MAMA_BEAR.BRIEFING));
+    try {
+      const response = await fetch(buildApiUrl(API_ENDPOINTS.MAMA_BEAR.BRIEFING));
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.json();
+      if (data.success && data.briefing) {
+        setBriefing(data.briefing);
+      } else {
+        console.warn("Failed to parse briefing data:", data.error || "Unknown error");
+        setBriefing(null); // Set to null or an empty state on failure
+      }
+    } catch (error) {
+      console.error('Error loading briefing:', error);
+      setBriefing(null); // Set to null or an empty state on error
+    } finally {
+      setIsLoading(false); // Initial loading complete even if briefing fails
+    }
+  };
+  
+  useEffect(() => {
+    // BackendConnectionManager will call handleBackendStatus, which then calls fetchBriefing
+    // So, direct call to fetchBriefing here might be redundant if BackendConnectionManager is quick.
+    // However, keeping it for initial load if BackendConnectionManager takes time or is bypassed.
+    if (backendOnline && !briefing) { // Only fetch if online and no briefing yet
+        fetchBriefing();
+    } else if (!backendOnline) {
+        setIsLoading(false); // If backend is offline, don't hang on loading
+    }
+  }, [backendOnline, briefing]);
+
+  const renderActiveView = () => {
+    switch (activeView) {
+      case 'Sanctuary':
+        return <MamaBearGreeting briefing={briefing} />;
+      case 'Marketplace':
+        return <MCPMarketplace />;
+      case 'Discovery':
+        return <HyperbubbleDiscovery />;
+      case 'MamaBear':
+        return <EnhancedChatInterface />;
+      case 'VertexChat':
+        return <VertexGardenChat />;
+      case 'DevSandbox':
+        return <DevSandbox />;
+      case 'Workspaces': // New Case
+        return <WorkspacesView />;
+      case 'ScoutAgentProject': // New Case
+        return <ScoutProjectView projectId={currentScoutProjectId} />;
+      default:
+        return <MamaBearGreeting briefing={briefing} />; // Fallback view
+    }
   };
 
-  useEffect(() => {
-    // Load daily briefing
-    fetch(buildApiUrl(API_ENDPOINTS.MAMA_BEAR.BRIEFING))
-      .then(res => res.json())
-      .then(data => {
-        if (data.success) {
-          setBriefing(data.briefing);
-        }
-        setIsLoading(false);
-      })
-      .catch(error => {
-        console.error('Error loading briefing:', error);
-        setIsLoading(false);
-      });
-  }, []);
-
-  if (isLoading) {
+  if (isLoading && !briefing && backendOnline) { // Refined loading condition
     return (
       <div className="loading-sanctuary">
         <div className="loading-content">
@@ -651,52 +715,69 @@ const App: React.FC = () => {
         
         <nav className="sidebar-nav">
           <button
-            className={`nav-tab ${activeView === 'sanctuary' ? 'active' : ''}`}
-            onClick={() => setActiveView('sanctuary')}
+            className={`nav-tab ${activeView === 'Sanctuary' ? 'active' : ''}`}
+            onClick={() => setActiveView('Sanctuary')}
             title="Sanctuary"
           >
             <span className="nav-icon">🏠</span>
             {!sidebarCollapsed && <span className="nav-label">Sanctuary</span>}
           </button>
           <button
-            className={`nav-tab ${activeView === 'marketplace' ? 'active' : ''}`}
-            onClick={() => setActiveView('marketplace')}
+            className={`nav-tab ${activeView === 'Marketplace' ? 'active' : ''}`}
+            onClick={() => setActiveView('Marketplace')}
             title="Marketplace"
           >
             <span className="nav-icon">🛠️</span>
             {!sidebarCollapsed && <span className="nav-label">Marketplace</span>}
           </button>
           <button
-            className={`nav-tab ${activeView === 'discovery' ? 'active' : ''}`}
-            onClick={() => setActiveView('discovery')}
+            className={`nav-tab ${activeView === 'Discovery' ? 'active' : ''}`}
+            onClick={() => setActiveView('Discovery')}
             title="Discovery"
           >
             <span className="nav-icon">🔮</span>
             {!sidebarCollapsed && <span className="nav-label">Discovery</span>}
           </button>
           <button
-            className={`nav-tab ${activeView === 'mama-bear' ? 'active' : ''}`}
-            onClick={() => setActiveView('mama-bear')}
+            className={`nav-tab ${activeView === 'MamaBear' ? 'active' : ''}`}
+            onClick={() => setActiveView('MamaBear')}
             title="Mama Bear Agent"
           >
             <span className="nav-icon">🐻</span>
             {!sidebarCollapsed && <span className="nav-label">Mama Bear</span>}
           </button>
           <button
-            className={`nav-tab ${activeView === 'vertex-chat' ? 'active' : ''}`}
-            onClick={() => setActiveView('vertex-chat')}
+            className={`nav-tab ${activeView === 'VertexChat' ? 'active' : ''}`}
+            onClick={() => setActiveView('VertexChat')}
             title="Multi-Model Chat"
           >
             <span className="nav-icon">🌟</span>
             {!sidebarCollapsed && <span className="nav-label">Multi-Model</span>}
           </button>
           <button
-            className={`nav-tab ${activeView === 'dev-sandbox' ? 'active' : ''}`}
-            onClick={() => setActiveView('dev-sandbox')}
+            className={`nav-tab ${activeView === 'DevSandbox' ? 'active' : ''}`}
+            onClick={() => setActiveView('DevSandbox')}
             title="Development Environments"
           >
             <span className="nav-icon">🏗️</span>
             {!sidebarCollapsed && <span className="nav-label">Dev Environments</span>}
+          </button>
+          {/* NEW NAVIGATION BUTTONS */}
+          <button
+            className={`nav-tab ${activeView === 'Workspaces' ? 'active' : ''}`}
+            onClick={() => setActiveView('Workspaces')}
+            title="NixOS Workspaces"
+          >
+            <span className="nav-icon">❄️</span>
+            {!sidebarCollapsed && <span className="nav-label">Workspaces</span>}
+          </button>
+          <button
+            className={`nav-tab ${activeView === 'ScoutAgentProject' ? 'active' : ''}`}
+            onClick={() => setActiveView('ScoutAgentProject')}
+            title="Scout Agent"
+          >
+            <span className="nav-icon">🤖</span>
+            {!sidebarCollapsed && <span className="nav-label">Scout Agent</span>}
           </button>
         </nav>
         
@@ -713,7 +794,7 @@ const App: React.FC = () => {
 
       {/* Main Content Area */}
       <main className={`sanctuary-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-        {activeView === 'sanctuary' && (
+        {activeView === 'Sanctuary' && (
           <div className="sanctuary-view">
             <MamaBearGreeting briefing={briefing} />
             
@@ -742,11 +823,8 @@ const App: React.FC = () => {
           </div>
         )}
 
-        {activeView === 'marketplace' && <MCPMarketplace />}
-        {activeView === 'discovery' && <HyperbubbleDiscovery />}
-        {activeView === 'mama-bear' && <EnhancedChatInterface />}
-        {activeView === 'vertex-chat' && <VertexGardenChat />}
-        {activeView === 'dev-sandbox' && <DevSandbox />}
+        {/* Render views using the helper function */}
+        {activeView !== 'Sanctuary' && renderActiveView()}
       </main>
     </div>
   );
