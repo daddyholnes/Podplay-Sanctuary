@@ -1,3 +1,18 @@
+"""
+Scout Logger Module
+
+This module provides structured logging and project management functionality using TinyDB.
+It includes the following key components:
+- ScoutLogManager: Manages multiple project log databases
+- ScoutProjectLogger: Handles logging operations for individual projects
+
+The module supports:
+- Structured logging with metadata
+- Project-specific log storage
+- Status tracking and management
+- Workspace integration
+"""
+
 import os
 import uuid
 import logging
@@ -15,10 +30,9 @@ SCOUT_LOGS_DIR = os.getenv("SCOUT_LOGS_DIR", DEFAULT_SCOUT_LOGS_DIR)
 # Ensure logs directory exists
 os.makedirs(SCOUT_LOGS_DIR, exist_ok=True)
 
-# --- Log Entry Types/Keys (for consistency, based on design) ---
-# These are not strictly enforced by TinyDB but guide usage.
+# Log Entry Types/Keys (for consistency, based on design)
 LOG_KEY_LOG_ID = "log_id"
-LOG_KEY_PROJECT_ID = "project_id" # Will be part of DB path, but can be in record too
+LOG_KEY_PROJECT_ID = "project_id"  # Part of DB path, but included in record for reference
 LOG_KEY_TIMESTAMP = "timestamp"
 LOG_KEY_STEP_ID = "step_id"
 LOG_KEY_STEP_NAME = "step_name"
@@ -254,121 +268,72 @@ if __name__ == '__main__':
     project1_logger.log_entry(
         message="VM created successfully.",
         step_id="1.0", step_name="Initialize Environment",
-        agent_action="tool_call", vm_id="vm_alpha_123",
+        agent_action="tool_call", 
+        vm_id="vm_alpha_123",
         parameters={"tool_name": "create_vm", "vm_type": "nixos"},
         outputs={"vm_ip": "192.168.1.10"},
         status_update="progress_update"
     )
-    time.sleep(0.1)
 
-    project1_logger.log_entry(
-        message="Environment setup complete.",
-        step_id="1.0", step_name="Initialize Environment",
-        agent_action="setup", status_update="step_completed",
-        agent_thoughts="Base environment ready."
-    )
-    project1_logger.update_plan_step_status("1.0", "Initialize Environment", "completed")
-
-
-    # Log for project2
-    project2_logger.set_project_goal("Research quantum computing algorithms.")
-    project2_logger.log_entry(message="Literature review started.", step_id="q_research_1", agent_action="research")
-
-    # Retrieve logs and status
-    print("\n--- Project Alpha Logs (last 5) ---")
-    for log in project1_logger.get_logs(limit=5):
-        print(f"  {log.get(LOG_KEY_TIMESTAMP)} - {log.get(LOG_KEY_MESSAGE)}")
-
-    print("\n--- Project Alpha Status Summary ---")
-    summary = project1_logger.get_project_status_summary(recent_logs_count=2)
-    import json
-    print(json.dumps(summary, indent=2))
+def main():
+    """Example usage of the ScoutLogger module.
     
-    # Close DBs (optional, TinyDB auto-saves)
-    log_manager.close_all_dbs()
+    This demonstrates how to use the ScoutLogManager and ScoutProjectLogger
+    to log events and track project status.
+    """
+    logging.basicConfig(level=logging.DEBUG, 
+                      format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    try:
+        # Example usage of ScoutLogger
+        log_manager = ScoutLogManager()
+        project_logger = log_manager.get_project_logger("test_project")
+        
+        # Set project goal
+        project_logger.set_project_goal("Test project for ScoutLogger functionality")
+        
+        # Log some entries
+        log_id = project_logger.log_entry("Starting test process", 
+                                        status_update="started",
+                                        step_name="initialization")
+        
+        try:
+            # Simulate some work
+            project_logger.log_entry("Processing step 1", 
+                                    step_id="step1",
+                                    status_update="in_progress")
+            
+            # More processing...
+            project_logger.log_entry("Completed step 1",
+                                    step_id="step1",
+                                    status_update="completed",
+                                    outputs={"result": "success"})
+            
+            # Set overall status
+            project_logger.set_overall_status("completed", "All tasks completed successfully")
+            
+        except Exception as e:
+            project_logger.log_entry(f"Error occurred: {str(e)}", 
+                                   is_error=True,
+                                   status_update="error")
+            project_logger.set_overall_status("error", f"Test failed: {str(e)}")
+        
+        # Get and print logs
+        logs = project_logger.get_logs()
+        for log in logs:
+            timestamp = log.get('timestamp', 'N/A')
+            message = log.get('message', 'No message')
+            print(f"{timestamp} - {message}")
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error in main example: {str(e)}")
+        return False
+    finally:
+        # Clean up
+        if 'log_manager' in locals():
+            log_manager.close_all_dbs()
 
-    # Clean up test log directory (optional)
-    # import shutil
-    # shutil.rmtree("./test_scout_logs")
-```
-
-**Explanation of `scout_logger.py`:**
-
-*   **Configuration:** Sets up `SCOUT_LOGS_DIR` for TinyDB JSON files.
-*   **Log Keys:** Defines constants for common log entry keys to ensure consistency, based on the design document.
-*   **`ScoutLogManager`:**
-    *   Manages multiple TinyDB database instances, one per project ID. This keeps logs for different projects separate.
-    *   `_get_db()`: Lazily creates/opens a `TinyDB` instance for a project in a subdirectory.
-    *   `get_project_logger()`: A factory method to obtain a `ScoutProjectLogger` instance for a given project ID. Includes basic sanitization for `project_id` to be used in filenames.
-    *   `close_db()`, `close_all_dbs()`: For explicit DB connection closing if needed (TinyDB auto-saves, but good for cleanup).
-*   **`ScoutProjectLogger`:**
-    *   **`__init__`**: Takes `project_id` and the manager. Gets the TinyDB instance and specific tables (`logs`, `metadata`).
-    *   **`log_entry()`**:
-        *   The main logging method. Accepts various structured parameters as defined in the design (message, step info, action, VM details, parameters, outputs, thoughts, status, error flag).
-        *   Automatically generates a `log_id` (UUID) and a UTC timestamp.
-        *   Merges any `extra_data` provided.
-        *   Cleans the entry by removing keys with `None` values (except booleans) before insertion into the `logs` table.
-    *   **`get_logs()`**: Retrieves log entries. Sorts them by timestamp in Python (TinyDB's querying for sorted results on all data is less direct). Supports limit and skip for basic pagination.
-    *   **Project Metadata Methods:** (`_set_project_metadata`, `_get_project_metadata`, `set_project_goal`, `get_project_goal`, `set_overall_status`, `update_plan_step_status`, `get_current_plan`, etc.)
-        *   These methods use a separate `metadata` table within the project's TinyDB file to store and retrieve project-level information like the goal, overall status, current plan (list of steps with their statuses), active step, and associated workspace.
-        *   Updating metadata (e.g., `set_overall_status`, `update_plan_step_status`) also creates a corresponding log entry in the `logs` table for auditability.
-    *   **`get_project_status_summary()`**: Consolidates various metadata and recent logs into a single dictionary, suitable for the `/status` API endpoint.
-*   **Example Usage (`if __name__ == '__main__':`)**: Demonstrates creating loggers for two different projects, logging various types of entries (including goal setting, status updates, step progress), and retrieving logs and a status summary.
-
-This module provides a flexible and structured way to log Scout Agent activities on a per-project basis using TinyDB. The separation of logs and metadata within each project's DB file allows for both detailed audit trails and quick retrieval of current project status.
-
-**Next Steps:**
-
-1.  **Integrate `ScoutLogManager` into `app.py`:**
-    *   Initialize an instance of `ScoutLogManager`.
-    *   Use it in the new Scout Agent API endpoints.
-2.  **Implement the Scout Agent API endpoints in `app.py`:**
-    *   `GET /api/v1/scout_agent/projects/{project_id}/status`
-    *   `POST /api/v1/scout_agent/projects/{project_id}/intervene`
-3.  **Implement the Workspace API endpoints in `app.py`** (using `LibvirtManager` from `vm_manager.py`).
-4.  **Implement the WebSocket SSH Bridge in `app.py`** (using `VMSSHBridge` from `ssh_bridge.py`).
-5.  Add `tinydb` to `requirements.txt`.I have created `backend/scout_logger.py` for Scout Agent logging using TinyDB.
-
-Now, I will proceed to implement the new Flask API endpoints in `app.py` for:
-1.  **Workspace VM Management:** Using `LibvirtManager` from `vm_manager.py`.
-2.  **Scout Agent Status & Intervention:** Using `ScoutLogManager` from `scout_logger.py`.
-3.  **WebSocket SSH Bridge:** Using `VMSSHBridge` from `ssh_bridge.py` and Flask-SocketIO.
-
-**Plan for `app.py` modifications:**
-
-1.  **Imports:** Import `NixOSSandboxOrchestrator` (for ephemeral execution, already added but might need review), `LibvirtManager`, `ScoutLogManager`, `VMSSHBridge`, and Flask-SocketIO components.
-2.  **Initialization:**
-    *   Initialize `LibvirtManager` (for workspaces, separate from any instance used by ephemeral orchestrator).
-    *   Initialize `ScoutLogManager`.
-    *   The `nixos_orchestrator` for ephemeral VMs is already set up.
-    *   The `socketio` object is already initialized.
-3.  **Workspace API Endpoints:**
-    *   `POST /api/v1/workspaces`: Calls `libvirt_manager.define_workspace_vm()` and `libvirt_manager.start_vm()`.
-    *   `GET /api/v1/workspaces`: Calls `libvirt_manager.list_domains_with_metadata(domain_type_filter="workspace")`.
-    *   `GET /api/v1/workspaces/{workspace_id}`: Calls `libvirt_manager.get_domain_details()`. Will include WebSocket URL construction.
-    *   `DELETE /api/v1/workspaces/{workspace_id}`: Calls `libvirt_manager.delete_workspace_vm()`.
-    *   `POST /api/v1/workspaces/{workspace_id}/start`: Calls `libvirt_manager.start_vm()`.
-    *   `POST /api/v1/workspaces/{workspace_id}/stop`: Calls `libvirt_manager.stop_vm(for_workspace=True)`.
-4.  **Scout Agent API Endpoints:**
-    *   `GET /api/v1/scout_agent/projects/{project_id}/status`: Uses `scout_log_manager.get_project_logger(project_id).get_project_status_summary()`.
-    *   `POST /api/v1/scout_agent/projects/{project_id}/intervene`: Gets a logger for the project and logs the intervention command (e.g., `project_logger.log_entry(message=f"User intervention: {command}", parameters=payload, agent_action="user_intervention")`).
-5.  **WebSocket SSH Bridge Endpoints (Flask-SocketIO):**
-    *   Define a namespace (e.g., `/terminal_ws`).
-    *   `connect` event:
-        *   Client will pass `workspace_id` (e.g., in connect query string or initial message).
-        *   Authenticate/authorize user for this workspace (conceptual for now, actual auth logic is separate).
-        *   Use `libvirt_manager.get_domain_details(workspace_id)` to get IP.
-        *   Create a `VMSSHBridge` instance and store it in a dictionary mapping `request.sid` (SocketIO session ID) to the bridge instance.
-        *   Start a greenlet/thread to continuously poll `bridge.get_output()` and `socketio.emit('terminal_out', data, room=request.sid)`.
-    *   `terminal_in` event (client sends data): Call `bridge.send_input(data)` for the corresponding `request.sid`.
-    *   `resize` event (client sends new dimensions): Call `bridge.resize_pty()`.
-    *   `disconnect` event: Call `bridge.close()` and remove from the dictionary.
-6.  **Configuration:** Ensure `ENABLE_WORKSPACE_MANAGER` and `ENABLE_SCOUT_LOGGER` environment variables control initialization, similar to `ENABLE_NIXOS_SANDBOX`.
-7.  **Error Handling:** Add `try-except` blocks for new routes.
-8.  **Dependencies:** Add `Flask-SocketIO`, `paramiko`, `scp`, `tinydb`, `libvirt-python` to `requirements.txt` if not already covered. (I will list them in the final report).
-
-This is a large set of changes. I will focus on getting the structure and core logic for each part into `app.py`.
-I'll start by adding initializations and then the Workspace API endpoints.
-The `paramiko` library is used by `ssh_executor.py` and `ssh_bridge.py`. `scp` is used by `ssh_executor.py`. It's good to ensure these are noted.
-
-Given this is the last turn, I will implement as much as possible and then provide a summary. I'll prioritize the Workspace and Scout Agent REST APIs. The WebSocket bridge is more complex and might only have its structure laid out.
+if __name__ == '__main__':
+    main()
