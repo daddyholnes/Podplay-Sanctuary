@@ -858,8 +858,13 @@ class EnhancedMamaBear:
     def _generate_together_ai_response(self, message: str, memory_context: str, user_id: str) -> str:
         """Generate response using Together.ai API with Mama Bear personality"""
         try:
+            logger.info(f"🔧 Together.ai client status: {self.together_client is not None}")
+            if self.together_client:
+                logger.info(f"🔧 Together.ai API key available: {bool(os.getenv('TOGETHER_AI_API_KEY'))}")
+            
             if not self.together_client:
                 # Fallback to intelligent placeholder responses if Together.ai not available
+                logger.warning("🔧 Together.ai client not available, using fallback")
                 return self._generate_fallback_response(message, memory_context, user_id)
             
             # Build the system prompt for Mama Bear
@@ -885,19 +890,21 @@ Context from our previous conversations:
 Always provide helpful, actionable advice while maintaining your warm, caring tone. Focus on practical solutions that help Nathan build amazing things in his sanctuary."""
 
             # Generate response using Together.ai
-            response = self.together_client.chat.completions.create(
+            logger.info(f"🔧 Calling Together.ai API with model: meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo")
+            response = self.together_client.Complete.create(
+                prompt=f"{system_prompt}\n\nUser: {message}\nAssistant:",
                 model="meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": message}
-                ],
-                temperature=0.7,
                 max_tokens=1024,
+                temperature=0.7,
                 top_p=0.9,
-                repetition_penalty=1.1
+                repetition_penalty=1.1,
+                stop=["User:", "Human:"]
             )
             
-            return response.choices[0].message.content
+            logger.info(f"🔧 Together.ai response received: {response.get('status', 'no status')}")
+            response_text = response['output']['choices'][0]['text'].strip()
+            logger.info(f"🔧 Response text length: {len(response_text)}")
+            return response_text
             
         except Exception as e:
             logger.error(f"Together.ai API error: {e}")
@@ -1705,16 +1712,20 @@ def mama_bear_chat():
             
             return jsonify(response_data)
         else:
-            # Fallback to legacy enhanced mama bear
+            # Use Together.ai enhanced mama bear
             response = enhanced_mama_bear.respond(message, user_id)
+            
+            # Check if Together.ai is actually working
+            has_together_ai = enhanced_mama_bear.together_client is not None
             
             return jsonify({
                 "success": True,
                 "response": response,
-                "enhanced": False,
+                "enhanced": has_together_ai,
                 "vertex_ai": False,
-                "agent": "Legacy Mama Bear",
-                "message": "🐻 Using fallback mode - Vertex AI not configured",
+                "together_ai": has_together_ai,
+                "agent": "Enhanced Mama Bear with Together.ai" if has_together_ai else "Basic Mama Bear",
+                "message": "🐻 Using Together.ai integration" if has_together_ai else "🐻 Using basic mode - Together.ai not configured",
                 "timestamp": datetime.now().isoformat()
             })
             
