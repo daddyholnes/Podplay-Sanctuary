@@ -5,28 +5,8 @@
   "main": "electron/main.js",
   "homepage": "./",
   "scripts": {
-    "setup-all": "npm run setup-backend && npm run setup-frontend && npm install",
-    "setup-backend": "cd backend && python -m venv venv && source venv/bin/activate && pip install -r requirements.txt",
-    "setup-frontend": "cd frontend && npm install",
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
-    "dev:backend": "cd backend && source venv/bin/activate && python app.py",
-    "dev:frontend": "cd frontend && npm run dev",
-    "dev:all": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\" \"wait-on http://localhost:5173 && npm run electron:dev\"",
-    "build": "npm run build:frontend && npm run build:electron",
-    "build:frontend": "cd frontend && npm run build",
-    "build:electron": "electron-builder",
-    "electron": "npm run start:backend && wait-on http://localhost:8000 && electron .",
-    "electron:dev": "nodemon --watch electron/ --exec electron .",
-    "start": "npm run electron",
-    "start:backend": "bash -c 'cd backend && source venv/bin/activate && python app.py' &",
-    "start:frontend": "cd frontend && npm run preview",
-    "test": "python backend_master_test.py",
-    "test:quick": "python backend_master_test.py --quick",
-    "pack": "electron-builder --dir",
-    "dist": "electron-builder",
-    "dist:win": "electron-builder --win",
-    "dist:mac": "electron-builder --mac",
-    "dist:linux": "electron-builder --linux"
+    "setup-backend": "echo 'Please see README for backend setup.'",
+    "setup-frontend": "cd frontend && npm install"
   },
   "keywords": [
     "ai",
@@ -51,85 +31,7 @@
     "electron-store": "^8.1.0",
     "node-fetch": "^2.7.0"
   },
-  "build": {
-    "appId": "com.podplay.sanctuary",
-    "productName": "Podplay Build Sanctuary",
-    "copyright": "Copyright © 2025 Podplay Sanctuary",
-    "directories": {
-      "output": "dist"
-    },
-    "files": [
-      "electron/**/*",
-      "frontend/dist/**/*",
-      "backend/**/*",
-      "!backend/venv/**/*",
-      "!backend/__pycache__/**/*",
-      "!backend/*.log",
-      "!backend/uploads/**/*",
-      "package.json"
-    ],
-    "extraResources": [
-      {
-        "from": "backend/",
-        "to": "backend/",
-        "filter": [
-          "**/*",
-          "!venv/**/*",
-          "!__pycache__/**/*",
-          "!*.log",
-          "!uploads/**/*"
-        ]
-      }
-    ],
-    "mac": {
-      "icon": "assets/icon.icns",
-      "category": "public.app-category.developer-tools",
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "x64",
-            "arm64"
-          ]
-        }
-      ]
-    },
-    "win": {
-      "icon": "assets/icon.ico",
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        }
-      ]
-    },
-    "linux": {
-      "icon": "assets/icon.png",
-      "category": "Development",
-      "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "deb",
-          "arch": [
-            "x64"
-          ]
-        }
-      ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true
-    }
-  },
+  "build": {},
   "repository": {
     "type": "git",
     "url": "https://github.com/yourusername/podplay-build-sanctuary.git"
