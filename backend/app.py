@@ -372,24 +372,7 @@ class MCPMarketplaceManager:
                 installation_status="not_installed",
                 tags=["notion", "productivity", "community"]
             ),
-            MCPServer(
-                name="docker-mcp",
-                description="Docker container management and operations",
-                repository_url="https://github.com/docker/mcp-docker",
-                category=MCPCategory.DEVELOPMENT_TOOLS,
-                author="Docker",
-                version="1.2.0",
-                installation_method="npm",
-                capabilities=["container_management", "image_operations", "docker_compose"],
-                dependencies=["dockerode"],
-                configuration_schema={"docker_host": "string"},
-                popularity_score=82,
-                last_updated="2024-12-19",
-                is_official=False,
-                is_installed=False,
-                installation_status="not_installed",
-                tags=["docker", "containers", "devops"]
-            ),
+            # Docker MCP server removed (deprecated)
             MCPServer(
                 name="openai-mcp",
                 description="OpenAI API integration for AI model access",
