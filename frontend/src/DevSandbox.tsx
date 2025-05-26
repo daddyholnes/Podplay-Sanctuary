@@ -6,6 +6,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Editor } from '@monaco-editor/react';
 import io, { Socket } from 'socket.io-client';
 import MultimodalInput from './components/MultimodalInput';
+import CloudBrowser from './components/CloudBrowser';
 import { buildApiUrl, API_ENDPOINTS } from './config/api';
 import './DevSandbox.css';
 
@@ -94,6 +95,11 @@ const DevSandbox: React.FC = () => {
   const [bottomPanelHeight, setBottomPanelHeight] = useState(200);
   const [showChat, setShowChat] = useState(true);
   const [chatPanelWidth, setChatPanelWidth] = useState(400);
+  
+  // ==================== CLOUD BROWSER STATE ====================
+  const [showCloudBrowser, setShowCloudBrowser] = useState(false);
+  const [cloudBrowserMode, setCloudBrowserMode] = useState<'inline' | 'modal' | 'popup'>('inline');
+  const [cloudEnvironment, setCloudEnvironment] = useState<any>(null);
   
   // ==================== MAMA BEAR CHAT STATE ====================
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -737,7 +743,7 @@ const DevSandbox: React.FC = () => {
     // Initialize WebSocket connection
     if (!socketRef.current) {
       try {
-        socketRef.current = io('http://localhost:8000', {
+        socketRef.current = io('http://localhost:5000', {
           timeout: 5000,
           forceNew: true
         });
@@ -874,6 +880,14 @@ const DevSandbox: React.FC = () => {
             title={showChat ? 'Hide Mama Bear Chat' : 'Show Mama Bear Chat'}
           >
             🐻 {showChat ? 'Hide Chat' : 'Show Chat'}
+          </button>
+          
+          <button 
+            onClick={() => setShowCloudBrowser(!showCloudBrowser)} 
+            className={`cloud-browser-toggle-btn ${showCloudBrowser ? 'active' : ''}`}
+            title={showCloudBrowser ? 'Hide Cloud Browser' : 'Show Cloud Browser'}
+          >
+            ☁️ {showCloudBrowser ? 'Hide Browser' : 'Show Browser'}
           </button>
           
           <div className="layout-controls">
@@ -1099,6 +1113,50 @@ const DevSandbox: React.FC = () => {
                       attachments={[]} // No attachments in DevSandbox currently
                     />
                   </div>
+                </div>
+              </>
+            )}
+            
+            {/* Cloud Browser Panel */}
+            {showCloudBrowser && (
+              <>
+                {/* Cloud Browser Resize Handle */}
+                <div 
+                  className={`resize-handle vertical ${isResizing ? 'resizing' : ''}`}
+                  onMouseDown={startChatResize}
+                  title="Drag to resize cloud browser panel"
+                />
+                <div className="cloud-browser-panel" style={{ width: chatPanelWidth }}>
+                  <div className="panel-header">
+                    <h3>☁️ Cloud Development Browser</h3>
+                    <div className="cloud-browser-controls">
+                      <button 
+                        onClick={() => setCloudBrowserMode('modal')} 
+                        title="Open in Modal"
+                        className={cloudBrowserMode === 'modal' ? 'active' : ''}
+                      >
+                        🪟
+                      </button>
+                      <button 
+                        onClick={() => setCloudBrowserMode('popup')} 
+                        title="Open in Popup"
+                        className={cloudBrowserMode === 'popup' ? 'active' : ''}
+                      >
+                        ↗️
+                      </button>
+                      <button onClick={() => setShowCloudBrowser(false)} title="Hide Browser">
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <CloudBrowser
+                    mode={cloudBrowserMode}
+                    environment={cloudEnvironment}
+                    onClose={() => setShowCloudBrowser(false)}
+                    onEnvironmentChange={setCloudEnvironment}
+                    className="dev-sandbox-browser"
+                  />
                 </div>
               </>
             )}

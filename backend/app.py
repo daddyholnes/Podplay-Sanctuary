@@ -29,6 +29,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import requests
 from dataclasses import dataclass, asdict
+import together
 from enum import Enum
 import sqlite3
 from contextlib import contextmanager
@@ -676,12 +677,14 @@ class EnhancedMamaBear:
         if TOGETHER_AVAILABLE and os.getenv('TOGETHER_AI_API_KEY'):
             try:
                 together_api_key = os.getenv('TOGETHER_AI_API_KEY')
-                if together and together_api_key:
+                if together_api_key:
+                    import together
                     together.api_key = together_api_key
-                self.together_client = together
-                logger.info("🔧 Mama Bear sandbox initialized with Together.ai")
+                    self.together_client = together  # Use the module directly
+                    logger.info("🔧 Mama Bear sandbox initialized with Together.ai")
             except Exception as e:
                 logger.error(f"Failed to initialize Together.ai: {e}")
+                self.together_client = None
     
     def store_memory(self, content: str, metadata: Optional[Dict] = None) -> bool:
         """Store memory using Mem0.ai cloud service"""
@@ -836,27 +839,8 @@ class EnhancedMamaBear:
                     f"- {mem.get('text', '')}" for mem in relevant_memories[:3]
                 ])
             
-            # Check if this is an MCP-related query
-            mcp_keywords = ['mcp', 'server', 'database', 'search', 'discover', 'install']
-            is_mcp_query = any(keyword in message.lower() for keyword in mcp_keywords)
-            
-            # Generate response based on context
-            if is_mcp_query:
-                # MCP-specific response
-                if 'database' in message.lower():
-                    response = "🐻 I found some excellent database MCP servers for you! The PostgreSQL MCP server is official and highly rated (85 popularity score). There's also SQLite and MySQL options available. Would you like me to help you install one of these?"
-                elif 'search' in message.lower() or 'discover' in message.lower():
-                    response = "🐻 I can help you discover MCP servers! I have access to a marketplace with servers for databases, cloud services, AI/ML, development tools, and more. What specific functionality are you looking for?"
-                else:
-                    response = f"🐻 Hello {user_id}! I'm here to help you with MCP server management and development tasks. I can search, discover, and help install MCP servers for your sanctuary. What would you like to explore?"
-            else:
-                # General response
-                response = f"🐻 Hello {user_id}! I'm Mama Bear, your lead developer agent. I'm here to help with your Podplay Build sanctuary. "
-                
-                if memory_context:
-                    response += f"Based on our previous conversations, I remember:\n{memory_context}\n\nHow can I assist you today?"
-                else:
-                    response += "This appears to be our first conversation. I'm equipped with memory capabilities, MCP server management, and code execution tools. How can I help you today?"
+            # Generate response using Together.ai
+            response = self._generate_together_ai_response(message, memory_context, user_id)
             
             # Store this interaction in memory
             self.store_memory(
@@ -870,6 +854,79 @@ class EnhancedMamaBear:
         except Exception as e:
             logger.error(f"Error generating response: {e}")
             return f"🐻 Sorry {user_id}, I encountered an error while processing your message. Please try again."
+
+    def _generate_together_ai_response(self, message: str, memory_context: str, user_id: str) -> str:
+        """Generate response using Together.ai API with Mama Bear personality"""
+        try:
+            if not self.together_client:
+                # Fallback to intelligent placeholder responses if Together.ai not available
+                return self._generate_fallback_response(message, memory_context, user_id)
+            
+            # Build the system prompt for Mama Bear
+            system_prompt = f"""You are Mama Bear, the lead developer agent for Nathan's Podplay Build Sanctuary. 
+
+Your personality:
+- Warm, caring, and nurturing like a protective mother bear 🐻
+- Proactive and deeply knowledgeable about software development
+- Expert in MCP (Model Context Protocol) servers, AI integration, and development tools
+- Always focused on Nathan's productivity, well-being, and creating calm empowered environments
+- Use the 🐻 emoji occasionally to show your bear nature
+
+Your capabilities in Nathan's sanctuary:
+- MCP server discovery and management (500+ servers available)
+- Persistent memory system via Mem0.ai for learning preferences
+- Code execution in secure Together.ai sandbox environments
+- Multi-model AI integration and development assistance
+- Proactive daily briefings and project recommendations
+
+Context from our previous conversations:
+{memory_context if memory_context else "This is our first conversation together."}
+
+Always provide helpful, actionable advice while maintaining your warm, caring tone. Focus on practical solutions that help Nathan build amazing things in his sanctuary."""
+
+            # Generate response using Together.ai
+            response = self.together_client.chat.completions.create(
+                model="meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": message}
+                ],
+                temperature=0.7,
+                max_tokens=1024,
+                top_p=0.9,
+                repetition_penalty=1.1
+            )
+            
+            return response.choices[0].message.content
+            
+        except Exception as e:
+            logger.error(f"Together.ai API error: {e}")
+            return self._generate_fallback_response(message, memory_context, user_id)
+    
+    def _generate_fallback_response(self, message: str, memory_context: str, user_id: str) -> str:
+        """Generate intelligent fallback responses when Together.ai is not available"""
+        # Check if this is an MCP-related query
+        mcp_keywords = ['mcp', 'server', 'database', 'search', 'discover', 'install']
+        is_mcp_query = any(keyword in message.lower() for keyword in mcp_keywords)
+        
+        if is_mcp_query:
+            # MCP-specific response
+            if 'database' in message.lower():
+                return "🐻 I found some excellent database MCP servers for you! The PostgreSQL MCP server is official and highly rated (85 popularity score). There's also SQLite and MySQL options available. Would you like me to help you install one of these?"
+            elif 'search' in message.lower() or 'discover' in message.lower():
+                return "🐻 I can help you discover MCP servers! I have access to a marketplace with servers for databases, cloud services, AI/ML, development tools, and more. What specific functionality are you looking for?"
+            else:
+                return f"🐻 Hello {user_id}! I'm here to help you with MCP server management and development tasks. I can search, discover, and help install MCP servers for your sanctuary. What would you like to explore?"
+        else:
+            # General response
+            response = f"🐻 Hello {user_id}! I'm Mama Bear, your lead developer agent. I'm here to help with your Podplay Build sanctuary. "
+            
+            if memory_context:
+                response += f"Based on our previous conversations, I remember:\n{memory_context}\n\nHow can I assist you today?"
+            else:
+                response += "This appears to be our first conversation. I'm equipped with memory capabilities, MCP server management, and code execution tools. How can I help you today?"
+            
+            return response
 
 # ==================== PROACTIVE DISCOVERY SYSTEM ====================
 
@@ -976,6 +1033,15 @@ if DEV_SANDBOX_AVAILABLE and DevSandboxManager:
         logger.info("🏗️ DevSandbox manager initialized")
     except Exception as e:
         logger.warning(f"DevSandbox not available: {e}")
+
+# Initialize Mem0 Chat Manager for global access
+mem0_manager = None
+if MEM0_CHAT_AVAILABLE and mem0_chat_manager:
+    try:
+        mem0_manager = mem0_chat_manager
+        logger.info("🧠 Mem0 Chat Manager initialized for global access")
+    except Exception as e:
+        logger.warning(f"Mem0 Chat Manager not available: {e}")
 
 logger.info("🐻 Mama Bear Sanctuary - All systems initialized!")
 

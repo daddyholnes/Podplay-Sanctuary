@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { buildApiUrl, API_ENDPOINTS } from './config/api';
+import CloudBrowser from './components/CloudBrowser';
 import './EnhancedChat.css';
 
 // ==================== CHAT INTERFACES ====================
@@ -40,6 +41,9 @@ interface ChatState {
   connectedModels: string[];
   activeMCPServers: string[];
   isDragOver: boolean;
+  showCloudBrowser: boolean;
+  cloudBrowserMode: 'modal' | 'popup';
+  cloudEnvironment?: any;
 }
 
 // ==================== ENHANCED CHAT COMPONENT ====================
@@ -55,7 +59,9 @@ export const EnhancedChatInterface: React.FC = () => {
     memories: [],
     connectedModels: ['Mama Bear Core', 'Mem0.ai Memory', 'Together.ai Sandbox'],
     activeMCPServers: [],
-    isDragOver: false
+    isDragOver: false,
+    showCloudBrowser: false,
+    cloudBrowserMode: 'modal'
   });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -685,7 +691,33 @@ What would you like to explore first? I'm here to make your development journey 
           <span className="hint">💡 Try: "Install GitHub MCP server" or "Execute some Python code" or "What do you remember about me?"</span>
           <span className="hint multimodal">📎 Drag files, paste images, or click media buttons to add attachments</span>
         </div>
+        
+        {/* Cloud Browser Quick Access */}
+        <div className="quick-actions">
+          <button 
+            className="quick-action-btn cloud-browser-btn"
+            onClick={() => setChatState(prev => ({ 
+              ...prev, 
+              showCloudBrowser: true, 
+              cloudBrowserMode: 'modal' 
+            }))}
+            title="Launch Cloud Development Environment"
+          >
+            ☁️ Launch Cloud Environment
+          </button>
+        </div>
       </div>
+      
+      {/* Cloud Browser Modal */}
+      {chatState.showCloudBrowser && (
+        <CloudBrowser
+          mode={chatState.cloudBrowserMode}
+          environment={chatState.cloudEnvironment}
+          onClose={() => setChatState(prev => ({ ...prev, showCloudBrowser: false }))}
+          onEnvironmentChange={(env) => setChatState(prev => ({ ...prev, cloudEnvironment: env }))}
+          className="mama-bear-cloud-browser"
+        />
+      )}
     </div>
   );
 };
