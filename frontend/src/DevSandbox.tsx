@@ -106,20 +106,7 @@ const DevSandbox: React.FC = () => {
   const [showEnvironmentCreator, setShowEnvironmentCreator] = useState(false);
 
   // ==================== NIXOS WORKSPACE STATE ====================
-  const [nixosWorkspaces, setNixosWorkspaces] = useState<NixOSWorkspace[]>([]);
   const [activeWorkspace, setActiveWorkspace] = useState<NixOSWorkspace | null>(null);
-  const [showWorkspaceManager, setShowWorkspaceManager] = useState(false);
-
-  // ==================== SCOUT AGENT STATE ====================
-  const [scoutStatus, setScoutStatus] = useState<ScoutAgentStatus>({
-    isActive: false,
-    lastActivity: new Date().toISOString(),
-    totalActions: 0,
-    successfulActions: 0,
-    failedActions: 0
-  });
-  const [scoutLogs, setScoutLogs] = useState<ScoutLogEntry[]>([]);
-  const [showScoutMonitor, setShowScoutMonitor] = useState(false);
 
   // ==================== FILE SYSTEM STATE ====================
   const [fileTree, setFileTree] = useState<FileNode | null>(null);
@@ -145,7 +132,6 @@ const DevSandbox: React.FC = () => {
   const [bottomPanelHeight, setBottomPanelHeight] = useState(200);
   const [showChat, setShowChat] = useState(true);
   const [chatPanelWidth, setChatPanelWidth] = useState(400);
-  const [activeView, setActiveView] = useState<'environments' | 'workspaces' | 'scout'>('environments');
   
   // ==================== CLOUD BROWSER STATE ====================
   const [showCloudBrowser, setShowCloudBrowser] = useState(false);
@@ -551,107 +537,7 @@ const DevSandbox: React.FC = () => {
     }
   };
 
-  const stopNixosWorkspace = async (workspaceId: string) => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/v1/workspaces/${workspaceId}/stop`, {
-        method: 'POST'
-      });
-      
-      const result = await response.json();
-      if (result.success) {
-        await loadNixosWorkspaces();
-      } else {
-        throw new Error(result.error);
-      }
-    } catch (error) {
-      console.error('Error stopping NixOS workspace:', error);
-      throw error;
-    }
-  };
-
-  const deleteNixosWorkspace = async (workspaceId: string) => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/v1/workspaces/${workspaceId}`, {
-        method: 'DELETE'
-      });
-      
-      const result = await response.json();
-      if (result.success) {
-        await loadNixosWorkspaces();
-        if (activeWorkspace?.id === workspaceId) {
-          setActiveWorkspace(null);
-        }
-      } else {
-        throw new Error(result.error);
-      }
-    } catch (error) {
-      console.error('Error deleting NixOS workspace:', error);
-      throw error;
-    }
-  };
-
-  // ==================== SCOUT AGENT OPERATIONS ====================
-  
-  const loadScoutStatus = async () => {
-    try {
-      const response = await fetch('http://localhost:5000/api/v1/scout/status');
-      const result = await response.json();
-      
-      if (result.success) {
-        setScoutStatus(result.status);
-      }
-    } catch (error) {
-      console.error('Error loading scout status:', error);
-    }
-  };
-
-  const loadScoutLogs = async () => {
-    try {
-      const response = await fetch('http://localhost:5000/api/v1/scout/logs');
-      const result = await response.json();
-      
-      if (result.success) {
-        setScoutLogs(result.logs);
-      }
-    } catch (error) {
-      console.error('Error loading scout logs:', error);
-    }
-  };
-
-  const createNixosEnvironment = async (type: string, name: string, template?: string) => {
-    try {
-      // First create a NixOS workspace
-      const workspaceId = await createNixosWorkspace(`${name}-workspace`);
-      
-      // Start the workspace
-      await startNixosWorkspace(workspaceId);
-      
-      // Create environment entry
-      const newEnv: DevEnvironment = {
-        id: `nixos-${Date.now()}`,
-        name,
-        type: type as any,
-        status: 'running',
-        workspaceId,
-        port: await getAvailablePort(),
-        previewUrl: `http://localhost:22222`, // SSH tunnel port
-        workspaceRoot: `/workspace`,
-        installedPackages: [],
-        environmentVariables: {},
-        createdAt: new Date().toISOString(),
-        lastAccessed: new Date().toISOString(),
-        deploymentMode: 'nixos'
-      };
-
-      setEnvironments(prev => [...prev, newEnv]);
-      setActiveEnvironment(newEnv);
-      
-      return newEnv;
-    } catch (error) {
-      console.error('Error creating NixOS environment:', error);
-      throw error;
-    }
-  };
+  // ==================== FILE SYSTEM OPERATIONS ====================
 
   const stopEnvironment = async (environmentId: string) => {
     try {
