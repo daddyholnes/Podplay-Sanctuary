@@ -1120,20 +1120,152 @@ else:
 scout_log_manager = None
 if NIXOS_INFRASTRUCTURE_AVAILABLE and os.getenv("ENABLE_SCOUT_LOGGER", "false").lower() == "true":
     try:
-        scout_log_manager = ScoutLogManager()
-        logger.info("📜 Scout Agent Log Manager initialized and enabled.")
+        # Ensure ScoutLogManager is initialized before AgenticDevSandbox if it's a dependency for logging
+        # This global instance will be used by the new Scout Project endpoints.
+        # AgenticDevSandbox itself also initializes its own ScoutLogManager if scout_log_manager.py is found,
+        # which is fine for its internal logging. For these app-level endpoints, we use this global one.
+        if ScoutLogManager: # Check if class was imported
+             scout_log_manager = ScoutLogManager()
+             logger.info("📜 Scout Agent Log Manager initialized and enabled globally for app.")
         
-        def close_scout_log_dbs():
-            if scout_log_manager:
-                logger.info("Flask app exiting, closing Scout Log Manager DBs...")
-                scout_log_manager.close_all_dbs()
-        import atexit
-        atexit.register(close_scout_log_dbs)
+             def close_scout_log_dbs():
+                 if scout_log_manager:
+                     logger.info("Flask app exiting, closing Scout Log Manager DBs...")
+                     scout_log_manager.close_all_dbs()
+             import atexit
+             atexit.register(close_scout_log_dbs)
+        else:
+            logger.error("ScoutLogManager class not available despite NIXOS_INFRASTRUCTURE_AVAILABLE being true.")
+            scout_log_manager = None
+
     except Exception as e:
         logger.error(f"Failed to initialize Scout Log Manager: {e}")
         scout_log_manager = None
 else:
-    logger.info("Scout Agent Log Manager is disabled via ENABLE_SCOUT_LOGGER environment variable.")
+    logger.info("Scout Agent Log Manager is disabled via ENABLE_SCOUT_LOGGER environment variable or NIXOS_INFRASTRUCTURE_AVAILABLE is false.")
+
+
+# ==================== SCOUT.NEW PROJECT API ENDPOINTS ====================
+
+@app.route('/api/v1/scout/projects/initiate', methods=['POST'])
+def initiate_scout_project():
+    """
+    Initiates a new Scout project workflow asynchronously.
+    """
+    if not agentic_dev_assistant:
+        return jsonify({"success": False, "error": "AgenticDevSandbox is not available."}), 503
+
+    data = request.get_json()
+    if not data or "prompt" not in data:
+        return jsonify({"success": False, "error": "Missing 'prompt' in request body."}), 400
+    
+    user_prompt = data["prompt"]
+    # Generate project_id here to return it immediately
+    # This requires AgenticDevSandbox.manage_project_workflow to accept project_id
+    project_id = str(uuid.uuid4()) 
+
+    logger.info(f"Initiating Scout project. ID: {project_id}, Prompt: '{user_prompt[:50]}...'")
+
+    def workflow_runner():
+        # Each thread needs its own event loop for asyncio.run()
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            # Assuming manage_project_workflow is updated to accept project_id
+            # And that agentic_dev_assistant and its methods are thread-safe enough for this.
+            asyncio.run(agentic_dev_assistant.manage_project_workflow(prompt=user_prompt, project_id=project_id))
+        except Exception as e:
+            logger.error(f"Error in threaded project workflow for {project_id}: {e}", exc_info=True)
+            # Log this error to the specific project log if possible
+            if scout_log_manager:
+                try:
+                    project_logger = scout_log_manager.get_project_logger(project_id)
+                    if project_logger:
+                        project_logger.log_entry(
+                            agent_action="workflow_execution_error",
+                            inputs={"project_id": project_id},
+                            outputs={"error": str(e), "details": "Workflow thread crashed."}
+                        )
+                        project_logger.set_overall_status("ERROR_THREAD_CRASH")
+                except Exception as log_e:
+                    logger.error(f"Failed to log workflow crash for project {project_id}: {log_e}")
+        finally:
+            loop.close()
+
+
+    thread = threading.Thread(target=workflow_runner)
+    thread.start()
+
+    return jsonify({
+        "project_id": project_id,
+        "message": "Project initiated successfully. Check logs for progress."
+    }), 202
+
+
+@app.route('/api/v1/scout/projects/<project_id>/status', methods=['GET'])
+def get_scout_project_status(project_id: str):
+    """
+    Gets the status and logs for a specific Scout project.
+    """
+    if not scout_log_manager:
+        # Try to access ScoutLogManager from agentic_dev_assistant if global one failed
+        # This assumes AgenticDevSandbox has an attribute self.scout_log_manager
+        current_scout_manager = getattr(agentic_dev_assistant, 'scout_log_manager', None)
+        if not current_scout_manager:
+            return jsonify({"success": False, "error": "Scout Log Manager is not available."}), 503
+    else:
+        current_scout_manager = scout_log_manager
+        
+    try:
+        project_logger = current_scout_manager.get_project_logger(project_id)
+        if not project_logger: # Should not happen if get_project_logger creates one
+            return jsonify({"success": False, "error": "Project logger could not be retrieved."}), 404
+            
+        status_summary = project_logger.get_project_status_summary()
+        return jsonify({"success": True, "project_id": project_id, "status_summary": status_summary})
+    except FileNotFoundError: # Assuming get_project_logger might raise this if DB for project_id doesn't exist
+        return jsonify({"success": False, "error": f"Project '{project_id}' not found or no logs yet."}), 404
+    except Exception as e:
+        logger.error(f"Error getting project status for {project_id}: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@app.route('/api/v1/scout/projects/<project_id>/intervene', methods=['POST'])
+def intervene_scout_project(project_id: str):
+    """
+    Logs a user intervention command for a specific Scout project.
+    """
+    if not scout_log_manager:
+        current_scout_manager = getattr(agentic_dev_assistant, 'scout_log_manager', None)
+        if not current_scout_manager:
+            return jsonify({"success": False, "error": "Scout Log Manager is not available."}), 503
+    else:
+        current_scout_manager = scout_log_manager
+
+    data = request.get_json()
+    if not data or "intervention_command" not in data:
+        return jsonify({"success": False, "error": "Missing 'intervention_command' in request body."}), 400
+    
+    intervention_command = data["intervention_command"]
+
+    try:
+        project_logger = current_scout_manager.get_project_logger(project_id)
+        if not project_logger:
+            return jsonify({"success": False, "error": f"Project '{project_id}' not found for intervention."}), 404
+
+        project_logger.log_entry(
+            message=f"User intervention: {intervention_command}",
+            agent_action="user_intervention",
+            inputs={"command": intervention_command} 
+        )
+        logger.info(f"User intervention logged for project {project_id}: {intervention_command}")
+        return jsonify({"project_id": project_id, "message": "Intervention logged successfully."})
+    except FileNotFoundError:
+        return jsonify({"success": False, "error": f"Project '{project_id}' not found for intervention."}), 404
+    except Exception as e:
+        logger.error(f"Error logging intervention for project {project_id}: {e}", exc_info=True)
+        return jsonify({"success": False, "error": str(e)}), 500
+
 
 # ==================== NIXOS VM SANDBOX API ENDPOINTS ====================
 
