@@ -1341,7 +1341,7 @@ def get_scout_logs():
         
         # Get project logger and retrieve logs
         project_logger = scout_log_manager.get_project_logger(project_id)
-logs = project_logger.get_logs(limit=limit)
+        logs = project_logger.get_logs(limit=limit)
         
         return jsonify({"success": True, "logs": logs, "project_id": project_id})
     except Exception as e:

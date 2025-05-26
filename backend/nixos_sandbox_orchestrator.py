@@ -3,6 +3,7 @@ import logging
 import time
 import os
 import tempfile
+import paramiko
 from concurrent.futures import ThreadPoolExecutor, Future
 from dataclasses import dataclass, field, asdict
 from typing import Dict, Optional, Any, Tuple
@@ -56,7 +57,7 @@ class Job:
         d.pop('future', None) # Don't include the Future object in dict representation
         return d
 
-class NixOS SandboxOrchestrator:
+class NixOSSandboxOrchestrator:
     def __init__(self):
         self.executor = ThreadPoolExecutor(max_workers=MAX_CONCURRENT_VMS)
         self.jobs: Dict[str, Job] = {}
@@ -117,7 +118,7 @@ class NixOS SandboxOrchestrator:
             libvirt_manager = LibvirtManager()
             
             vm_memory, vm_vcpus = self._get_vm_resources(job.resource_profile)
-            domain, overlay_image_path = libvirt_manager.define_vm(job_id, memory_mb=vm_memory, vcpus=vm_vcpus)
+            domain, overlay_image_path = libvirt_manager.define_ephemeral_vm(job_id, memory_mb=vm_memory, vcpus=vm_vcpus)
             libvirt_manager.start_vm(domain)
 
             # Get VM IP address
@@ -239,7 +240,7 @@ class NixOS SandboxOrchestrator:
 
             if libvirt_manager and domain and overlay_image_path:
                 logger.info(f"Job {job_id}: Cleaning up VM resources.")
-                libvirt_manager.cleanup_vm_resources(domain, overlay_image_path)
+                libvirt_manager.cleanup_ephemeral_vm_resources(domain, overlay_image_path)
             if libvirt_manager:
                 libvirt_manager.close_connection()
             if ssh_executor:
@@ -286,6 +287,13 @@ class NixOS SandboxOrchestrator:
                 logger.warning(f"Job {job_id} marked as timed out by orchestrator.")
 
             return job.to_dict()
+        return None
+
+    def get_job_status(self, job_id: str) -> Optional[str]:
+        """Get just the status of a job"""
+        job = self.jobs.get(job_id)
+        if job:
+            return job.status
         return None
 
     def shutdown(self):
@@ -336,62 +344,89 @@ if __name__ == '__main__':
     orchestrator.shutdown()
     logger.info("Orchestrator shutdown complete.")
 
-```
-
-**Explanation of `nixos_sandbox_orchestrator.py`:**
-
-*   **`JobResult` and `Job` Dataclasses:** Define structures for storing job results and job metadata, including status, timestamps, and the `Future` object from the thread pool.
-*   **`NixOSSandboxOrchestrator` Class:**
-    *   **`__init__`**: Initializes a `ThreadPoolExecutor` with `MAX_CONCURRENT_VMS` and an in-memory dictionary `self.jobs` to store job states.
-    *   **`_get_vm_resources`**: Simple helper to map resource profile names to memory/vCPU configurations.
-    *   **`_wait_for_ssh`**: Polls the VM's IP address to check for SSH readiness before attempting to connect. Uses `paramiko` for a quick connection test.
-    *   **`_execute_job_task`**: This is the main worker function executed by the thread pool for each job.
-        1.  **Provisioning:** Initializes `LibvirtManager`, defines and starts a VM. Retrieves the VM's IP address.
-        2.  **SSH Ready Wait:** Calls `_wait_for_ssh`.
-        3.  **Code Upload:** Initializes `SSHExecutor`. Creates a local temporary file with the user's code, then uses `ssh_executor.transfer_file` to upload it to `/tmp/` in the VM.
-        4.  **Execution:** Constructs the command to run the Python script, redirecting its `stdout` and `stderr` to files within the VM (`/tmp/stdout_{job_id}.log`, `/tmp/stderr_{job_id}.log`). It then calls `ssh_executor.execute_command`, which internally prepends the `timeout` utility to the script execution part. The `job.requested_timeout` is passed to `ssh_executor.execute_command`.
-        5.  **Result Download:** Retrieves the content of the remote `stdout` and `stderr` log files using `ssh_executor.retrieve_file`. Handles potential errors during retrieval (e.g., if files are empty or not found).
-        6.  **Status Update:** Updates the `Job` object with the results (stdout, stderr, exit code) and sets the status to `COMPLETED`, `EXECUTION_TIMEOUT` (if exit code 124 from `timeout` utility), or `FAILED`.
-        7.  **Cleanup:** In a `finally` block, it ensures local temporary files are deleted, and VM resources (libvirt domain, overlay image) are cleaned up using `libvirt_manager.cleanup_vm_resources`. SSH and libvirt connections are closed.
-    *   **`submit_execution_job`**:
-        *   Creates a new `Job` object with a unique ID and "queued" status.
-        *   Stores the job in `self.jobs`.
-        *   Submits `_execute_job_task` to the `ThreadPoolExecutor`.
-        *   Returns the job ID.
-    *   **`get_job_details`**: Retrieves the current state of a job. Includes a basic check for overall job timeout at the orchestrator level.
-    *   **`shutdown`**: Shuts down the `ThreadPoolExecutor`.
-*   **Example Usage (`if __name__ == '__main__':`)**:
-    *   Demonstrates submitting a few test jobs (simple print, script with an error, script designed to time out) and polls their status.
-    *   **Requires a proper libvirt setup, base NixOS image, and SSH keys configured for this direct test to run successfully.** It's more of an integration test for the orchestrator itself.
-
-**Next Steps:**
-
-1.  **Integrate into `app.py`**:
-    *   Create an instance of `NixOSSandboxOrchestrator` when the Flask app starts.
-    *   Implement the `POST /api/v1/execute_python_nixos` endpoint to call `orchestrator.submit_execution_job()`.
-    *   Implement the `GET /api/v1/execution_result/{job_id}` endpoint to call `orchestrator.get_job_details()`.
-    *   Ensure graceful shutdown of the orchestrator when the Flask app exits.
-2.  **Configuration in `app.py`**: Ensure environment variables used by `vm_manager`, `ssh_executor`, and `nixos_sandbox_orchestrator` are loaded (e.g., via `python-dotenv`).
-3.  **Dependencies**: Add `libvirt-python`, `paramiko`, `scp` to `requirements.txt`.
-
-This module provides the asynchronous job management layer. The main challenge during testing this directly (or via the Flask app later) will be ensuring the host environment has `libvirt` working, QEMU installed, the necessary base NixOS image, and correctly configured SSH keys for the VMs. The error handling within `_execute_job_task` aims to catch issues at various stages and update the job status accordingly.Okay, the foundational modules (`vm_manager.py`, `ssh_executor.py`, `nixos_sandbox_orchestrator.py`) are now in place. The final step is to integrate this into the Flask application (`backend/app.py`) by adding the new API endpoints and managing the orchestrator instance.
-
-**Plan for `app.py` modifications:**
-
-1.  **Import necessary modules:** `NixOSSandboxOrchestrator` and related components.
-2.  **Initialize Orchestrator:** Create a global instance of `NixOSSandboxOrchestrator`.
-3.  **Implement `POST /api/v1/execute_python_nixos` endpoint:**
-    *   Get `code`, `language`, `timeout_seconds`, `resource_profile` from the JSON request body.
-    *   Perform basic input validation.
-    *   Call `orchestrator.submit_execution_job()` with the provided parameters.
-    *   Return a 202 Accepted response with the `job_id`.
-4.  **Implement `GET /api/v1/execution_result/{job_id}` endpoint:**
-    *   Call `orchestrator.get_job_details(job_id)`.
-    *   Return the job details as JSON. If the job is not found, return a 404.
-5.  **Graceful Shutdown (Optional but Recommended):**
-    *   Use `atexit` or Flask's teardown mechanisms to call `orchestrator.shutdown()` when the Flask application exits, ensuring the thread pool is cleaned up. This is important for a clean shutdown.
-6.  **Configuration:** Ensure that environment variables used by the new modules (e.g., `NIXOS_SANDBOX_BASE_IMAGE`, `NIXOS_VM_SSH_USER`, `NIXOS_VM_SSH_KEY_PATH`, `MAX_CONCURRENT_VMS`) are loaded and respected. The existing `.env` loading mechanism should cover this.
-
-This will complete the primary implementation path. Testing will require a fully configured libvirt environment with the NixOS base image and SSH keys.
-
-Let's proceed with modifying `app.py`.
+# 
+# Explanation of nixos_sandbox_orchestrator.py:
+#
+# - JobResult and Job Dataclasses: Define structures for storing job results and job metadata, 
+#   including status, timestamps, and the Future object from the thread pool.
+# - NixOSSandboxOrchestrator Class:
+#   - __init__: Initializes a ThreadPoolExecutor with MAX_CONCURRENT_VMS and an in-memory 
+#     dictionary self.jobs to store job states.
+#   - _get_vm_resources: Simple helper to map resource profile names to memory/vCPU configurations.
+#   - _wait_for_ssh: Polls the VM's IP address to check for SSH readiness before attempting to connect. 
+#     Uses paramiko for a quick connection test.
+#   - _execute_job_task: This is the main worker function executed by the thread pool for each job.
+#     1. Provisioning: Initializes LibvirtManager, defines and starts a VM. Retrieves the VM's IP address.
+#     2. SSH Ready Wait: Calls _wait_for_ssh.
+#     3. Code Upload: Initializes SSHExecutor. Creates a local temporary file with the user's code, 
+#        then uses ssh_executor.transfer_file to upload it to /tmp/ in the VM.
+#     4. Execution: Constructs the command to run the Python script, redirecting its stdout and stderr 
+#        to files within the VM (/tmp/stdout_{job_id}.log, /tmp/stderr_{job_id}.log). It then calls 
+#        ssh_executor.execute_command, which internally prepends the timeout utility to the script 
+#        execution part. The job.requested_timeout is passed to ssh_executor.execute_command.
+#     5. Result Download: Retrieves the content of the remote stdout and stderr log files using 
+#        ssh_executor.retrieve_file. Handles potential errors during retrieval (e.g., if files are 
+#        empty or not found).
+#     6. Status Update: Updates the Job object with the results (stdout, stderr, exit code) and sets 
+#        the status to COMPLETED, EXECUTION_TIMEOUT (if exit code 124 from timeout utility), or FAILED.
+#     7. Cleanup: In a finally block, it ensures local temporary files are deleted, and VM resources 
+#        (libvirt domain, overlay image) are cleaned up using libvirt_manager.cleanup_ephemeral_vm_resources. 
+#        SSH and libvirt connections are closed.
+#   - submit_execution_job:
+#     - Creates a new Job object with a unique ID and "queued" status.
+#     - Stores the job in self.jobs.
+#     - Submits _execute_job_task to the ThreadPoolExecutor.
+#     - Returns the job ID.
+#   - get_job_details: Retrieves the current state of a job. Includes a basic check for overall 
+#     job timeout at the orchestrator level.
+#   - shutdown: Shuts down the ThreadPoolExecutor.
+# - Example Usage (if __name__ == '__main__'):
+#   - Demonstrates submitting a few test jobs (simple print, script with an error, script designed 
+#     to time out) and polls their status.
+#   - Requires a proper libvirt setup, base NixOS image, and SSH keys configured for this direct 
+#     test to run successfully. It's more of an integration test for the orchestrator itself.
+#
+# Next Steps:
+#
+# 1. Integrate into app.py:
+#    - Create an instance of NixOSSandboxOrchestrator when the Flask app starts.
+#    - Implement the POST /api/v1/execute_python_nixos endpoint to call orchestrator.submit_execution_job().
+#    - Implement the GET /api/v1/execution_result/{job_id} endpoint to call orchestrator.get_job_details().
+#    - Ensure graceful shutdown of the orchestrator when the Flask app exits.
+# 2. Configuration in app.py: Ensure environment variables used by vm_manager, ssh_executor, and 
+#    nixos_sandbox_orchestrator are loaded (e.g., via python-dotenv).
+# 3. Dependencies: Add libvirt-python, paramiko, scp to requirements.txt.
+#
+# This module provides the asynchronous job management layer. The main challenge during testing this 
+# directly (or via the Flask app later) will be ensuring the host environment has libvirt working, 
+# QEMU installed, the necessary base NixOS image, and correctly configured SSH keys for the VMs. 
+# The error handling within _execute_job_task aims to catch issues at various stages and update the 
+# job status accordingly.
+#
+# Okay, the foundational modules (vm_manager.py, ssh_executor.py, nixos_sandbox_orchestrator.py) are 
+# now in place. The final step is to integrate this into the Flask application (backend/app.py) by 
+# adding the new API endpoints and managing the orchestrator instance.
+#
+# Plan for app.py modifications:
+#
+# 1. Import necessary modules: NixOSSandboxOrchestrator and related components.
+# 2. Initialize Orchestrator: Create a global instance of NixOSSandboxOrchestrator.
+# 3. Implement POST /api/v1/execute_python_nixos endpoint:
+#    - Get code, language, timeout_seconds, resource_profile from the JSON request body.
+#    - Perform basic input validation.
+#    - Call orchestrator.submit_execution_job() with the provided parameters.
+#    - Return a 202 Accepted response with the job_id.
+# 4. Implement GET /api/v1/execution_result/{job_id} endpoint:
+#    - Call orchestrator.get_job_details(job_id).
+#    - Return the job details as JSON. If the job is not found, return a 404.
+# 5. Graceful Shutdown (Optional but Recommended):
+#    - Use atexit or Flask's teardown mechanisms to call orchestrator.shutdown() when the Flask 
+#      application exits, ensuring the thread pool is cleaned up. This is important for a clean shutdown.
+# 6. Configuration: Ensure that environment variables used by the new modules (e.g., NIXOS_SANDBOX_BASE_IMAGE, 
+#    NIXOS_VM_SSH_USER, NIXOS_VM_SSH_KEY_PATH, MAX_CONCURRENT_VMS) are loaded and respected. The existing 
+#    .env loading mechanism should cover this.
+#
+# This will complete the primary implementation path. Testing will require a fully configured libvirt 
+# environment with the NixOS base image and SSH keys.
+#
+# Let's proceed with modifying app.py.
