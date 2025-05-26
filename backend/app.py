@@ -1771,6 +1771,190 @@ def vertex_garden_chat():
         logger.error(f"Error processing chat: {e}")
         return jsonify({"error": "Failed to process chat"}), 500
 
+# ==================== MISSING API ENDPOINTS ====================
+
+# MCP Search and Categories endpoints
+@app.route('/api/mcp/search', methods=['GET'])
+def search_mcp_servers():
+    """Search for MCP servers"""
+    try:
+        query = request.args.get('q', '')
+        category = request.args.get('category', '')
+        
+        # Mock search results
+        results = [
+            {
+                "id": "filesystem",
+                "name": "File System",
+                "description": "Access to local file system operations",
+                "category": "utility",
+                "version": "1.0.0",
+                "status": "available"
+            },
+            {
+                "id": "git",
+                "name": "Git Integration",
+                "description": "Git version control operations",
+                "category": "development",
+                "version": "1.2.0",
+                "status": "available"
+            }
+        ]
+        
+        # Simple filtering
+        if query:
+            results = [r for r in results if query.lower() in r['name'].lower() or query.lower() in r['description'].lower()]
+        if category:
+            results = [r for r in results if r['category'] == category]
+            
+        return jsonify({"results": results, "total": len(results)}), 200
+    except Exception as e:
+        logger.error(f"Error searching MCP servers: {e}")
+        return jsonify({"error": "Failed to search MCP servers"}), 500
+
+@app.route('/api/mcp/categories', methods=['GET'])
+def get_mcp_categories():
+    """Get available MCP categories"""
+    try:
+        categories = [
+            {"id": "development", "name": "Development", "count": 15},
+            {"id": "database", "name": "Database", "count": 8},
+            {"id": "utility", "name": "Utility", "count": 12},
+            {"id": "ai", "name": "AI/ML", "count": 6},
+            {"id": "testing", "name": "Testing", "count": 4},
+            {"id": "deployment", "name": "Deployment", "count": 7}
+        ]
+        return jsonify({"categories": categories}), 200
+    except Exception as e:
+        logger.error(f"Error getting MCP categories: {e}")
+        return jsonify({"error": "Failed to get MCP categories"}), 500
+
+# NixOS Workspaces endpoints
+@app.route('/api/nixos/workspaces', methods=['GET'])
+def list_nixos_workspaces():
+    """List all NixOS workspaces"""
+    try:
+        # Mock workspace data
+        workspaces = [
+            {
+                "id": "ws-001",
+                "name": "Development Environment",
+                "description": "Main development workspace with NixOS",
+                "status": "running",
+                "created_at": datetime.utcnow().isoformat(),
+                "last_accessed": datetime.utcnow().isoformat(),
+                "resources": {
+                    "cpu": "2 cores",
+                    "memory": "4GB",
+                    "storage": "20GB"
+                }
+            }
+        ]
+        return jsonify({"workspaces": workspaces, "total": len(workspaces)}), 200
+    except Exception as e:
+        logger.error(f"Error listing NixOS workspaces: {e}")
+        return jsonify({"error": "Failed to list workspaces"}), 500
+
+@app.route('/api/nixos/workspaces', methods=['POST'])
+def create_nixos_workspace():
+    """Create a new NixOS workspace"""
+    try:
+        data = request.get_json()
+        workspace_id = f"ws-{uuid.uuid4().hex[:8]}"
+        
+        workspace = {
+            "id": workspace_id,
+            "name": data.get('name', 'New Workspace'),
+            "description": data.get('description', ''),
+            "status": "creating",
+            "created_at": datetime.utcnow().isoformat(),
+            "config": data.get('config', {})
+        }
+        
+        return jsonify(workspace), 201
+    except Exception as e:
+        logger.error(f"Error creating NixOS workspace: {e}")
+        return jsonify({"error": "Failed to create workspace"}), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>', methods=['GET'])
+def get_nixos_workspace(workspace_id):
+    """Get specific NixOS workspace"""
+    try:
+        # Mock workspace data
+        workspace = {
+            "id": workspace_id,
+            "name": f"Workspace {workspace_id}",
+            "description": "NixOS development workspace",
+            "status": "running",
+            "created_at": datetime.utcnow().isoformat(),
+            "last_accessed": datetime.utcnow().isoformat(),
+            "config": {
+                "packages": ["git", "nodejs", "python3"],
+                "services": ["ssh"]
+            },
+            "resources": {
+                "cpu": "2 cores",
+                "memory": "4GB",
+                "storage": "20GB"
+            }
+        }
+        return jsonify(workspace), 200
+    except Exception as e:
+        logger.error(f"Error getting NixOS workspace {workspace_id}: {e}")
+        return jsonify({"error": "Failed to get workspace"}), 500
+
+# Scout Agent endpoints
+@app.route('/api/scout/projects', methods=['GET'])
+def list_scout_projects():
+    """List all Scout Agent projects"""
+    try:
+        projects = [
+            {
+                "id": "test-project-alpha",
+                "name": "Test Project Alpha",
+                "description": "Sample project for testing Scout Agent functionality",
+                "status": "monitoring",
+                "created_at": datetime.utcnow().isoformat(),
+                "last_analysis": datetime.utcnow().isoformat(),
+                "health_score": 85
+            }
+        ]
+        return jsonify({"projects": projects, "total": len(projects)}), 200
+    except Exception as e:
+        logger.error(f"Error listing Scout projects: {e}")
+        return jsonify({"error": "Failed to list projects"}), 500
+
+@app.route('/api/scout/projects/<project_id>', methods=['GET'])
+def get_scout_project(project_id):
+    """Get specific Scout Agent project"""
+    try:
+        project = {
+            "id": project_id,
+            "name": f"Project {project_id}",
+            "description": "Monitored project with Scout Agent",
+            "status": "monitoring",
+            "created_at": datetime.utcnow().isoformat(),
+            "last_analysis": datetime.utcnow().isoformat(),
+            "health_score": 85,
+            "metrics": {
+                "performance": {"score": 90, "trend": "stable"},
+                "security": {"score": 80, "trend": "improving"},
+                "maintainability": {"score": 85, "trend": "stable"}
+            },
+            "alerts": [
+                {
+                    "id": "alert-001",
+                    "severity": "warning",
+                    "message": "High memory usage detected",
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            ]
+        }
+        return jsonify(project), 200
+    except Exception as e:
+        logger.error(f"Error getting Scout project {project_id}: {e}")
+        return jsonify({"error": "Failed to get project"}), 500
+
 # ==================== MAIN APP START ====================
 if __name__ == '__main__':
     # Set global logging level based on environment variable

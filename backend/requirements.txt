@@ -15,6 +15,7 @@ together==0.2.7
 psutil==5.9.6
 python-socketio==5.9.0
 paramiko==3.3.1
+libvirt-python==9.8.0
 
 # Google Cloud and Vertex AI integration
 google-cloud-aiplatform==1.38.1

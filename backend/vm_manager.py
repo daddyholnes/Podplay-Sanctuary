@@ -10,11 +10,13 @@ from xml.etree import ElementTree # For parsing XML metadata
 logger = logging.getLogger(__name__)
 
 # Configuration (Ideally from app config or .env)
-BASE_QCOW2_IMAGE_PATH = os.getenv("NIXOS_SANDBOX_BASE_IMAGE", "/var/lib/libvirt/images/nixos-sandbox-base.qcow2")
+# Use local directories instead of system directories to avoid permission issues
+LOCAL_VM_DIR = os.path.join(os.path.dirname(__file__), "nixos_vms")
+BASE_QCOW2_IMAGE_PATH = os.getenv("NIXOS_SANDBOX_BASE_IMAGE", os.path.join(LOCAL_VM_DIR, "nixos-sandbox-base.qcow2"))
 # Directory for ephemeral sandbox instances
-EPHEMERAL_VM_IMAGES_DIR = os.getenv("NIXOS_EPHEMERAL_VM_IMAGES_DIR", "/var/lib/libvirt/images/sandbox_instances")
+EPHEMERAL_VM_IMAGES_DIR = os.getenv("NIXOS_EPHEMERAL_VM_IMAGES_DIR", os.path.join(LOCAL_VM_DIR, "sandbox_instances"))
 # Directory for persistent workspace VMs
-WORKSPACE_VM_IMAGES_DIR = os.getenv("NIXOS_WORKSPACE_VM_IMAGES_DIR", "/var/lib/libvirt/images/workspaces")
+WORKSPACE_VM_IMAGES_DIR = os.getenv("NIXOS_WORKSPACE_VM_IMAGES_DIR", os.path.join(LOCAL_VM_DIR, "workspaces"))
 
 DEFAULT_VM_MEMORY_MB = int(os.getenv("NIXOS_VM_DEFAULT_MEMORY_MB", "512")) # MB for ephemeral
 DEFAULT_VM_VCPUS = int(os.getenv("NIXOS_VM_DEFAULT_VCPUS", "1")) # for ephemeral
