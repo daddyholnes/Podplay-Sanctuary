@@ -8,6 +8,11 @@
 .env.test.local
 .env.production.local
 
+# Google Cloud SDK and CLI
+google-cloud-sdk/
+google-cloud-cli-*.tar.gz
+gcloud/
+
 # Google Cloud credentials
 *.json
 !package*.json
