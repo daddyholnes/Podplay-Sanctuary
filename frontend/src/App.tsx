@@ -10,6 +10,7 @@ import DevSandbox from './DevSandbox';
 import WorkspacesView from './components/workspaces/WorkspacesView';
 import ScoutProjectView from './components/scout_agent/ScoutProjectView';
 import ScoutDynamicWorkspace from './components/scout_agent/ScoutDynamicWorkspace';
+import MiniAppLauncher from './components/MiniAppLauncher';
 
 import { API_BASE_URL, buildApiUrl, API_ENDPOINTS } from './config/api';
 
@@ -610,7 +611,8 @@ type ActiveView =
   | 'DevSandbox'
   | 'Workspaces' // New View
   | 'ScoutAgentProject' // New View
-  | 'ScoutDynamicWorkspace'; // Dynamic Workspace
+  | 'ScoutDynamicWorkspace' // Dynamic Workspace
+  | 'MiniAppLauncher'; // Cherry Studio inspired mini apps
 
 const App: React.FC = () => {
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
@@ -621,7 +623,7 @@ const App: React.FC = () => {
 
   // For ScoutAgentProject view, we'll need a project ID.
   // For now, hardcode one for testing. In a real app, this would come from a list/selection.
-  const [currentScoutProjectId, setCurrentScoutProjectId] = useState<string>("test-project-alpha");
+  const [currentScoutProjectId] = useState<string>("test-project-alpha");
 
   const handleBackendStatus = useCallback((isRunning: boolean) => {
     setBackendOnline(isRunning);
@@ -666,7 +668,7 @@ const App: React.FC = () => {
 
   const renderActiveView = () => {
     switch (activeView) {
-      case 'Sanctuary':
+            case 'Sanctuary':
         return <MamaBearGreeting briefing={briefing} />;
       case 'Marketplace':
         return <MCPMarketplace />;
@@ -684,6 +686,8 @@ const App: React.FC = () => {
         return <ScoutProjectView projectId={currentScoutProjectId} />;
       case 'ScoutDynamicWorkspace': // Dynamic Workspace
         return <ScoutDynamicWorkspace />;
+      case 'MiniAppLauncher': // Cherry Studio inspired mini apps
+        return <MiniAppLauncher />;
       default:
         return <MamaBearGreeting briefing={briefing} />; // Fallback view
     }
@@ -790,6 +794,14 @@ const App: React.FC = () => {
           >
             <span className="nav-icon">🐻</span>
             {!sidebarCollapsed && <span className="nav-label">Dynamic Workspace</span>}
+          </button>
+          <button
+            className={`nav-tab ${activeView === 'MiniAppLauncher' ? 'active' : ''}`}
+            onClick={() => setActiveView('MiniAppLauncher')}
+            title="Mini App Launcher - Cherry Studio inspired"
+          >
+            <span className="nav-icon">🚀</span>
+            {!sidebarCollapsed && <span className="nav-label">Mini Apps</span>}
           </button>
         </nav>
         

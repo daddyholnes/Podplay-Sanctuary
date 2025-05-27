@@ -384,7 +384,7 @@ const ScoutDynamicWorkspace: React.FC = () => {
     }
   };
 
-  const simulateInitialWorkspaceSetup = async (orchestrationData: any) => {
+  const simulateInitialWorkspaceSetup = async (_orchestrationData: any) => {
     const actions = [
       {
         type: 'file_operation' as const,
@@ -840,24 +840,41 @@ const ScoutDynamicWorkspace: React.FC = () => {
   );
 
   const renderChatPanel = () => (
-    <div className="scout-chat-panel">
-      <div className="scout-messages-container">
+    <div className="chat-panel">
+      <div className="chat-messages">
         {messages.slice(-10).map((message) => (
-          <div key={message.id} className={`scout-message scout-message-${message.type}`}>
-            <div className="scout-message-content">
+          <div key={message.id} className={`chat-message ${message.type}`}>
+            <div className="message-header">
+              <span className="message-icon">
+                {message.type === 'user' ? '👤' : '🤖'}
+              </span>
+              <span className="message-sender">
+                {message.type === 'user' ? 'You' : 'Mama Bear'}
+              </span>
+              <span className="message-timestamp">
+                {new Date(message.timestamp).toLocaleTimeString()}
+              </span>
+            </div>
+            <div className="message-content">
               {message.content.split('\n').map((line, i) => (
                 <p key={i}>{line}</p>
               ))}
             </div>
-            <div className="scout-message-time">
-              {new Date(message.timestamp).toLocaleTimeString()}
-            </div>
           </div>
         ))}
         {isLoading && (
-          <div className="scout-message scout-message-assistant">
-            <div className="scout-loading-pulse">
-              <span></span><span></span><span></span>
+          <div className="chat-message assistant">
+            <div className="message-header">
+              <span className="message-icon">🤖</span>
+              <span className="message-sender">Mama Bear</span>
+              <span className="message-timestamp">
+                {new Date().toLocaleTimeString()}
+              </span>
+            </div>
+            <div className="message-content">
+              <div className="scout-loading-pulse">
+                <span></span><span></span><span></span>
+              </div>
             </div>
           </div>
         )}
