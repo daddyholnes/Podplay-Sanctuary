@@ -3,12 +3,12 @@
 // Backend API base URL - Ensure this matches your backend's running port (from .env API_PORT)
 export const API_BASE_URL = process.env.NODE_ENV === 'development' 
   ? 'http://localhost:5000' // Updated to match backend running on port 5000
-  : '/'; // For production, assuming frontend is served by the same host or proxied
+  : 'https://mama-bear-backend-197406322381.us-central1.run.app'; // Deployed backend URL
 
 // Socket.io connection URL - Should also match your backend
 export const SOCKET_URL = process.env.NODE_ENV === 'development'
   ? 'http://localhost:5000' // Updated to match backend running on port 5000
-  : '/';
+  : 'https://mama-bear-backend-197406322381.us-central1.run.app';
 
 // Helper to build full API URLs
 export const buildApiUrl = (endpoint: string): string => {
