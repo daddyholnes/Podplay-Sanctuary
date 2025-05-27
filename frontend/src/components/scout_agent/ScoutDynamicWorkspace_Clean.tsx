@@ -384,7 +384,7 @@ const ScoutDynamicWorkspace: React.FC = () => {
     }
   };
 
-  const simulateInitialWorkspaceSetup = async (orchestrationData: any) => {
+  const simulateInitialWorkspaceSetup = async (_orchestrationData: any) => {
     const actions = [
       {
         type: 'file_operation' as const,

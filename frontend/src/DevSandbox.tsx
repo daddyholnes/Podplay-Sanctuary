@@ -39,25 +39,26 @@ interface NixOSWorkspace {
   lastAccessed: string;
 }
 
-interface ScoutAgentStatus {
-  isActive: boolean;
-  currentPlan?: string;
-  lastActivity: string;
-  projectId?: string;
-  totalActions: number;
-  successfulActions: number;
-  failedActions: number;
-}
+// These interfaces are commented out as they are currently unused
+// interface ScoutAgentStatus {
+//   isActive: boolean;
+//   currentPlan?: string;
+//   lastActivity: string;
+//   projectId?: string;
+//   totalActions: number;
+//   successfulActions: number;
+//   failedActions: number;
+// }
 
-interface ScoutLogEntry {
-  id: string;
-  timestamp: string;
-  level: 'info' | 'warning' | 'error' | 'debug';
-  message: string;
-  projectId?: string;
-  action?: string;
-  metadata?: Record<string, any>;
-}
+// interface ScoutLogEntry {
+//   id: string;
+//   timestamp: string;
+//   level: 'info' | 'warning' | 'error' | 'debug';
+//   message: string;
+//   projectId?: string;
+//   action?: string;
+//   metadata?: Record<string, any>;
+// }
 
 interface FileNode {
   name: string;
@@ -106,7 +107,8 @@ const DevSandbox: React.FC = () => {
   const [showEnvironmentCreator, setShowEnvironmentCreator] = useState(false);
 
   // ==================== NIXOS WORKSPACE STATE ====================
-  const [activeWorkspace, setActiveWorkspace] = useState<NixOSWorkspace | null>(null);
+  const [, /* setActiveWorkspace */] = useState<NixOSWorkspace | null>(null);
+  const [/* nixosWorkspaces */, /* setNixosWorkspaces */] = useState<NixOSWorkspace[]>([]);
 
   // ==================== FILE SYSTEM STATE ====================
   const [fileTree, setFileTree] = useState<FileNode | null>(null);
@@ -476,7 +478,7 @@ const DevSandbox: React.FC = () => {
 
   // ==================== NIXOS WORKSPACE OPERATIONS ====================
   
-  const loadNixosWorkspaces = async () => {
+  /* const loadNixosWorkspaces = async () => {
     try {
       const response = await fetch('http://localhost:5000/api/v1/workspaces');
       const result = await response.json();
@@ -496,46 +498,47 @@ const DevSandbox: React.FC = () => {
     } catch (error) {
       console.error('Error loading NixOS workspaces:', error);
     }
-  };
+  }; */
 
-  const createNixosWorkspace = async (name: string, memoryMB: number = 1024, vcpus: number = 2) => {
-    try {
-      const response = await fetch('http://localhost:5000/api/v1/workspaces', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, memory_mb: memoryMB, vcpus })
-      });
-      
-      const result = await response.json();
-      if (result.success) {
-        await loadNixosWorkspaces();
-        return result.workspace_id;
-      } else {
-        throw new Error(result.error);
-      }
-    } catch (error) {
-      console.error('Error creating NixOS workspace:', error);
-      throw error;
-    }
-  };
+  // These functions are commented out as they are currently unused
+  // const createNixosWorkspace = async (name: string, memoryMB: number = 1024, vcpus: number = 2) => {
+  //   try {
+  //     const response = await fetch('http://localhost:5000/api/v1/workspaces', {
+  //       method: 'POST',
+  //       headers: { 'Content-Type': 'application/json' },
+  //       body: JSON.stringify({ name, memory_mb: memoryMB, vcpus })
+  //     });
+  //     
+  //     const result = await response.json();
+  //     if (result.success) {
+  //       await loadNixosWorkspaces();
+  //       return result.workspace_id;
+  //     } else {
+  //       throw new Error(result.error);
+  //     }
+  //   } catch (error) {
+  //     console.error('Error creating NixOS workspace:', error);
+  //     throw error;
+  //   }
+  // };
 
-  const startNixosWorkspace = async (workspaceId: string) => {
-    try {
-      const response = await fetch(`http://localhost:5000/api/v1/workspaces/${workspaceId}/start`, {
-        method: 'POST'
-      });
-      
-      const result = await response.json();
-      if (result.success) {
-        await loadNixosWorkspaces();
-      } else {
-        throw new Error(result.error);
-      }
-    } catch (error) {
-      console.error('Error starting NixOS workspace:', error);
-      throw error;
-    }
-  };
+  // const startNixosWorkspace = async (workspaceId: string) => {
+  //   try {
+  //     const response = await fetch(`http://localhost:5000/api/v1/workspaces/${workspaceId}/start`, {
+  //       method: 'POST'
+  //     });
+  //     
+  //     const result = await response.json();
+  //     if (result.success) {
+  //       await loadNixosWorkspaces();
+  //     } else {
+  //       throw new Error(result.error);
+  //     }
+  //   } catch (error) {
+  //     console.error('Error starting NixOS workspace:', error);
+  //     throw error;
+  //   }
+  // };
 
   // ==================== FILE SYSTEM OPERATIONS ====================
 

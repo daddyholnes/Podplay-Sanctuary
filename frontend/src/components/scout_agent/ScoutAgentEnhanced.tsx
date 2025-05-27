@@ -65,7 +65,7 @@ const ScoutAgentEnhanced: React.FC = () => {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [workspaceData, setWorkspaceData] = useState<WorkspaceData | null>(null);
-  const [projectId, setProjectId] = useState<string>('test-project-alpha');
+  const [projectId, /* setProjectId */] = useState<string>('test-project-alpha');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [activePanel, setActivePanel] = useState<'files' | 'preview' | 'timeline'>('preview');
 
@@ -179,7 +179,7 @@ const ScoutAgentEnhanced: React.FC = () => {
       setIsLoading(true);
       
       // Fetch workspace data
-      const [projectStatus, files, timeline] = await Promise.all([
+      const [projectStatus, /* files */, /* timeline */] = await Promise.all([
         fetch(buildDynamicApiUrl(API_ENDPOINTS.SCOUT_AGENT.GET_PROJECT, { id: projectId })),
         fetch('/api/files/list'), // You'll need to implement this
         fetch('/api/timeline/recent') // You'll need to implement this
