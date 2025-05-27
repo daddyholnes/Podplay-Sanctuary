@@ -15,6 +15,7 @@ together==0.2.7
 psutil==5.9.6
 python-socketio==5.9.0
 paramiko==3.3.1
+scp==0.14.5
 libvirt-python==9.8.0
 
 # Google Cloud and Vertex AI integration
@@ -28,6 +29,7 @@ google-cloud-core==2.3.3
 # Production server
 gunicorn==21.2.0
 gevent==23.9.1
+gevent-websocket==0.10.1
 
 # Development dependencies
 pytest==7.4.2

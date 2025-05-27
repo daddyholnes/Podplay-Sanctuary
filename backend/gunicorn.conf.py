@@ -6,7 +6,7 @@ bind = f"0.0.0.0:{os.getenv('PORT', '8080')}"
 backlog = 2048
 
 # Worker processes
-worker_class = "gevent"
+worker_class = "gevent"  # gevent works better with Python 3.12
 worker_connections = 1000
 workers = 1  # Single worker for Cloud Run
 threads = 1
