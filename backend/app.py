@@ -224,7 +224,6 @@ except ImportError as e:
 
 app = Flask(__name__)
 CORS(app)
-socketio = SocketIO(app, cors_allowed_origins="*")
 
 # ==================== MCP MARKETPLACE DATA MODELS ====================
 
@@ -2099,6 +2098,10 @@ if __name__ == '__main__':
     app.logger.setLevel(log_level_str)
 
     logger.info(f"Global logging level set to: {log_level_str}")
+
+# ==================== FLASK APPLICATION STARTUP ====================
+
+if __name__ == "__main__":
     logger.info("🚀 Starting Podplay Backend Server with NixOS Capabilities...")
     logger.info(f"🔧 NixOS Ephemeral Sandbox Orchestrator: {'Initialized and Enabled' if nixos_ephemeral_orchestrator else 'Disabled / Not Initialized (check ENABLE_NIXOS_SANDBOX env var and import logs)'}")
     logger.info(f"🔧 Libvirt Workspace Manager: {'Initialized and Enabled' if libvirt_workspace_manager else 'Disabled / Not Initialized (check ENABLE_WORKSPACE_MANAGER env var and import logs)'}")
@@ -2106,7 +2109,7 @@ if __name__ == '__main__':
     
     flask_debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"  # Default to False for production
     api_host = os.getenv("HOST", os.getenv("API_HOST", "0.0.0.0"))
-    api_port = int(os.environ.get('PORT', os.environ.get('API_PORT', '8080')))  # Cloud Run uses PORT env var
+    api_port = int(os.environ.get('PORT', os.environ.get('API_PORT', '8000')))  # Use 8000 for development, 8080 for Cloud Run
 
     logger.info(f"Flask Debug Mode: {flask_debug_mode}, Host: {api_host}, Port: {api_port}")
     
