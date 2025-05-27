@@ -505,7 +505,7 @@ const ScoutDynamicWorkspace: React.FC = () => {
     }
   };
 
-  const simulateInitialWorkspaceSetup = async (orchestrationData: any) => {
+  const simulateInitialWorkspaceSetup = async (_orchestrationData: any) => {
     // Simulate initial development activity
     await new Promise(resolve => setTimeout(resolve, 1000));
     
@@ -884,7 +884,7 @@ const ScoutDynamicWorkspace: React.FC = () => {
     ));
   };
 
-  const renderChatInput = () => (
+  /* const renderChatInput = () => (
     <div className="scout-chat-input-container">
       <form onSubmit={handleSubmit} className="scout-chat-form">
         <div className="scout-input-wrapper">
@@ -916,7 +916,7 @@ const ScoutDynamicWorkspace: React.FC = () => {
         </div>
       </form>
     </div>
-  );
+  ); */
 
   const renderChatPanel = () => (
     <div className="scout-chat-panel">
@@ -1012,7 +1012,7 @@ const ScoutDynamicWorkspace: React.FC = () => {
     return 'general';
   };
 
-  const simulateWorkspaceActivity = async (userMessage: string) => {
+  /* const simulateWorkspaceActivity = async (userMessage: string) => {
     // Simulate Mama Bear working on the user's request
     const actionId = addAgentAction({
       type: 'code_execution',
@@ -1045,9 +1045,9 @@ const ScoutDynamicWorkspace: React.FC = () => {
         '$'
       ]);
     }
-  };
+  }; */
 
-  const simulateInitialWorkspaceSetup = async (_orchestrationData: any) => {
+  /* const simulateInitialWorkspaceSetup = async (_orchestrationData: any) => {
     // Simulate initial setup actions
     const actions = [
       {
@@ -1084,7 +1084,7 @@ const ScoutDynamicWorkspace: React.FC = () => {
 
     // Update project status
     setProjectContext(prev => prev ? { ...prev, status: 'executing' } : null);
-  };
+  }; */
 
   const handleFileSelect = (file: FileNode) => {
     setActiveFile(file);

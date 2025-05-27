@@ -10,7 +10,7 @@ interface ScoutInterventionControlsProps {
 }
 
 const ScoutInterventionControlsComponent: React.FC<ScoutInterventionControlsProps> = ({
-  projectId,
+  projectId: _projectId,
   currentProjectStatus,
   // activeStepId, // Could be used for context-specific interventions
   onIntervene,
@@ -40,7 +40,7 @@ const ScoutInterventionControlsComponent: React.FC<ScoutInterventionControlsProp
         <button onClick={() => handleSimpleCommand('pause')} disabled={!isAgentActive || isSubmitting} title="Pause the agent's execution">
           ⏸️ Pause Agent
         </button>
-        <button onClick={() => handleSimpleCommand('resume')} disabled={isAgentActive && currentProjectStatus !== 'paused' || isSubmitting} title="Resume a paused agent">
+        <button onClick={() => handleSimpleCommand('resume')} disabled={(!isAgentActive || currentProjectStatus !== 'paused') || isSubmitting} title="Resume a paused agent">
           ▶️ Resume Agent
         </button>
       </div>

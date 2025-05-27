@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "format": "prettier --write \"src/**/*.{ts,tsx,css,json}\"",
-    "start": "npm run dev"
+    "start": "npm run dev",
+    "postinstall": "tsc --noEmit"
   },
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
@@ -20,9 +21,11 @@
     "axios": "^1.5.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "socket.io-client": "^4.8.1"
+    "socket.io-client": "^4.8.1",
+    "typescript": "^5.0.2"
   },
   "devDependencies": {
+    "@types/node": "^22.15.21",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "@vitejs/plugin-react": "^4.0.3",
