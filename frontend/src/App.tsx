@@ -9,6 +9,7 @@ import DevSandbox from './DevSandbox';
 // New Views
 import WorkspacesView from './components/workspaces/WorkspacesView';
 import ScoutProjectView from './components/scout_agent/ScoutProjectView';
+import ScoutDynamicWorkspace from './components/scout_agent/ScoutDynamicWorkspace';
 
 import { API_BASE_URL, buildApiUrl, API_ENDPOINTS } from './config/api';
 
@@ -608,7 +609,8 @@ type ActiveView =
   | 'VertexChat' 
   | 'DevSandbox'
   | 'Workspaces' // New View
-  | 'ScoutAgentProject'; // New View
+  | 'ScoutAgentProject' // New View
+  | 'ScoutDynamicWorkspace'; // Dynamic Workspace
 
 const App: React.FC = () => {
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
@@ -680,6 +682,8 @@ const App: React.FC = () => {
         return <WorkspacesView />;
       case 'ScoutAgentProject': // New Case
         return <ScoutProjectView projectId={currentScoutProjectId} />;
+      case 'ScoutDynamicWorkspace': // Dynamic Workspace
+        return <ScoutDynamicWorkspace />;
       default:
         return <MamaBearGreeting briefing={briefing} />; // Fallback view
     }
@@ -778,6 +782,14 @@ const App: React.FC = () => {
           >
             <span className="nav-icon">🤖</span>
             {!sidebarCollapsed && <span className="nav-label">Scout Agent</span>}
+          </button>
+          <button
+            className={`nav-tab ${activeView === 'ScoutDynamicWorkspace' ? 'active' : ''}`}
+            onClick={() => setActiveView('ScoutDynamicWorkspace')}
+            title="Dynamic Workspace - scout.new inspired"
+          >
+            <span className="nav-icon">🐻</span>
+            {!sidebarCollapsed && <span className="nav-label">Dynamic Workspace</span>}
           </button>
         </nav>
         
