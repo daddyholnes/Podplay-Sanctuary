@@ -3,7 +3,7 @@
 .git
 .gitignore
 README.md
-Dockerfile
+# Dockerfile  # Don't exclude Dockerfile for Cloud Build
 .dockerignore
 node_modules
 npm-debug.log
