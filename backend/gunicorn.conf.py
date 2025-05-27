@@ -15,9 +15,12 @@ threads = 1
 max_requests = 1000
 max_requests_jitter = 50
 
-# Timeout for graceful workers restart
-timeout = 120
-keepalive = 5
+# Timeout for graceful workers restart - reduced for faster startup
+timeout = 60
+keepalive = 2
+
+# Preload application for faster startup
+preload_app = True
 
 # Logging
 loglevel = "info"

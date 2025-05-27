@@ -15,12 +15,12 @@ if __name__ == "__main__":
         # Use Gunicorn for production
         from gunicorn.app.wsgiapp import WSGIApplication
         
-        # Set Gunicorn options
+        # Set Gunicorn options - use gevent to match Dockerfile
         sys.argv = [
             "gunicorn",
             "--config", "gunicorn.conf.py",
             "--bind", f"0.0.0.0:{port}",
-            "--worker-class", "eventlet",
+            "--worker-class", "gevent",
             "--workers", "1",
             "app:app"
         ]
