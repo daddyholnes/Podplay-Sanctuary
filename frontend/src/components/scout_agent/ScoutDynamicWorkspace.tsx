@@ -2,7 +2,6 @@
 // The "Transforming Canvas" - Dynamic, Unified, Proactive Agentic Workspace
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { buildDynamicApiUrl, API_ENDPOINTS } from '../../config/api';
 import './ScoutDynamicWorkspace.css';
 
 // ==================== INTERFACES ====================
@@ -94,11 +93,11 @@ const ScoutDynamicWorkspace: React.FC = () => {
 
   // UI State
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   // Refs
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLIFrameElement>(null);
 
@@ -366,10 +365,10 @@ const ScoutDynamicWorkspace: React.FC = () => {
         progress: 100 
       });
 
-    } catch (error) {
+    } catch (error: any) {
       updateAgentAction(actionId, { 
         status: 'failed', 
-        output: { error: error.message } 
+        output: { error: error?.message || 'Unknown error' } 
       });
     }
   };
@@ -425,7 +424,7 @@ const ScoutDynamicWorkspace: React.FC = () => {
     }
   };
 
-  const simulateGenericAction = async (action: any, actionId: string) => {
+  const simulateGenericAction = async (_action: any, actionId: string) => {
     for (let progress = 0; progress <= 100; progress += 25) {
       updateAgentAction(actionId, { progress });
       await new Promise(resolve => setTimeout(resolve, 400));
@@ -512,6 +511,10 @@ const ScoutDynamicWorkspace: React.FC = () => {
           </div>
         )}
         <div ref={chatEndRef} />
+      </div>
+
+      <div className="scout-chat-input-section">
+        {renderChatInput()}
       </div>
 
       {renderAgentTimeline()}
@@ -621,13 +624,62 @@ const ScoutDynamicWorkspace: React.FC = () => {
       <div className="scout-messages-container">
         {messages.slice(-10).map((message) => (
           <div key={message.id} className={`scout-message scout-message-${message.type}`}>
-            <div className="scout-message-content">{message.content}</div>
+            <div className="scout-message-content">
+              {message.content.split('\n').map((line, i) => (
+                <p key={i}>{line}</p>
+              ))}
+            </div>
             <div className="scout-message-time">
               {new Date(message.timestamp).toLocaleTimeString()}
             </div>
           </div>
         ))}
+        {isLoading && (
+          <div className="scout-message scout-message-assistant">
+            <div className="scout-loading-pulse">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+        )}
         <div ref={chatEndRef} />
+      </div>
+      
+      <div className="scout-chat-input-section">
+        <form onSubmit={handleSubmit} className="scout-chat-form">
+          <div className="scout-input-wrapper">
+            <textarea
+              ref={inputRef}
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              placeholder="Ask Mama Bear to build something amazing..."
+              className="scout-chat-input"
+              rows={2}
+              disabled={isLoading}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSubmit(e);
+                }
+              }}
+            />
+            <div className="scout-input-controls">
+              <button
+                type="button"
+                className="scout-emoji-btn"
+                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+              >
+                😊
+              </button>
+              <button
+                type="submit"
+                className="scout-send-btn"
+                disabled={!inputValue.trim() || isLoading}
+              >
+                {isLoading ? '⏳' : '🚀'}
+              </button>
+            </div>
+          </div>
+        </form>
       </div>
     </div>
   );
@@ -765,7 +817,7 @@ const ScoutDynamicWorkspace: React.FC = () => {
       <form onSubmit={handleSubmit} className="scout-chat-form">
         <div className="scout-input-wrapper">
           <input
-            ref={inputRef}
+            ref={chatInputRef}
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
@@ -807,7 +859,7 @@ const ScoutDynamicWorkspace: React.FC = () => {
   };
 
   const getViewIcon = (view: string): string => {
-    const icons = {
+    const icons: Record<string, string> = {
       chat: '💬',
       editor: '📝',
       preview: '👁️',
@@ -819,15 +871,15 @@ const ScoutDynamicWorkspace: React.FC = () => {
 
   const getFileIcon = (filename: string): string => {
     const ext = filename.split('.').pop()?.toLowerCase();
-    const icons = {
+    const icons: Record<string, string> = {
       js: '🟨', ts: '🔷', py: '🐍', html: '🌐', css: '🎨',
       json: '📋', md: '📝', txt: '📄'
     };
-    return icons[ext] || '📄';
+    return ext ? (icons[ext] || '📄') : '📄';
   };
 
   const getActionIcon = (type: string): string => {
-    const icons = {
+    const icons: Record<string, string> = {
       thinking: '🤔',
       tool_call: '🔧',
       code_execution: '⚡',
@@ -856,8 +908,8 @@ const ScoutDynamicWorkspace: React.FC = () => {
         {workspaceState.mode === 'full_workspace' && renderFullWorkspace()}
       </div>
 
-      {/* Chat input is always available at the bottom */}
-      {renderChatInput()}
+      {/* Chat input only for hybrid/full workspace modes */}
+      {workspaceState.mode !== 'chat' && renderChatInput()}
 
       {/* Emoji picker */}
       {showEmojiPicker && (
@@ -869,7 +921,7 @@ const ScoutDynamicWorkspace: React.FC = () => {
               onClick={() => {
                 setInputValue(prev => prev + emoji);
                 setShowEmojiPicker(false);
-                inputRef.current?.focus();
+                chatInputRef.current?.focus();
               }}
             >
               {emoji}
