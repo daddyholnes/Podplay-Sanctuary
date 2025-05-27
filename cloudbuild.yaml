@@ -1,0 +1,93 @@
+# Unified Cloud Build Configuration for Frontend + Backend
+steps:
+  # Build the frontend application
+  - name: 'node:18'
+    entrypoint: 'bash'
+    args:
+      - '-c'
+      - |
+        cd frontend
+        npm ci
+        npm run build
+        
+  # Build Frontend Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build', 
+      '-t', 'gcr.io/$PROJECT_ID/podplay-sanctuary-frontend:$COMMIT_SHA',
+      '-t', 'gcr.io/$PROJECT_ID/podplay-sanctuary-frontend:latest',
+      './frontend'
+    ]
+    
+  # Build Backend Docker image
+  - name: 'gcr.io/cloud-builders/docker'
+    args: [
+      'build',
+      '-t', 'gcr.io/$PROJECT_ID/mama-bear-backend:$COMMIT_SHA', 
+      '-t', 'gcr.io/$PROJECT_ID/mama-bear-backend:latest',
+      './backend'
+    ]
+    
+  # Push Frontend images
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/podplay-sanctuary-frontend:$COMMIT_SHA']
+    
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/podplay-sanctuary-frontend:latest']
+    
+  # Push Backend images  
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/mama-bear-backend:$COMMIT_SHA']
+    
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', 'gcr.io/$PROJECT_ID/mama-bear-backend:latest']
+    
+  # Deploy Frontend to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'podplay-sanctuary-frontend'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/podplay-sanctuary-frontend:$COMMIT_SHA'
+      - '--region'
+      - 'europe-west1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8080'
+      - '--memory'
+      - '1Gi'
+      - '--timeout'
+      - '300'
+
+  # Deploy Backend to Cloud Run
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'gcloud'
+    args:
+      - 'run'
+      - 'deploy'
+      - 'mama-bear-backend'
+      - '--image'
+      - 'gcr.io/$PROJECT_ID/mama-bear-backend:$COMMIT_SHA'
+      - '--region'
+      - 'europe-west1'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--port'
+      - '8080'
+      - '--memory'
+      - '2Gi'
+      - '--timeout'
+      - '300'
+      - '--set-env-vars'
+      - 'FLASK_ENV=production,PYTHONPATH=/app'
+
+images:
+  - 'gcr.io/$PROJECT_ID/podplay-sanctuary-frontend:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/podplay-sanctuary-frontend:latest'
+  - 'gcr.io/$PROJECT_ID/mama-bear-backend:$COMMIT_SHA'
+  - 'gcr.io/$PROJECT_ID/mama-bear-backend:latest'

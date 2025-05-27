@@ -25,6 +25,10 @@ google-auth-httplib2==0.1.1
 google-api-python-client==2.103.0
 google-cloud-core==2.3.3
 
+# Production server
+gunicorn==21.2.0
+eventlet==0.33.3
+
 # Development dependencies
 pytest==7.4.2
 pytest-flask==1.2.0

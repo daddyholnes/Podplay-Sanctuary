@@ -2095,15 +2095,29 @@ if __name__ == '__main__':
     logger.info(f"🔧 Libvirt Workspace Manager: {'Initialized and Enabled' if libvirt_workspace_manager else 'Disabled / Not Initialized (check ENABLE_WORKSPACE_MANAGER env var and import logs)'}")
     logger.info(f"🔧 Scout Agent Log Manager: {'Initialized and Enabled' if scout_log_manager else 'Disabled / Not Initialized (check ENABLE_SCOUT_LOGGER env var and import logs)'}")
     
-    flask_debug_mode = os.getenv("FLASK_DEBUG", "True").lower() == "true"
-    api_host = os.getenv("API_HOST", "0.0.0.0")
-    api_port = int(os.environ.get('API_PORT', '5000'))  # Default to 5000 to match frontend
+    flask_debug_mode = os.getenv("FLASK_DEBUG", "False").lower() == "true"  # Default to False for production
+    api_host = os.getenv("HOST", os.getenv("API_HOST", "0.0.0.0"))
+    api_port = int(os.environ.get('PORT', os.environ.get('API_PORT', '8080')))  # Cloud Run uses PORT env var
 
     logger.info(f"Flask Debug Mode: {flask_debug_mode}, Host: {api_host}, Port: {api_port}")
     
-    # Use socketio.run for development server with WebSocket support.
-    # For production, a proper WSGI server like Gunicorn with eventlet or gevent worker is needed.
-    try:
+    # Check if running in production (Cloud Run)
+    is_production = os.getenv("FLASK_ENV") == "production" or os.getenv("GAE_ENV") or os.getenv("K_SERVICE")
+    
+    if is_production:
+        logger.info("🚀 Production mode detected - using Gunicorn compatibility")
+        # In production, Gunicorn will handle the WSGI app
+        # This code path is for when app.py is run directly (which shouldn't happen in production)
+        socketio.run(app, 
+                    host=api_host, 
+                    port=api_port, 
+                    debug=False,
+                    use_reloader=False,
+                    allow_unsafe_werkzeug=True
+                   )
+    else:
+        # Development mode
+        logger.info("🔧 Development mode - using SocketIO dev server")
         socketio.run(app, 
                     host=api_host, 
                     port=api_port, 
