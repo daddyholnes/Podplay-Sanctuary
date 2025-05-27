@@ -15,7 +15,7 @@ class Mem0ChatManager:
         # Get API key from environment variables for security
         api_key = os.getenv('MEM0_API_KEY')
         if not api_key:
-            raise ValueError("MEM0_API_KEY environment variable not set")
+            raise ValueError("MEM0_API_KEY environment variable not set or empty")
         
         os.environ["MEM0_API_KEY"] = api_key
         self.client = MemoryClient()
@@ -396,5 +396,13 @@ class Mem0ChatManager:
                 "count": 0
             }
 
-# Global instance
-mem0_chat_manager = Mem0ChatManager()
+# Global instance - only create if API key is available
+try:
+    if os.getenv('MEM0_API_KEY'):
+        mem0_chat_manager = Mem0ChatManager()
+    else:
+        mem0_chat_manager = None
+        print("🐻 Mama Bear: MEM0_API_KEY not set, mem0 functionality disabled")
+except Exception as e:
+    mem0_chat_manager = None
+    print(f"🐻 Mama Bear: Failed to initialize Mem0ChatManager: {e}")

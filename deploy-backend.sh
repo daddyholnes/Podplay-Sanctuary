@@ -35,7 +35,6 @@ gcloud run deploy mama-bear-backend \
     --set-env-vars="ENABLE_NIXOS_SANDBOX=false" \
     --set-env-vars="ENABLE_WORKSPACE_MANAGER=false" \
     --set-env-vars="ENABLE_SCOUT_LOGGER=false" \
-    --set-env-vars="MEM0_API_KEY=" \
     --memory 1Gi \
     --cpu 1 \
     --timeout 300 \
