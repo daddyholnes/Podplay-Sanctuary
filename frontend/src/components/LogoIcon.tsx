@@ -25,59 +25,108 @@ export const LogoIcon: React.FC<LogoIconProps> = ({
 }) => {
   const [logoLoaded, setLogoLoaded] = useState(false);
   const [logoError, setLogoError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const logo: LogoAsset = getLogo(appId);
   const iconSize = sizeMap[size];
 
   useEffect(() => {
     if (!logo.logoUrl) {
       setLogoError(true);
+      setIsLoading(false);
       return;
     }
 
+    setIsLoading(true);
     const img = new Image();
-    img.onload = () => setLogoLoaded(true);
-    img.onerror = () => setLogoError(true);
+    img.onload = () => {
+      console.log(`✅ Logo loaded successfully for ${appId}:`, logo.logoUrl);
+      setLogoLoaded(true);
+      setLogoError(false);
+      setIsLoading(false);
+    };
+    img.onerror = () => {
+      console.warn(`❌ Logo failed to load for ${appId}:`, logo.logoUrl, 'falling back to', logo.fallbackIcon);
+      setLogoError(true);
+      setLogoLoaded(false);
+      setIsLoading(false);
+    };
     img.src = logo.logoUrl;
-  }, [logo.logoUrl]);
+  }, [logo.logoUrl, appId, logo.fallbackIcon]);
 
-  // Use logo if loaded, otherwise fallback to styled icon
-  if (logoLoaded && !logoError && logo.logoUrl) {
+  // Loading state
+  if (isLoading) {
     return (
-      <img
-        src={logo.logoUrl}
-        alt={`${logo.name} logo`}
-        width={iconSize}
-        height={iconSize}
-        className={`logo-icon ${className}`}
+      <div
+        className={`logo-icon-fallback logo-loading ${className}`}
         style={{
+          width: iconSize,
+          height: iconSize,
           borderRadius: '6px',
-          objectFit: 'contain',
+          backgroundColor: '#f0f0f0',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: Math.floor(iconSize * 0.4),
           ...style
         }}
-        onError={() => setLogoError(true)}
-      />
+      >
+        ⏳
+      </div>
+    );
+  }
+
+  // Use logo if loaded successfully
+  if (logoLoaded && !logoError && logo.logoUrl) {
+    return (
+      <div style={{ position: 'relative', display: 'inline-block' }}>
+        <img
+          src={logo.logoUrl}
+          alt={`${logo.name} logo`}
+          width={iconSize}
+          height={iconSize}
+          className={`logo-icon ${className}`}
+          style={{
+            borderRadius: '6px',
+            objectFit: 'contain',
+            ...style
+          }}
+          onError={() => setLogoError(true)}
+        />
+        {size !== 'small' && (
+          <div className="logo-status loaded" title="Official logo loaded">
+            ✓
+          </div>
+        )}
+      </div>
     );
   }
 
   // Fallback to styled emoji icon
   return (
-    <div
-      className={`logo-icon-fallback ${className}`}
-      style={{
-        width: iconSize,
-        height: iconSize,
-        borderRadius: '6px',
-        backgroundColor: logo.bgColor || '#6B7280',
-        color: logo.textColor || '#FFFFFF',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        fontSize: Math.floor(iconSize * 0.6),
-        fontWeight: '600',
-        ...style
-      }}
-    >
-      {logo.fallbackIcon}
+    <div style={{ position: 'relative', display: 'inline-block' }}>
+      <div
+        className={`logo-icon-fallback ${className}`}
+        style={{
+          width: iconSize,
+          height: iconSize,
+          borderRadius: '6px',
+          backgroundColor: logo.bgColor || '#6B7280',
+          color: logo.textColor || '#FFFFFF',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontSize: Math.floor(iconSize * 0.6),
+          fontWeight: '600',
+          ...style
+        }}
+      >
+        {logo.fallbackIcon}
+      </div>
+      {size !== 'small' && (
+        <div className="logo-status fallback" title="Using fallback icon">
+          !
+        </div>
+      )}
     </div>
   );
 };
