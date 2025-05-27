@@ -148,7 +148,7 @@ cors = CORS(app, resources={
 
 # All custom after_request and OPTIONS handlers removed. CORS is now handled globally and automatically.
 
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 try:
     import together
