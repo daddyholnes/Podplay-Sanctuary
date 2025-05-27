@@ -150,7 +150,7 @@ class ScoutProjectLogger:
         # TinyDB does not have built-in server-side sorting for all records easily.
         # We fetch all, then sort in Python. For very large logs, this could be inefficient.
         # Consider querying with a range or other filters if performance becomes an issue.
-        all_logs = self_log_table.all()
+        all_logs = self._log_table.all()
         
         # Sort by timestamp
         try:

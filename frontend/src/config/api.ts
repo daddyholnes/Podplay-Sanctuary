@@ -137,7 +137,7 @@ export const API_ENDPOINTS = {
   SCOUT_AGENT: {
     // Project Monitoring
     LIST_PROJECTS: '/api/scout/projects',
-    GET_PROJECT: '/api/scout/projects/:id',
+    GET_PROJECT: '/api/v1/scout_agent/projects/:id/status',
     CREATE_PROJECT: '/api/scout/projects',
     UPDATE_PROJECT: '/api/scout/projects/:id',
     DELETE_PROJECT: '/api/scout/projects/:id',

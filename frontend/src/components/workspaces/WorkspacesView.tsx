@@ -35,13 +35,13 @@ const WorkspacesView: React.FC = () => {
         throw new Error(`Failed to fetch workspaces: ${response.statusText}`);
       }
       const data = await response.json();
-      if (data.success && Array.isArray(data.workspaces)) {
+      if (Array.isArray(data.workspaces)) {
         // Transform backend data to frontend NixOSWorkspace interface
         const transformedWorkspaces = data.workspaces.map((ws: any) => ({
-          id: ws.name, // Assuming ws.name is the unique ID (like 'ws_xxxx')
+          id: ws.id, // Use ws.id instead of ws.name
           name: ws.name,
           status: ws.status,
-          vm_type: ws.vm_type,
+          vm_type: ws.vm_type || 'workspace',
           disk_path: ws.disk_path,
           memory_mb: ws.memory_mb,
           vcpus: ws.vcpus,
@@ -76,10 +76,10 @@ const WorkspacesView: React.FC = () => {
         body: JSON.stringify({ name, memory_mb: memoryMB, vcpus }),
       });
       const data = await response.json();
-      if (!response.ok || !data.success) {
+      if (!response.ok) {
         throw new Error(data.error || `Failed to create workspace: ${response.statusText}`);
       }
-      console.log('Workspace created successfully:', data.workspace);
+      console.log('Workspace created successfully:', data);
       fetchWorkspaces(); // Refresh list
       setIsCreateModalOpen(false);
       return true;
@@ -123,7 +123,7 @@ const WorkspacesView: React.FC = () => {
     try {
       const response = await fetch(endpoint, { method: action === 'delete' ? 'DELETE' : 'POST' });
       const data = await response.json();
-      if (!response.ok || !data.success) {
+      if (!response.ok) {
         throw new Error(data.error || `Action ${action} failed: ${response.statusText}`);
       }
       alert(data.message || successMessage); // Simple feedback for now
@@ -144,20 +144,20 @@ const WorkspacesView: React.FC = () => {
       const response = await fetch(buildDynamicApiUrl(API_ENDPOINTS.NIXOS_WORKSPACES.GET, { id: workspaceId }));
       if (!response.ok) throw new Error(`Failed to fetch workspace details: ${response.statusText}`);
       const data = await response.json();
-      if (data.success && data.workspace) {
-        if (data.workspace.status !== 'running') {
+      if (data.id) { // Check if workspace object exists
+        if (data.status !== 'running') {
           alert("Workspace is not running. Please start it first.");
           setIsLoading(false);
           return;
         }
-        if (!data.workspace.ip_address) {
+        if (!data.ip_address) {
           alert("IP address not available for this workspace. Cannot establish terminal connection.");
           setIsLoading(false);
           return;
         }
         // Create enhanced workspace object with terminal_websocket_url
         const enhancedWorkspace = {
-          ...data.workspace,
+          ...data,
           terminal_websocket_url: buildDynamicApiUrl(API_ENDPOINTS.NIXOS_WORKSPACES.TERMINAL_WEBSOCKET, { id: workspaceId })
         } as NixOSWorkspace;
         setSelectedWorkspaceForTerminal(enhancedWorkspace);

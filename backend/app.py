@@ -1481,7 +1481,9 @@ def get_scout_status():
         }), 503
 
     try:
-        status = scout_log_manager.get_status()
+        # Get a default project logger for overall status
+        project_logger = scout_log_manager.get_project_logger("default")
+        status = project_logger.get_project_status_summary()
         return jsonify({"success": True, "status": status})
     except Exception as e:
         logger.error(f"Error getting Scout Agent status: {e}")
@@ -1502,6 +1504,75 @@ def get_scout_logs():
     except Exception as e:
         logger.error(f"Error getting Scout Agent logs: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route('/api/v1/scout_agent/projects/<project_id>/status', methods=['GET'])
+def get_scout_project_status(project_id):
+    """Get specific Scout Agent project status with proper data format"""
+    if not scout_log_manager:
+        return jsonify({
+            "success": False,
+            "error": "Scout Agent logger is not enabled or available."
+        }), 503
+
+    try:
+        project_logger = scout_log_manager.get_project_logger(project_id)
+        status_summary = project_logger.get_project_status_summary()
+        return jsonify({"success": True, "status_summary": status_summary})
+    except Exception as e:
+        logger.error(f"Error getting Scout project status for {project_id}: {e}")
+        return jsonify({"success": False, "error": "Failed to retrieve project status"}), 500
+
+@app.route('/api/v1/scout_agent/projects/<project_id>/intervene', methods=['POST'])
+def scout_project_intervene(project_id):
+    """Handle Scout Agent project intervention commands"""
+    if not scout_log_manager:
+        return jsonify({
+            "success": False,
+            "error": "Scout Agent logger is not enabled or available."
+        }), 503
+
+    try:
+        data = request.get_json()
+        command = data.get('command', 'unknown')
+        parameters = data.get('parameters', {})
+        
+        project_logger = scout_log_manager.get_project_logger(project_id)
+        
+        # Execute the actual command based on command type
+        if command == 'set_project_goal':
+            goal = parameters.get('goal', '')
+            project_logger.set_project_goal(goal)
+        elif command == 'set_overall_status':
+            status = parameters.get('status', 'unknown')
+            message = parameters.get('message')
+            project_logger.set_overall_status(status, message)
+        elif command == 'update_plan_step_status':
+            step_id = parameters.get('step_id', '')
+            step_name = parameters.get('step_name', '')
+            status = parameters.get('status', 'unknown')
+            project_logger.update_plan_step_status(step_id, step_name, status)
+        elif command == 'set_active_step':
+            step_id = parameters.get('step_id')
+            project_logger.set_active_step(step_id)
+        elif command == 'set_associated_workspace':
+            workspace_id = parameters.get('workspace_id')
+            project_logger.set_associated_workspace(workspace_id)
+        else:
+            # Log unknown commands without executing
+            project_logger.log_entry(
+                message=f"Unknown intervention command: {command}",
+                parameters=parameters,
+                agent_action="user_intervention"
+            )
+        
+        return jsonify({
+            "success": True,
+            "message": f"Intervention '{command}' executed for project {project_id}",
+            "project_id": project_id
+        })
+    except Exception as e:
+        logger.error(f"Error processing intervention for project {project_id}: {e}")
+        return jsonify({"success": False, "error": "Failed to process intervention"}), 500
 
 # ==================== WebSocket SSH Bridge ====================
 
@@ -1902,6 +1973,56 @@ def get_nixos_workspace(workspace_id):
     except Exception as e:
         logger.error(f"Error getting NixOS workspace {workspace_id}: {e}")
         return jsonify({"error": "Failed to get workspace"}), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>/start', methods=['POST'])
+def start_nixos_workspace(workspace_id):
+    """Start a NixOS workspace"""
+    try:
+        # Mock workspace start operation
+        logger.info(f"Starting NixOS workspace: {workspace_id}")
+        
+        return jsonify({
+            "success": True,
+            "message": f"Workspace {workspace_id} is starting",
+            "workspace_id": workspace_id,
+            "status": "starting"
+        }), 200
+    except Exception as e:
+        logger.error(f"Error starting NixOS workspace {workspace_id}: {e}")
+        return jsonify({"error": "Failed to start workspace"}), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>/stop', methods=['POST'])
+def stop_nixos_workspace(workspace_id):
+    """Stop a NixOS workspace"""
+    try:
+        # Mock workspace stop operation
+        logger.info(f"Stopping NixOS workspace: {workspace_id}")
+        
+        return jsonify({
+            "success": True,
+            "message": f"Workspace {workspace_id} is stopping",
+            "workspace_id": workspace_id,
+            "status": "stopping"
+        }), 200
+    except Exception as e:
+        logger.error(f"Error stopping NixOS workspace {workspace_id}: {e}")
+        return jsonify({"error": "Failed to stop workspace"}), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>', methods=['DELETE'])
+def delete_nixos_workspace(workspace_id):
+    """Delete a NixOS workspace"""
+    try:
+        # Mock workspace delete operation
+        logger.info(f"Deleting NixOS workspace: {workspace_id}")
+        
+        return jsonify({
+            "success": True,
+            "message": f"Workspace {workspace_id} has been deleted",
+            "workspace_id": workspace_id
+        }), 200
+    except Exception as e:
+        logger.error(f"Error deleting NixOS workspace {workspace_id}: {e}")
+        return jsonify({"error": "Failed to delete workspace"}), 500
 
 # Scout Agent endpoints
 @app.route('/api/scout/projects', methods=['GET'])
