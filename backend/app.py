@@ -1781,6 +1781,15 @@ def discover_mcp_servers():
         logger.error(f"Error discovering MCP servers: {e}")
         return jsonify({"error": "Failed to discover MCP servers"}), 500
 
+@app.route('/health', methods=['GET'])
+def health_check_endpoint():
+    """Health check endpoint for Docker and Cloud Run"""
+    return jsonify({
+        "status": "healthy",
+        "service": "mama-bear-backend",
+        "timestamp": datetime.now().isoformat()
+    }), 200
+
 # Root endpoint for health checks
 @app.route('/', methods=['GET'])
 def health_check():
