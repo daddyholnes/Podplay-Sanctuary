@@ -148,7 +148,7 @@ cors = CORS(app, resources={
 
 # All custom after_request and OPTIONS handlers removed. CORS is now handled globally and automatically.
 
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='gevent')
 
 try:
     import together
@@ -2104,27 +2104,28 @@ if __name__ == '__main__':
     # Check if running in production (Cloud Run)
     is_production = os.getenv("FLASK_ENV") == "production" or os.getenv("GAE_ENV") or os.getenv("K_SERVICE")
     
-    if is_production:
-        logger.info("🚀 Production mode detected - using Gunicorn compatibility")
-        # In production, Gunicorn will handle the WSGI app
-        # This code path is for when app.py is run directly (which shouldn't happen in production)
-        socketio.run(app, 
-                    host=api_host, 
-                    port=api_port, 
-                    debug=False,
-                    use_reloader=False,
-                    allow_unsafe_werkzeug=True
-                   )
-    else:
-        # Development mode
-        logger.info("🔧 Development mode - using SocketIO dev server")
-        socketio.run(app, 
-                    host=api_host, 
-                    port=api_port, 
-                    debug=flask_debug_mode, 
-                    use_reloader=flask_debug_mode,  # Be cautious with reloader if background threads/processes don't clean up well
-                    allow_unsafe_werkzeug=True  # Needed for Werkzeug >= 2.3 with SocketIO dev server reloader
-                   )
+    try:
+        if is_production:
+            logger.info("🚀 Production mode detected - using Gunicorn compatibility")
+            # In production, Gunicorn will handle the WSGI app
+            # This code path is for when app.py is run directly (which shouldn't happen in production)
+            socketio.run(app, 
+                        host=api_host, 
+                        port=api_port, 
+                        debug=False,
+                        use_reloader=False,
+                        allow_unsafe_werkzeug=True
+                       )
+        else:
+            # Development mode
+            logger.info("🔧 Development mode - using SocketIO dev server")
+            socketio.run(app, 
+                        host=api_host, 
+                        port=api_port, 
+                        debug=flask_debug_mode, 
+                        use_reloader=flask_debug_mode,  # Be cautious with reloader if background threads/processes don't clean up well
+                        allow_unsafe_werkzeug=True  # Needed for Werkzeug >= 2.3 with SocketIO dev server reloader
+                       )
     except Exception as e_main:
         logger.critical(f"Failed to start Flask-SocketIO server: {e_main}", exc_info=True)
         sys.exit(1)
