@@ -148,7 +148,9 @@ cors = CORS(app, resources={
 
 # All custom after_request and OPTIONS handlers removed. CORS is now handled globally and automatically.
 
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
+# Using threading as async_mode for Python 3.12 compatibility
+# eventlet has compatibility issues with Python 3.12's SSL module
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
 try:
     import together
@@ -1804,22 +1806,46 @@ def health_check():
 def get_daily_briefing():
     """Get Mama Bear's daily briefing"""
     try:
-        # Create a mock briefing for now
+        # Create a properly formatted briefing response
         briefing = {
             "date": datetime.utcnow().isoformat(),
-            "new_mcp_tools": [],
-            "updated_models": [],
-            "project_priorities": ["Set up your first project", "Explore MCP tools", "Configure your environment"],
-            "recommendations": ["Start with a simple project to explore the features"],
+            "new_mcp_tools": [
+                {
+                    "name": "Example Tool",
+                    "description": "A sample MCP tool",
+                    "category": "development_tools",
+                    "version": "1.0.0"
+                }
+            ],
+            "updated_models": [
+                {
+                    "name": "Sample Model",
+                    "version": "2.1.0",
+                    "category": "ai_ml"
+                }
+            ],
+            "project_priorities": [
+                "Set up your first project",
+                "Explore MCP tools",
+                "Configure your environment"
+            ],
+            "recommendations": [
+                "Start with a simple project to explore the features"
+            ],
             "system_status": {
                 "status": "healthy",
-                "message": "All systems operational"
-            }
+                "message": "All systems operational and ready for Nathan's creative flow"
+            },
+            "last_updated": datetime.utcnow().isoformat()
         }
-        return jsonify(briefing), 200
+        return jsonify({"data": briefing, "status": "success"}), 200
     except Exception as e:
-        logger.error(f"Error generating briefing: {e}")
-        return jsonify({"error": "Failed to generate briefing"}), 500
+        logger.error(f"Error generating briefing: {e}", exc_info=True)
+        return jsonify({
+            "error": "Failed to generate briefing",
+            "details": str(e),
+            "status": "error"
+        }), 500
 
 @app.route('/api/vertex-garden/chat-history', methods=['GET'])
 def get_chat_history():
