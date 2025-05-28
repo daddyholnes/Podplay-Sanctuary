@@ -1,0 +1,166 @@
+version: '3.8'
+
+services:
+  # Backend Service - Mama Bear AI Backend
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile.prod
+    container_name: podplay-backend
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    volumes:
+      # Persistent data
+      - ./sanctuary.db:/app/sanctuary.db
+      - ./logs:/app/logs
+      - ./uploads:/app/uploads
+      - ./backups:/app/backups
+      # Secrets
+      - ./secrets:/app/secrets:ro
+    ports:
+      - "8081:5000"
+    networks:
+      - podplay-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    depends_on:
+      - redis
+    labels:
+      - "com.docker.compose.service=podplay-backend"
+      - "com.podplay.component=api"
+
+  # Frontend Service - React UI
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+    container_name: podplay-frontend
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    networks:
+      - podplay-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    labels:
+      - "com.docker.compose.service=podplay-frontend"
+      - "com.podplay.component=ui"
+
+  # Redis for caching and session management
+  redis:
+    image: redis:7-alpine
+    container_name: podplay-redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-podplay-redis-default}
+    volumes:
+      - redis_data:/data
+      - ./redis.conf:/usr/local/etc/redis/redis.conf:ro
+    ports:
+      - "127.0.0.1:6379:6379"
+    networks:
+      - podplay-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "com.docker.compose.service=podplay-redis"
+      - "com.podplay.component=cache"
+
+  # Nginx Proxy (optional - for internal routing)
+  nginx:
+    image: nginx:alpine
+    container_name: podplay-nginx
+    restart: unless-stopped
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - ./logs/nginx:/var/log/nginx
+    ports:
+      - "127.0.0.1:8090:80"
+    depends_on:
+      - frontend
+      - backend
+    networks:
+      - podplay-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:80/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    labels:
+      - "com.docker.compose.service=podplay-nginx"
+      - "com.podplay.component=proxy"
+
+  # Database Backup Service
+  backup:
+    image: alpine:latest
+    container_name: podplay-backup
+    restart: "no"
+    volumes:
+      - ./sanctuary.db:/data/sanctuary.db:ro
+      - ./backups:/backups
+      - ./backup-scripts:/scripts:ro
+    command: >
+      sh -c "
+        apk add --no-cache sqlite &&
+        /scripts/backup.sh
+      "
+    networks:
+      - podplay-network
+    profiles:
+      - backup
+    labels:
+      - "com.docker.compose.service=podplay-backup"
+      - "com.podplay.component=backup"
+
+  # Log Aggregator (optional)
+  logrotate:
+    image: alpine:latest
+    container_name: podplay-logrotate
+    restart: "no"
+    volumes:
+      - ./logs:/logs
+      - ./logrotate.conf:/etc/logrotate.conf:ro
+    command: >
+      sh -c "
+        apk add --no-cache logrotate &&
+        logrotate -f /etc/logrotate.conf
+      "
+    profiles:
+      - maintenance
+    labels:
+      - "com.docker.compose.service=podplay-logrotate"
+      - "com.podplay.component=maintenance"
+
+volumes:
+  redis_data:
+    driver: local
+    labels:
+      - "com.podplay.volume=redis-data"
+
+networks:
+  podplay-network:
+    driver: bridge
+    labels:
+      - "com.podplay.network=main"
+
+# Production deployment labels
+x-common-labels: &common-labels
+  com.podplay.environment: "production"
+  com.podplay.project: "podplay-sanctuary"
+  com.podplay.version: "1.0.0"
