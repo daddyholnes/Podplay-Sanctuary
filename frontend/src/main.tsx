@@ -2,6 +2,7 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App.tsx'
 import './App.css'
+import 'react-toastify/dist/ReactToastify.css'; // Import react-toastify CSS
 
 // Welcome message for Nathan's sanctuary
 console.log(`

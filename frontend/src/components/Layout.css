@@ -1,0 +1,112 @@
+/* Basic styling for the new IDE layout */
+.app-ide-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #1e1e1e; /* Dark background for the app */
+  color: #d4d4d4; /* Light text color for dark theme */
+}
+
+.ide-header {
+  padding: 8px 12px;
+  background-color: #333;
+  border-bottom: 1px solid #444;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #ccc;
+}
+
+.ide-header h1 {
+  margin: 0;
+  font-size: 1.2em;
+}
+
+.ide-header .panel-toggles button {
+  background-color: #4f4f4f;
+  color: #ccc;
+  border: 1px solid #666;
+  padding: 4px 8px;
+  margin-left: 8px;
+  cursor: pointer;
+  border-radius: 3px;
+}
+
+.ide-header .panel-toggles button:hover {
+  background-color: #5f5f5f;
+}
+
+.main-content-area {
+  display: flex;
+  flex-grow: 1;
+  overflow: hidden; /* Prevent content from overflowing window */
+}
+
+.left-sidebar-area {
+  display: flex;
+  flex-direction: column;
+  width: 250px; /* Default width, can be made resizable later */
+  min-width: 200px;
+  background-color: #252526;
+  border-right: 1px solid #444;
+}
+
+.center-area {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  background-color: #1e1e1e;
+}
+
+.editor-preview-area {
+  display: flex;
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+/* Placeholder Panel Styling */
+.panel-placeholder {
+  border: 1px solid #444; /* Darker border for dark theme */
+  padding: 10px;
+  background-color: #2a2a2a; /* Slightly lighter than main background */
+  color: #ccc;
+  margin: 5px; /* Add some margin for separation */
+  border-radius: 4px; /* Rounded corners */
+  overflow: auto; /* Allow scrolling if content overflows */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+}
+
+.file-explorer-panel,
+.agent-timeline-panel {
+  height: 50%; /* Example: divide left sidebar space */
+}
+
+.code-editor-panel,
+.live-preview-panel {
+  flex-grow: 1;
+  width: 50%; /* Example: divide editor/preview space */
+}
+
+.terminal-panel-container { /* Renamed to avoid conflict with panel-placeholder */
+  height: 200px; /* Default height, can be made resizable later */
+  min-height: 100px;
+  background-color: #252526;
+  border-top: 1px solid #444;
+}
+
+.chat-panel-container { /* Renamed to avoid conflict with panel-placeholder */
+  width: 300px; /* Default width, can be made resizable later */
+  min-width: 250px;
+  background-color: #252526;
+  border-left: 1px solid #444;
+  display: flex; /* To make it a column */
+  flex-direction: column;
+}
+
+/* Visibility styling */
+.hidden {
+  display: none !important; /* Ensure it overrides other display properties */
+}

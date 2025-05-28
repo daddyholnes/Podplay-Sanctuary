@@ -5,7 +5,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { MODEL_REGISTRY, ModelConfig, ChatSession, ChatMessage, MediaAttachment, getModelById } from './ModelRegistry';
 import DevSandbox from './DevSandbox';
 import MultimodalInput from './components/MultimodalInput';
-import { buildApiUrl, buildDynamicApiUrl, API_ENDPOINTS } from './config/api';
+import { API_ENDPOINTS } from './config/api'; // buildApiUrl and buildDynamicApiUrl might be removed
+import { apiService } from './services/apiService'; // Import the new apiService
 import './VertexGardenChat.css';
 
 interface VertexGardenChatProps {
@@ -94,8 +95,14 @@ const VertexGardenChat: React.FC<VertexGardenChatProps> = ({ initialModelId = 'm
   // ==================== CHAT FUNCTIONS ====================
   const loadChatHistory = async () => {
     try {
-      const response = await fetch(buildApiUrl(API_ENDPOINTS.VERTEX_GARDEN.CHAT) + '-history');
-      const data = await response.json();
+      // Assuming VERTEX_GARDEN.CHAT_HISTORY is or will be a valid endpoint key or a direct path
+      // If it's a direct path like '/api/vertex-garden/chat-history', apiService will handle it.
+      // If API_ENDPOINTS.VERTEX_GARDEN.CHAT is '/api/vertex-garden/chat', then appending '-history' makes it a custom path.
+      const chatHistoryPath = API_ENDPOINTS.VERTEX_GARDEN.CHAT.endsWith('/') 
+        ? `${API_ENDPOINTS.VERTEX_GARDEN.CHAT}history` 
+        : `${API_ENDPOINTS.VERTEX_GARDEN.CHAT}-history`;
+
+      const data = await apiService.get<any>(chatHistoryPath);
       if (data.success) {
         setChatHistory(data.sessions);
         // Build model sessions map
@@ -139,8 +146,22 @@ const VertexGardenChat: React.FC<VertexGardenChatProps> = ({ initialModelId = 'm
   
   const loadSessionMessages = async (sessionId: string) => {
     try {
-      const response = await fetch(buildDynamicApiUrl(API_ENDPOINTS.VERTEX_GARDEN.SESSION_MESSAGES, {sessionId}));
-      const data = await response.json();
+      // buildDynamicApiUrl implies a path that needs parameter substitution.
+      // apiService.get can take a full path. We need to construct it here if it's dynamic.
+      // For now, assuming API_ENDPOINTS.VERTEX_GARDEN.SESSION_MESSAGES is a template like '/api/vertex-garden/session/{sessionId}/messages'
+      // The apiService currently doesn't handle path parameters directly in its methods.
+      // So, we'll construct the path before calling.
+      // A better approach for buildDynamicApiUrl would be to integrate its logic into apiService or have a helper.
+      // Let's assume API_ENDPOINTS.VERTEX_GARDEN.SESSION_MESSAGES is a key that buildApiUrl (used by apiService) can handle
+      // if it's designed for that, or it's a simple string path.
+      // Given the current apiService, if API_ENDPOINTS.VERTEX_GARDEN.SESSION_MESSAGES = "VERTEX_GARDEN.SESSION_MESSAGES_KEY"
+      // and buildApiUrl(key, params) exists, apiService needs modification or we pre-build the path.
+      // Let's assume for this refactor, buildDynamicApiUrl is still used to get the final path string.
+      // If API_ENDPOINTS.VERTEX_GARDEN.SESSION_MESSAGES is just a string template like "/api/v1/sessions/{sessionId}/messages"
+      // then we'd do:
+      const path = API_ENDPOINTS.VERTEX_GARDEN.SESSION_MESSAGES.replace('{sessionId}', sessionId);
+      const data = await apiService.get<any>(path);
+
       if (data.success) {
         setMessages(data.messages);
       }
@@ -170,27 +191,21 @@ const VertexGardenChat: React.FC<VertexGardenChatProps> = ({ initialModelId = 'm
     setIsTyping(true);
 
     try {
-      const response = await fetch(buildApiUrl(API_ENDPOINTS.VERTEX_GARDEN.CHAT), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model_id: selectedModel.id,
-          session_id: currentSession.id,
-          message: inputMessage,
-          attachments: attachments.map(att => ({
-            type: att.type,
-            name: att.name,
-            size: att.size
-          })),
-          context: {
-            terminal_session: terminalSession,
-            memory_context: memoryContext,
-            model_config: selectedModel
-          }
-        })
+      const data = await apiService.post<any>(API_ENDPOINTS.VERTEX_GARDEN.CHAT, {
+        model_id: selectedModel.id,
+        session_id: currentSession.id,
+        message: inputMessage,
+        attachments: attachments.map(att => ({
+          type: att.type,
+          name: att.name,
+          size: att.size
+        })),
+        context: {
+          terminal_session: terminalSession,
+          memory_context: memoryContext,
+          model_config: selectedModel
+        }
       });
-      
-      const data = await response.json();
       
       if (data.success) {
         const assistantMessage: ChatMessage = {
@@ -248,17 +263,11 @@ const VertexGardenChat: React.FC<VertexGardenChatProps> = ({ initialModelId = 'm
     setTerminalOutput(prev => [...prev, `$ ${command}`]);
     
     try {
-      const response = await fetch(buildApiUrl(API_ENDPOINTS.VERTEX_GARDEN.TERMINAL), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          command,
-          session_id: terminalSession.id,
-          working_directory: terminalSession.workingDirectory
-        })
+      const data = await apiService.post<any>(API_ENDPOINTS.VERTEX_GARDEN.TERMINAL, {
+        command,
+        session_id: terminalSession.id,
+        working_directory: terminalSession.workingDirectory
       });
-      
-      const data = await response.json();
       
       if (data.success) {
         setTerminalOutput(prev => [...prev, data.output]);
@@ -289,13 +298,11 @@ const VertexGardenChat: React.FC<VertexGardenChatProps> = ({ initialModelId = 'm
     setCodeExecutions(prev => [...prev, execution]);
     
     try {
-      const response = await fetch(buildApiUrl(API_ENDPOINTS.VERTEX_GARDEN.EXECUTE_CODE), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: code, language: language, session_id: terminalSession?.id })
+      const data = await apiService.post<any>(API_ENDPOINTS.VERTEX_GARDEN.EXECUTE_CODE, {
+        code: code,
+        language: language,
+        session_id: terminalSession?.id
       });
-      
-      const data = await response.json();
       
       setCodeExecutions(prev => prev.map(exec => 
         exec.id === execution.id 

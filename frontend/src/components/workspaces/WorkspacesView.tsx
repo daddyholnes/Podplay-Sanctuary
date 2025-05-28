@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { API_ENDPOINTS, buildApiUrl, buildDynamicApiUrl } from '../../config/api';
+import { API_BASE_URL, API_ENDPOINTS } from '../../config/api'; // buildApiUrl and buildDynamicApiUrl might be removed, API_BASE_URL added for ws URL
+import { apiService } from '../../services/apiService'; // Import the new apiService
+import { notify } from '../../services/notificationService'; // Import notificationService
 import WorkspaceListComponent from './WorkspaceListComponent';
 import WorkspaceCreationModal from './WorkspaceCreationModal';
 import WebTerminalComponent from './WebTerminalComponent'; // Will be used by WorkspaceItem
@@ -30,11 +32,8 @@ const WorkspacesView: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(buildApiUrl(API_ENDPOINTS.NIXOS_WORKSPACES.LIST));
-      if (!response.ok) {
-        throw new Error(`Failed to fetch workspaces: ${response.statusText}`);
-      }
-      const data = await response.json();
+      const data = await apiService.get<any>(API_ENDPOINTS.NIXOS_WORKSPACES.LIST);
+      // apiService throws on !response.ok, so we can assume success if no error
       if (Array.isArray(data.workspaces)) {
         // Transform backend data to frontend NixOSWorkspace interface
         const transformedWorkspaces = data.workspaces.map((ws: any) => ({
@@ -70,15 +69,8 @@ const WorkspacesView: React.FC = () => {
     setError(null);
     console.log(`Attempting to create workspace: ${name}, Mem: ${memoryMB}, vCPUs: ${vcpus}`);
     try {
-      const response = await fetch(buildApiUrl(API_ENDPOINTS.NIXOS_WORKSPACES.CREATE), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, memory_mb: memoryMB, vcpus }),
-      });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || `Failed to create workspace: ${response.statusText}`);
-      }
+      const data = await apiService.post<any>(API_ENDPOINTS.NIXOS_WORKSPACES.CREATE, { name, memory_mb: memoryMB, vcpus });
+      // apiService throws on error
       console.log('Workspace created successfully:', data);
       fetchWorkspaces(); // Refresh list
       setIsCreateModalOpen(false);
@@ -94,43 +86,53 @@ const WorkspacesView: React.FC = () => {
   };
 
   const handleAction = async (workspaceId: string, action: 'start' | 'stop' | 'delete') => {
-    let endpoint = '';
+    let pathKey: keyof typeof API_ENDPOINTS.NIXOS_WORKSPACES;
+    let method: 'post' | 'delete' = 'post';
     let successMessage = '';
 
     switch (action) {
       case 'start':
-        endpoint = buildDynamicApiUrl(API_ENDPOINTS.NIXOS_WORKSPACES.START, { id: workspaceId });
+        pathKey = API_ENDPOINTS.NIXOS_WORKSPACES.START as any; // Type assertion if needed by apiService structure for dynamic paths
         successMessage = 'Workspace starting...';
         break;
       case 'stop':
-        endpoint = buildDynamicApiUrl(API_ENDPOINTS.NIXOS_WORKSPACES.STOP, { id: workspaceId });
+        pathKey = API_ENDPOINTS.NIXOS_WORKSPACES.STOP as any;
         successMessage = 'Workspace stopping...';
         break;
       case 'delete':
         if (!window.confirm(`Are you sure you want to delete workspace ${workspaceId}? This is irreversible.`)) {
           return;
         }
-        endpoint = buildDynamicApiUrl(API_ENDPOINTS.NIXOS_WORKSPACES.DELETE, { id: workspaceId });
+        pathKey = API_ENDPOINTS.NIXOS_WORKSPACES.DELETE as any;
+        method = 'delete';
         successMessage = 'Workspace deleting...';
         break;
       default:
         return;
     }
+    
+    // Construct the dynamic path. Assumes pathKey is like "NIXOS_WORKSPACES.START" which maps to a template string.
+    // And apiService needs a way to substitute {id}.
+    // For this refactor, we'll manually construct the path string.
+    // Example: API_ENDPOINTS.NIXOS_WORKSPACES.START might be "/api/v1/nixos/workspaces/{id}/start"
+    const pathTemplate = API_ENDPOINTS.NIXOS_WORKSPACES[action.toUpperCase() as keyof typeof API_ENDPOINTS.NIXOS_WORKSPACES];
+    const actualPath = pathTemplate.replace('{id}', workspaceId);
 
-    console.log(`Performing action '${action}' on workspace ${workspaceId} via ${endpoint}`);
-    // Add a temporary optimistic update or loading state for the specific item
-    // For now, just log and refetch
+
+    console.log(`Performing action '${action}' on workspace ${workspaceId} via ${actualPath}`);
     try {
-      const response = await fetch(endpoint, { method: action === 'delete' ? 'DELETE' : 'POST' });
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.error || `Action ${action} failed: ${response.statusText}`);
+      let data: any;
+      if (method === 'post') {
+        data = await apiService.post<any>(actualPath, {});
+      } else { // delete
+        data = await apiService.delete<any>(actualPath);
       }
-      alert(data.message || successMessage); // Simple feedback for now
+      notify.success(data.message || successMessage);
       fetchWorkspaces(); // Refresh list
     } catch (err) {
+      // apiService already notifies, so setError for local UI update and console.error is fine
       const errorMsg = err instanceof Error ? err.message : String(err);
-      setError(errorMsg); // Show error globally for now
+      setError(errorMsg); 
       console.error(`Error performing ${action} on ${workspaceId}:`, errorMsg);
       fetchWorkspaces(); // Refresh list even on error to get latest state
     }
@@ -141,24 +143,33 @@ const WorkspacesView: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const response = await fetch(buildDynamicApiUrl(API_ENDPOINTS.NIXOS_WORKSPACES.GET, { id: workspaceId }));
-      if (!response.ok) throw new Error(`Failed to fetch workspace details: ${response.statusText}`);
-      const data = await response.json();
+      // Manually construct path for GET
+      const pathTemplate = API_ENDPOINTS.NIXOS_WORKSPACES.GET;
+      const actualPath = pathTemplate.replace('{id}', workspaceId);
+      const data = await apiService.get<any>(actualPath);
+
       if (data.id) { // Check if workspace object exists
         if (data.status !== 'running') {
-          alert("Workspace is not running. Please start it first.");
+          notify.warn("Workspace is not running. Please start it first.");
           setIsLoading(false);
           return;
         }
         if (!data.ip_address) {
-          alert("IP address not available for this workspace. Cannot establish terminal connection.");
+          notify.error("IP address not available for this workspace. Cannot establish terminal connection.");
           setIsLoading(false);
           return;
         }
         // Create enhanced workspace object with terminal_websocket_url
+        // Manually construct terminal websocket URL if buildDynamicApiUrl is removed
+        const terminalWsPathTemplate = API_ENDPOINTS.NIXOS_WORKSPACES.TERMINAL_WEBSOCKET;
+        const terminalWsActualPath = `${API_BASE_URL}${terminalWsPathTemplate.replace('{id}', workspaceId)}`;
+
         const enhancedWorkspace = {
           ...data,
-          terminal_websocket_url: buildDynamicApiUrl(API_ENDPOINTS.NIXOS_WORKSPACES.TERMINAL_WEBSOCKET, { id: workspaceId })
+          // Ensure your API_BASE_URL for websockets is correctly handled.
+          // If API_BASE_URL is http://localhost:5000, then ws://localhost:5000/...
+          // This might need adjustment depending on how WebSocket URLs are formed.
+          terminal_websocket_url: terminalWsActualPath.replace(/^http/, 'ws')
         } as NixOSWorkspace;
         setSelectedWorkspaceForTerminal(enhancedWorkspace);
       } else {

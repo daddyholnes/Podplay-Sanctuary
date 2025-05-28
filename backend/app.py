@@ -38,7 +38,7 @@ import asyncio
 import atexit
 from contextlib import contextmanager
 from dataclasses import dataclass, asdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from enum import Enum
 import json
 import sqlite3
@@ -81,20 +81,23 @@ try:
     from vm_manager import LibvirtManager, VMManagerError
     from scout_logger import ScoutLogManager
     from ssh_bridge import VMSSHBridge, SSHBridgeError
+    # Scout RAG Service
+    from scout_rag_service import add_document_to_mem0, query_mem0_for_project, is_mem0_rag_available
     NIXOS_INFRASTRUCTURE_AVAILABLE = True
-    logger.info("Successfully imported NixOS infrastructure modules.")
+    logger.info("Successfully imported NixOS infrastructure modules (including RAG service).")
 except ImportError as e:
     NIXOS_INFRASTRUCTURE_AVAILABLE = False
     NixOSSandboxOrchestrator = Job = LibvirtManager = VMManagerError = None
     ScoutLogManager = VMSSHBridge = SSHBridgeError = None
-    logger.warning(f"NixOS infrastructure core modules not available or import error: {e}", exc_info=True)
+    add_document_to_mem0 = query_mem0_for_project = is_mem0_rag_available = None # Ensure they are None if import fails
+    logger.warning(f"NixOS infrastructure core modules (or RAG service) not available or import error: {e}", exc_info=True)
 
 import asyncio
 import json
 import logging
 import subprocess
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional, Any
 import requests
 from dataclasses import dataclass, asdict
@@ -733,7 +736,7 @@ class MamaBearAgent:
         # Store briefing context in memory
         self.enhanced_mama.store_memory(
             f"Generated daily briefing for {today} with {len(new_tools)} tools and {len(recommendations)} recommendations",
-            {"type": "daily_briefing", "date": today, "tools_count": len(new_tools)}
+            {"type": "daily_briefing", "date": today, "tools_count": len(new_tools), "timestamp": datetime.now(timezone.utc).isoformat()}
         )
         
         self.last_briefing_date = today
@@ -744,7 +747,7 @@ class MamaBearAgent:
         """Enhanced Mama Bear learning with persistent memory"""
         learning_data = {
             "type": interaction_type,
-            "context": {"raw_context": context, "timestamp": datetime.now().isoformat()},
+            "context": {"raw_context": context, "timestamp": datetime.now(timezone.utc).isoformat()},
             "insight": insight
         }
         
@@ -879,7 +882,7 @@ class EnhancedMamaBear:
                 "success": True,
                 "output": output,
                 "language": language,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             }
             
         except Exception as e:
@@ -938,7 +941,7 @@ class EnhancedMamaBear:
         self.store_memory(memory_content, {
             "type": "learning",
             "interaction_type": interaction_data.get('type'),
-            "timestamp": datetime.now().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         })
         
         logger.info(f"🧠 Enhanced learning stored: {interaction_data.get('insight', '')[:50]}")
@@ -1099,10 +1102,10 @@ class ProactiveDiscoveryAgent:
                 if new_servers:
                     self.enhanced_mama.store_memory(
                         f"Discovered {len(new_servers)} new MCP servers",
-                        {"type": "discovery", "count": len(new_servers), "timestamp": datetime.now().isoformat()}
+                        {"type": "discovery", "count": len(new_servers), "timestamp": datetime.now(timezone.utc).isoformat()}
                     )
                 
-                self.last_discovery = datetime.now()
+                self.last_discovery = datetime.now(timezone.utc)
                 return new_servers
             
         except Exception as e:
@@ -1575,6 +1578,90 @@ def scout_project_intervene(project_id):
         logger.error(f"Error processing intervention for project {project_id}: {e}")
         return jsonify({"success": False, "error": "Failed to process intervention"}), 500
 
+@app.route('/api/v1/scout_agent/projects/<project_id>/timeline_feed', methods=['GET'])
+def get_scout_project_timeline_feed(project_id: str):
+    if not scout_log_manager:
+        return jsonify({
+            "success": False,
+            "error": "Scout Agent logger service is not enabled or available."
+        }), 503
+
+    try:
+        project_logger = scout_log_manager.get_project_logger(project_id)
+        # Fetch logs in ascending order for timeline display
+        # Consider adding default limit if fetching all logs becomes too performance-intensive
+        logs = project_logger.get_logs(sort_desc=False) 
+                                       
+        return jsonify({
+            "success": True,
+            "project_id": project_id,
+            "timeline_feed": logs,
+            "count": len(logs)
+        })
+    except ValueError as ve: # Handles invalid project_id format from get_project_logger
+        logger.warning(f"Invalid project_id format for timeline_feed: {project_id} - {ve}")
+        return jsonify({"success": False, "error": "Invalid project ID format."}), 400
+    except Exception as e:
+        logger.error(f"Error fetching timeline_feed for project {project_id}: {e}", exc_info=True)
+        return jsonify({"success": False, "error": "Failed to retrieve timeline feed."}), 500
+
+# ==================== Scout Agent RAG API Endpoints ====================
+
+@app.route('/api/v1/scout_agent/projects/<project_id>/rag_ingest', methods=['POST'])
+def rag_ingest_document(project_id: str):
+    if not is_mem0_rag_available or not is_mem0_rag_available():
+        logger.warning(f"RAG ingest attempt for project {project_id} failed: Mem0.ai service not available.")
+        return jsonify({"success": False, "error": "Mem0.ai RAG service is not configured or available."}), 503
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "error": "Invalid JSON payload."}), 400
+
+    document_text = data.get('document_text')
+    document_id = data.get('document_id') # Optional
+    metadata = data.get('metadata')       # Optional
+
+    if not document_text or not isinstance(document_text, str):
+        return jsonify({"success": False, "error": "Missing or invalid 'document_text'."}), 400
+    if document_id and not isinstance(document_id, str):
+        return jsonify({"success": False, "error": "Invalid 'document_id', must be a string if provided."}), 400
+    if metadata and not isinstance(metadata, dict):
+        return jsonify({"success": False, "error": "Invalid 'metadata', must be an object if provided."}), 400
+    
+    logger.info(f"RAG ingest request for project {project_id}, doc_id: {document_id or 'auto'}.")
+    result = add_document_to_mem0(project_id, document_text, document_id, metadata)
+    
+    if result.get("success"):
+        return jsonify(result), 200
+    else:
+        return jsonify(result), 500
+
+@app.route('/api/v1/scout_agent/projects/<project_id>/rag_query', methods=['POST'])
+def rag_query_project_memory(project_id: str):
+    if not is_mem0_rag_available or not is_mem0_rag_available():
+        logger.warning(f"RAG query attempt for project {project_id} failed: Mem0.ai service not available.")
+        return jsonify({"success": False, "error": "Mem0.ai RAG service is not configured or available."}), 503
+
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "error": "Invalid JSON payload."}), 400
+
+    query_text = data.get('query_text')
+    limit = data.get('limit', 5)
+
+    if not query_text or not isinstance(query_text, str):
+        return jsonify({"success": False, "error": "Missing or invalid 'query_text'."}), 400
+    if not isinstance(limit, int) or limit <= 0:
+        limit = 5 # Default to 5 if invalid
+    
+    logger.info(f"RAG query request for project {project_id} with query: '{query_text[:50]}...'")
+    result = query_mem0_for_project(project_id, query_text, limit)
+    
+    if result.get("success"):
+        return jsonify(result), 200
+    else:
+        return jsonify(result), 500
+
 # ==================== WebSocket SSH Bridge ====================
 
 @socketio.on('connect', namespace='/terminal_ws')
@@ -1788,7 +1875,7 @@ def health_check_endpoint():
     return jsonify({
         "status": "healthy",
         "service": "mama-bear-backend",
-        "timestamp": datetime.now().isoformat()
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }), 200
 
 # Root endpoint for health checks
@@ -1808,7 +1895,7 @@ def get_daily_briefing():
     try:
         # Create a properly formatted briefing response
         briefing = {
-            "date": datetime.utcnow().isoformat(),
+            "date": datetime.now(timezone.utc).isoformat(),
             "new_mcp_tools": [
                 {
                     "name": "Example Tool",
@@ -1836,7 +1923,7 @@ def get_daily_briefing():
                 "status": "healthy",
                 "message": "All systems operational and ready for Nathan's creative flow"
             },
-            "last_updated": datetime.utcnow().isoformat()
+            "last_updated": datetime.now(timezone.utc).isoformat()
         }
         return jsonify({"data": briefing, "status": "success"}), 200
     except Exception as e:
@@ -1869,7 +1956,7 @@ def vertex_garden_chat():
         # Simple echo response for now
         response = {
             "response": f"I received your message: {message}",
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(timezone.utc).isoformat()
         }
         return jsonify(response), 200
     except Exception as e:
@@ -1946,8 +2033,8 @@ def list_nixos_workspaces():
                 "name": "Development Environment",
                 "description": "Main development workspace with NixOS",
                 "status": "running",
-                "created_at": datetime.utcnow().isoformat(),
-                "last_accessed": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "last_accessed": datetime.now(timezone.utc).isoformat(),
                 "resources": {
                     "cpu": "2 cores",
                     "memory": "4GB",
@@ -1972,7 +2059,7 @@ def create_nixos_workspace():
             "name": data.get('name', 'New Workspace'),
             "description": data.get('description', ''),
             "status": "creating",
-            "created_at": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
             "config": data.get('config', {})
         }
         
@@ -1991,8 +2078,8 @@ def get_nixos_workspace(workspace_id):
             "name": f"Workspace {workspace_id}",
             "description": "NixOS development workspace",
             "status": "running",
-            "created_at": datetime.utcnow().isoformat(),
-            "last_accessed": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "last_accessed": datetime.now(timezone.utc).isoformat(),
             "config": {
                 "packages": ["git", "nodejs", "python3"],
                 "services": ["ssh"]
@@ -2069,8 +2156,8 @@ def list_scout_projects():
                 "name": "Test Project Alpha",
                 "description": "Sample project for testing Scout Agent functionality",
                 "status": "monitoring",
-                "created_at": datetime.utcnow().isoformat(),
-                "last_analysis": datetime.utcnow().isoformat(),
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "last_analysis": datetime.now(timezone.utc).isoformat(),
                 "health_score": 85
             }
         ]
@@ -2088,8 +2175,8 @@ def get_scout_project(project_id):
             "name": f"Project {project_id}",
             "description": "Monitored project with Scout Agent",
             "status": "monitoring",
-            "created_at": datetime.utcnow().isoformat(),
-            "last_analysis": datetime.utcnow().isoformat(),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "last_analysis": datetime.now(timezone.utc).isoformat(),
             "health_score": 85,
             "metrics": {
                 "performance": {"score": 90, "trend": "stable"},
@@ -2101,7 +2188,7 @@ def get_scout_project(project_id):
                     "id": "alert-001",
                     "severity": "warning",
                     "message": "High memory usage detected",
-                    "timestamp": datetime.utcnow().isoformat()
+                    "timestamp": datetime.now(timezone.utc).isoformat()
                 }
             ]
         }

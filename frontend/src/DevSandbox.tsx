@@ -7,7 +7,8 @@ import { Editor } from '@monaco-editor/react';
 import io, { Socket } from 'socket.io-client';
 import MultimodalInput from './components/MultimodalInput';
 import CloudBrowser from './components/CloudBrowser';
-import { buildApiUrl, API_ENDPOINTS } from './config/api';
+import { API_ENDPOINTS } from './config/api'; // buildApiUrl might be removed
+import { apiService } from './services/apiService'; // Import the new apiService
 import './DevSandbox.css';
 
 interface DevEnvironment {
@@ -251,21 +252,15 @@ const DevSandbox: React.FC = () => {
     setChatInput('');
     
     try {
-      const response = await fetch(buildApiUrl(API_ENDPOINTS.MAMA_BEAR.CHAT), {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message,
-          context: {
-            environment: activeEnvironment,
-            openFiles: openFiles.map(f => ({ path: f.path, language: f.language })),
-            currentFile: activeFile,
-            terminalOutput: terminalSessions.find(t => t.isActive)?.output || []
-          }
-        })
+      const data = await apiService.post<any>(API_ENDPOINTS.MAMA_BEAR.CHAT, {
+        message,
+        context: {
+          environment: activeEnvironment,
+          openFiles: openFiles.map(f => ({ path: f.path, language: f.language })),
+          currentFile: activeFile,
+          terminalOutput: terminalSessions.find(t => t.isActive)?.output || []
+        }
       });
-      
-      const data = await response.json();
       
       if (data.success) {
         const assistantMessage: ChatMessage = {
@@ -385,17 +380,14 @@ const DevSandbox: React.FC = () => {
 
     try {
       // Try to create via local backend
-      const response = await fetch('http://localhost:5000/api/dev-sandbox/create-local', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          environment: newEnv,
-          template
-        })
+      // Assuming '/api/dev-sandbox/create-local' is a custom path not in API_ENDPOINTS
+      const result = await apiService.post<any>('/api/dev-sandbox/create-local', {
+        environment: newEnv,
+        template
       });
 
-      if (response.ok) {
-        const result = await response.json();
+      // apiService throws on !response.ok, so we can assume success if no error
+      if (result) { // Check if result is not null (e.g. for 204 No Content, though post usually returns data)
         const updatedEnv = {
           ...newEnv,
           status: 'running' as const,
@@ -480,8 +472,8 @@ const DevSandbox: React.FC = () => {
   
   /* const loadNixosWorkspaces = async () => {
     try {
-      const response = await fetch('http://localhost:5000/api/v1/workspaces');
-      const result = await response.json();
+      // Assuming '/api/v1/workspaces' is a custom path
+      const result = await apiService.get<any>('/api/v1/workspaces');
       
       if (result.success) {
         setNixosWorkspaces(result.workspaces.map((ws: any) => ({
@@ -503,13 +495,9 @@ const DevSandbox: React.FC = () => {
   // These functions are commented out as they are currently unused
   // const createNixosWorkspace = async (name: string, memoryMB: number = 1024, vcpus: number = 2) => {
   //   try {
-  //     const response = await fetch('http://localhost:5000/api/v1/workspaces', {
-  //       method: 'POST',
-  //       headers: { 'Content-Type': 'application/json' },
-  //       body: JSON.stringify({ name, memory_mb: memoryMB, vcpus })
-  //     });
+  //     // Assuming '/api/v1/workspaces' is a custom path
+  //     const result = await apiService.post<any>('/api/v1/workspaces', { name, memory_mb: memoryMB, vcpus });
   //     
-  //     const result = await response.json();
   //     if (result.success) {
   //       await loadNixosWorkspaces();
   //       return result.workspace_id;
@@ -524,11 +512,9 @@ const DevSandbox: React.FC = () => {
 
   // const startNixosWorkspace = async (workspaceId: string) => {
   //   try {
-  //     const response = await fetch(`http://localhost:5000/api/v1/workspaces/${workspaceId}/start`, {
-  //       method: 'POST'
-  //     });
+  //     // Assuming `/api/v1/workspaces/${workspaceId}/start` is a custom path
+  //     const result = await apiService.post<any>(`/api/v1/workspaces/${workspaceId}/start`, {});
   //     
-  //     const result = await response.json();
   //     if (result.success) {
   //       await loadNixosWorkspaces();
   //     } else {
@@ -544,9 +530,8 @@ const DevSandbox: React.FC = () => {
 
   const stopEnvironment = async (environmentId: string) => {
     try {
-      await fetch(`http://localhost:5000/api/dev-sandbox/${environmentId}/stop`, {
-        method: 'POST'
-      });
+      // Assuming `/api/dev-sandbox/${environmentId}/stop` is a custom path
+      await apiService.post<any>(`/api/dev-sandbox/${environmentId}/stop`, {});
       
       setEnvironments(prev => prev.map(env => 
         env.id === environmentId ? { ...env, status: 'stopped' } : env
@@ -558,9 +543,8 @@ const DevSandbox: React.FC = () => {
 
   const deleteEnvironment = async (environmentId: string) => {
     try {
-      await fetch(`http://localhost:5000/api/dev-sandbox/${environmentId}`, {
-        method: 'DELETE'
-      });
+      // Assuming `/api/dev-sandbox/${environmentId}` is a custom path
+      await apiService.delete<any>(`/api/dev-sandbox/${environmentId}`);
       
       setEnvironments(prev => prev.filter(env => env.id !== environmentId));
       
@@ -578,8 +562,8 @@ const DevSandbox: React.FC = () => {
   
   const loadFileTree = async (environmentId: string) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/dev-sandbox/${environmentId}/files`);
-      const result = await response.json();
+      // Assuming `/api/dev-sandbox/${environmentId}/files` is a custom path
+      const result = await apiService.get<any>(`/api/dev-sandbox/${environmentId}/files`);
       
       if (result.success) {
         setFileTree(result.fileTree);
@@ -596,10 +580,8 @@ const DevSandbox: React.FC = () => {
     }
 
     try {
-      const response = await fetch(
-        `http://localhost:5000/api/dev-sandbox/${activeEnvironment?.id}/file?path=${encodeURIComponent(filePath)}`
-      );
-      const result = await response.json();
+      // Assuming `/api/dev-sandbox/${activeEnvironment?.id}/file` is a custom path
+      const result = await apiService.get<any>(`/api/dev-sandbox/${activeEnvironment?.id}/file`, { path: filePath });
       
       if (result.success) {
         const language = getLanguageFromPath(filePath);
@@ -620,13 +602,8 @@ const DevSandbox: React.FC = () => {
 
   const saveFile = async (filePath: string, content: string) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/dev-sandbox/${activeEnvironment?.id}/file`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: filePath, content })
-      });
-
-      const result = await response.json();
+      // Assuming `/api/dev-sandbox/${activeEnvironment?.id}/file` is a custom path
+      const result = await apiService.post<any>(`/api/dev-sandbox/${activeEnvironment?.id}/file`, { path: filePath, content });
       
       if (result.success) {
         setOpenFiles(prev => prev.map(file => 
@@ -645,19 +622,14 @@ const DevSandbox: React.FC = () => {
 
   const createFile = async (dirPath: string, fileName: string, isDirectory: boolean = false) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/dev-sandbox/${activeEnvironment?.id}/file/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          path: `${dirPath}/${fileName}`,
-          isDirectory,
-          content: isDirectory ? undefined : ''
-        })
+      // Assuming `/api/dev-sandbox/${activeEnvironment?.id}/file/create` is a custom path
+      await apiService.post<any>(`/api/dev-sandbox/${activeEnvironment?.id}/file/create`, {
+        path: `${dirPath}/${fileName}`,
+        isDirectory,
+        content: isDirectory ? undefined : ''
       });
-
-      if (response.ok) {
-        await loadFileTree(activeEnvironment!.id);
-      }
+      // apiService throws on error, so if we reach here, it was successful (response.ok)
+      await loadFileTree(activeEnvironment!.id);
     } catch (error) {
       console.error('Error creating file:', error);
     }
@@ -667,10 +639,8 @@ const DevSandbox: React.FC = () => {
   
   const createTerminalSession = async (environmentId: string) => {
     try {
-      const response = await fetch(`http://localhost:5000/api/dev-sandbox/${environmentId}/terminal`, {
-        method: 'POST'
-      });
-      const result = await response.json();
+      // Assuming `/api/dev-sandbox/${environmentId}/terminal` is a custom path
+      const result = await apiService.post<any>(`/api/dev-sandbox/${environmentId}/terminal`, {});
       
       if (result.success) {
         const newSession: TerminalSession = {
@@ -698,11 +668,8 @@ const DevSandbox: React.FC = () => {
     if (!activeTerminal || !activeEnvironment) return;
 
     try {
-      await fetch(`http://localhost:5000/api/dev-sandbox/terminal/${activeTerminal.id}/execute`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command })
-      });
+      // Assuming `/api/dev-sandbox/terminal/${activeTerminal.id}/execute` is a custom path
+      await apiService.post<any>(`/api/dev-sandbox/terminal/${activeTerminal.id}/execute`, { command });
 
       // Output will come through WebSocket
       setTerminalInput('');
@@ -754,10 +721,8 @@ const DevSandbox: React.FC = () => {
     if (!activeEnvironment) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/dev-sandbox/${activeEnvironment.id}/preview/start`, {
-        method: 'POST'
-      });
-      const result = await response.json();
+      // Assuming `/api/dev-sandbox/${activeEnvironment.id}/preview/start` is a custom path
+      const result = await apiService.post<any>(`/api/dev-sandbox/${activeEnvironment.id}/preview/start`, {});
       
       if (result.success) {
         setLivePreview({

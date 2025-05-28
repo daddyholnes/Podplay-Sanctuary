@@ -6,101 +6,6 @@ import VertexGardenChat from './VertexGardenChat';
 import DevSandbox from './DevSandbox';
 import { API_BASE_URL, buildApiUrl, API_ENDPOINTS } from './config/api';
 
-// ==================== ELECTRON INTEGRATION ====================
-
-// Type declarations for Electron API
-declare global {
-  interface Window {
-    electronAPI?: {
-      getAppInfo: () => Promise<{
-        version: string;
-        name: string;
-        isBackendRunning: boolean;
-        backendUrl: string;
-      }>;
-      restartBackend: () => Promise<void>;
-      checkBackendStatus: () => Promise<void>;
-      openExternal: (url: string) => Promise<void>;
-      getSetting: (key: string, defaultValue: any) => Promise<any>;
-      setSetting: (key: string, value: any) => Promise<void>;
-      onFileSelected: (callback: (event: any, filePath: string) => void) => void;
-      onShowNotification: (callback: (event: any, data: {title: string, body: string}) => void) => void;
-      onShowSettings: (callback: (event: any) => void) => void;
-      onNewChat: (callback: (event: any) => void) => void;
-      removeAllListeners: (channel: string) => void;
-    };
-    isElectron?: boolean;
-  }
-}
-
-// ==================== ELECTRON STATUS COMPONENT ====================
-
-const ElectronStatus: React.FC = () => {
-  const [electronInfo, setElectronInfo] = useState<{
-    version: string;
-    name: string;
-    isBackendRunning: boolean;
-    backendUrl: string;
-  } | null>(null);
-  const [showStatus, setShowStatus] = useState(false);
-
-  useEffect(() => {
-    if (window.electronAPI) {
-      window.electronAPI.getAppInfo().then(setElectronInfo);
-      
-      // Setup Electron event listeners
-      window.electronAPI.onShowNotification((_event, data) => {
-        // Create desktop notification
-        if (Notification.permission === 'granted') {
-          new Notification(data.title, { body: data.body });
-        }
-      });
-
-      return () => {
-        window.electronAPI?.removeAllListeners('show-notification');
-      };
-    }
-  }, []);
-
-  if (!window.isElectron) return null;
-
-  return (
-    <div className="electron-status">
-      <button 
-        className="electron-toggle-btn"
-        onClick={() => setShowStatus(!showStatus)}
-        title="Desktop App Status"
-      >
-        🖥️ Desktop
-      </button>
-      
-      {showStatus && electronInfo && (
-        <div className="electron-status-panel">
-          <h4>🐻 {electronInfo.name}</h4>
-          <p>Version: {electronInfo.version}</p>
-          <p>Backend: {electronInfo.isBackendRunning ? '✅ Running' : '❌ Stopped'}</p>
-          <p>URL: {electronInfo.backendUrl}</p>
-          
-          <div className="electron-actions">
-            <button 
-              onClick={() => window.electronAPI?.restartBackend()}
-              className="restart-backend-btn"
-            >
-              🔄 Restart Backend
-            </button>
-            <button 
-              onClick={() => window.electronAPI?.checkBackendStatus()}
-              className="check-status-btn"
-            >
-              📡 Check Status
-            </button>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
 // ==================== BACKEND CONNECTION MANAGER ====================
 
 const BackendConnectionManager: React.FC<{
@@ -135,18 +40,8 @@ const BackendConnectionManager: React.FC<{
   };
 
   const startLocalBackend = async () => {
-    if (window.electronAPI) {
-      try {
-        await window.electronAPI.restartBackend();
-        // Wait a moment then check connection
-        setTimeout(() => checkBackendConnection(), 3000);
-      } catch (error) {
-        console.error('Failed to start backend:', error);
-      }
-    } else {
-      // Show instructions for manual backend start
-      alert('Please start the backend manually:\n\ncd backend\nsource venv/bin/activate\npython app.py');
-    }
+    // Show instructions for manual backend start
+    alert('Please start the backend manually:\n\ncd backend\nsource venv/bin/activate\npython app.py');
   };
 
   useEffect(() => {
@@ -702,7 +597,6 @@ const App: React.FC = () => {
         
         {!sidebarCollapsed && (
           <div className="sidebar-footer">
-            <ElectronStatus />
             <BackendConnectionManager onBackendStatus={handleBackendStatus} />
             <div className="sidebar-motto">
               <p>🐻 Your creative sanctuary</p>

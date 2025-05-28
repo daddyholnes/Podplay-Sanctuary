@@ -16,7 +16,7 @@ The module supports:
 import os
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from tinydb import TinyDB, Query, where
 from tinydb.operations import set as tinydb_set
 from typing import Dict, List, Optional, Any, Union
@@ -44,6 +44,9 @@ LOG_KEY_AGENT_THOUGHTS = "agent_thoughts" # String or structured thoughts
 LOG_KEY_STATUS_UPDATE = "status_update" # e.g., "step_started", "step_completed", "step_failed", "project_completed"
 LOG_KEY_IS_ERROR = "is_error" # Boolean
 LOG_KEY_MESSAGE = "message" # General human-readable message for the log entry
+LOG_KEY_TOOL_CALLS = "tool_calls"  # To store tool invocation details (name, params)
+LOG_KEY_TOOL_OUTPUTS = "tool_outputs" # To store direct results from tools
+
 
 # --- Project Level Keys ---
 # These might be stored in a separate table or as special log entries
@@ -102,7 +105,7 @@ class ScoutProjectLogger:
         self._metadata_table = self._db.table('metadata') # For project-level info
 
     def _now_iso(self) -> str:
-        return datetime.utcnow().isoformat() + "Z"
+        return datetime.now(timezone.utc).isoformat()
 
     def log_entry(self,
                   message: str,
@@ -112,9 +115,11 @@ class ScoutProjectLogger:
                   vm_id: Optional[str] = None,
                   parameters: Optional[Dict[str, Any]] = None,
                   outputs: Optional[Dict[str, Any]] = None, # stdout, stderr, tool_result
-                  agent_thoughts: Optional[Union[str, Dict]] = None,
+                  agent_thoughts: Optional[Union[str, Dict, List]] = None, # Allow more structured thoughts
                   status_update: Optional[str] = None, # step_started, step_completed, etc.
                   is_error: bool = False,
+                  tool_calls: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None, # For tool call details
+                  tool_outputs: Optional[Union[Dict[str, Any], List[Dict[str, Any]]]] = None, # For tool call results
                   **extra_data: Any) -> str:
         """
         Creates a structured log entry.
@@ -135,6 +140,8 @@ class ScoutProjectLogger:
             LOG_KEY_AGENT_THOUGHTS: agent_thoughts,
             LOG_KEY_STATUS_UPDATE: status_update,
             LOG_KEY_IS_ERROR: is_error,
+            LOG_KEY_TOOL_CALLS: tool_calls,
+            LOG_KEY_TOOL_OUTPUTS: tool_outputs,
         }
         entry.update(extra_data) # Merge any additional custom data
 
@@ -211,6 +218,17 @@ class ScoutProjectLogger:
     def get_current_plan(self) -> List[Dict[str, Any]]:
         return self._get_project_metadata(PROJECT_KEY_CURRENT_PLAN, default=[])
 
+    def set_project_plan(self, plan: List[Dict[str, Any]], project_goal: Optional[str] = None):
+        """Sets the entire project plan and optionally updates the project goal."""
+        self._set_project_metadata(PROJECT_KEY_CURRENT_PLAN, plan)
+        if project_goal is not None:
+            self.set_project_goal(project_goal)
+        self.log_entry(
+            message="Project plan set/updated.",
+            agent_action="project_management",
+            parameters={"plan_length": len(plan), "has_goal": project_goal is not None}
+        )
+
     def set_active_step(self, step_id: Optional[str]):
         self._set_project_metadata(PROJECT_KEY_ACTIVE_STEP_ID, step_id)
         if step_id:
@@ -263,77 +281,72 @@ if __name__ == '__main__':
     project1_logger.update_plan_step_status("1.0", "Initialize Environment", "in_progress")
     project1_logger.set_active_step("1.0")
 
-    time.sleep(0.1) # Ensure timestamps differ slightly
+    # Example of setting a full plan
+    example_plan = [
+        {"id": "1.0", "name": "Initialize Environment", "status": "pending"},
+        {"id": "2.0", "name": "Develop Feature X", "status": "pending"},
+        {"id": "3.0", "name": "Test Feature X", "status": "pending"},
+        {"id": "4.0", "name": "Deploy", "status": "pending"}
+    ]
+    project1_logger.set_project_plan(example_plan, project_goal="Complete Project Alpha with Feature X")
+
+    # import time # Already imported if running as a script, but good for clarity if this snippet is isolated
+    # time.sleep(0.1) # Ensure timestamps differ slightly
 
     project1_logger.log_entry(
         message="VM created successfully.",
         step_id="1.0", step_name="Initialize Environment",
         agent_action="tool_call", 
         vm_id="vm_alpha_123",
-        parameters={"tool_name": "create_vm", "vm_type": "nixos"},
-        outputs={"vm_ip": "192.168.1.10"},
+        parameters={"tool_name": "create_vm", "vm_type": "nixos"}, # General parameters for this specific log entry
+        outputs={"vm_ip": "192.168.1.10", "status_code": 200}, # General outputs for this specific log entry
+        tool_calls=[ # Specific structured data for tool calls
+            {"tool_name": "create_vm", "parameters": {"vm_type": "nixos", "region": "us-central1"}},
+            {"tool_name": "assign_ip", "parameters": {"vm_id": "vm_alpha_123"}}
+        ],
+        tool_outputs=[ # Specific structured data for tool outputs
+            {"tool_name": "create_vm", "result": {"vm_id": "vm_alpha_123", "status": "created"}},
+            {"tool_name": "assign_ip", "result": {"vm_ip": "192.168.1.10"}}
+        ],
+        agent_thoughts=[ # Example of structured thoughts
+            {"type": "reasoning", "text": "VM creation was successful, proceeding to IP assignment."},
+            {"type": "next_action", "tool_name": "configure_firewall"}
+        ],
         status_update="progress_update"
     )
-
-def main():
-    """Example usage of the ScoutLogger module.
     
-    This demonstrates how to use the ScoutLogManager and ScoutProjectLogger
-    to log events and track project status.
-    """
-    logging.basicConfig(level=logging.DEBUG, 
-                      format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    project1_logger.log_entry(
+        message="Firewall configuration failed.",
+        step_id="1.0", step_name="Initialize Environment",
+        agent_action="tool_interaction_result",
+        is_error=True,
+        tool_calls={"tool_name": "configure_firewall", "parameters": {"rules": "allow_ssh"}},
+        tool_outputs={"tool_name": "configure_firewall", "error": "permission_denied", "stdout": "", "stderr": "Permission denied to access firewall rules."}
+    )
     
-    try:
-        # Example usage of ScoutLogger
-        log_manager = ScoutLogManager()
-        project_logger = log_manager.get_project_logger("test_project")
-        
-        # Set project goal
-        project_logger.set_project_goal("Test project for ScoutLogger functionality")
-        
-        # Log some entries
-        log_id = project_logger.log_entry("Starting test process", 
-                                        status_update="started",
-                                        step_name="initialization")
-        
-        try:
-            # Simulate some work
-            project_logger.log_entry("Processing step 1", 
-                                    step_id="step1",
-                                    status_update="in_progress")
-            
-            # More processing...
-            project_logger.log_entry("Completed step 1",
-                                    step_id="step1",
-                                    status_update="completed",
-                                    outputs={"result": "success"})
-            
-            # Set overall status
-            project_logger.set_overall_status("completed", "All tasks completed successfully")
-            
-        except Exception as e:
-            project_logger.log_entry(f"Error occurred: {str(e)}", 
-                                   is_error=True,
-                                   status_update="error")
-            project_logger.set_overall_status("error", f"Test failed: {str(e)}")
-        
-        # Get and print logs
-        logs = project_logger.get_logs()
-        for log in logs:
-            timestamp = log.get('timestamp', 'N/A')
-            message = log.get('message', 'No message')
-            print(f"{timestamp} - {message}")
-        
-        return True
-        
-    except Exception as e:
-        logger.error(f"Error in main example: {str(e)}")
-        return False
-    finally:
-        # Clean up
-        if 'log_manager' in locals():
-            log_manager.close_all_dbs()
+    # Get and print logs for project1
+    logs1 = project1_logger.get_logs(limit=5)
+    logger.info(f"--- Logs for {project1_logger.project_id} ---")
+    for log in logs1:
+        logger.info(f"{log.get('timestamp')} [{log.get('step_name', 'General')}] - {log.get('message')}")
 
-if __name__ == '__main__':
-    main()
+    # Example for project2 (less detailed)
+    project2_logger.set_project_goal("Maintain legacy system.")
+    project2_logger.log_entry("Performing routine maintenance.", agent_action="maintenance")
+    project2_logger.set_overall_status("completed")
+
+    logs2 = project2_logger.get_logs(limit=3)
+    logger.info(f"--- Logs for {project2_logger.project_id} ---")
+    for log in logs2:
+        logger.info(f"{log.get('timestamp')} - {log.get('message')}")
+
+    # Demonstrate get_project_status_summary
+    summary1 = project1_logger.get_project_status_summary()
+    logger.info(f"--- Status Summary for {project1_logger.project_id} ---")
+    logger.info(f"Goal: {summary1.get(PROJECT_KEY_GOAL)}")
+    logger.info(f"Overall Status: {summary1.get(PROJECT_KEY_OVERALL_STATUS)}")
+    logger.info(f"Plan: {summary1.get(PROJECT_KEY_CURRENT_PLAN)}")
+    logger.info(f"Active Step: {summary1.get(PROJECT_KEY_ACTIVE_STEP_ID)}")
+    
+    # Close connections
+    log_manager.close_all_dbs()

@@ -1,5 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { API_ENDPOINTS, buildDynamicApiUrl } from '../../config/api';
+import { API_ENDPOINTS } from '../../config/api'; // buildDynamicApiUrl might be removed
+import { apiService } from '../../services/apiService'; // Import the new apiService
+import { notify } from '../../services/notificationService'; // Import notificationService
 import ScoutPlanDisplayComponent from './ScoutPlanDisplayComponent';
 import ScoutLogViewerComponent from './ScoutLogViewerComponent';
 import ScoutInterventionControlsComponent from './ScoutInterventionControlsComponent';
@@ -56,12 +58,11 @@ const ScoutProjectView: React.FC<ScoutProjectViewProps> = ({ projectId }) => {
     }
     setError(null);
     try {
-      const apiUrl = buildDynamicApiUrl(API_ENDPOINTS.SCOUT_AGENT.GET_PROJECT, { id: projectId });
-      const response = await fetch(apiUrl);
-      if (!response.ok) {
-        throw new Error(`Failed to fetch project status: ${response.statusText}`);
-      }
-      const data = await response.json();
+      // Manually construct path for GET_PROJECT
+      const pathTemplate = API_ENDPOINTS.SCOUT_AGENT.GET_PROJECT;
+      const actualPath = pathTemplate.replace('{id}', projectId);
+      const data = await apiService.get<any>(actualPath);
+
       if (data.success && data.status_summary) {
         setProjectStatus(data.status_summary);
       } else {
@@ -89,21 +90,22 @@ const ScoutProjectView: React.FC<ScoutProjectViewProps> = ({ projectId }) => {
     console.log(`Intervening in project ${projectId}: ${command}`, params);
     setError(null);
     try {
-      const apiUrl = buildDynamicApiUrl(API_ENDPOINTS.SCOUT_AGENT.CREATE_INTERVENTION, { id: projectId });
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ command, parameters: params }),
-      });
-      const data = await response.json();
-      if (!response.ok || !data.success) {
-        throw new Error(data.error || 'Failed to send intervention');
+      // Manually construct path for CREATE_INTERVENTION
+      const pathTemplate = API_ENDPOINTS.SCOUT_AGENT.CREATE_INTERVENTION;
+      const actualPath = pathTemplate.replace('{id}', projectId);
+      const data = await apiService.post<any>(actualPath, { command, parameters: params });
+
+      // apiService throws on error, so no need to check response.ok or data.success here if that's the convention.
+      // However, if data.success is part of the expected JSON payload for successful business logic, keep it.
+      if (!data.success) { // Assuming the backend might return success: false for logical errors
+          throw new Error(data.error || 'Failed to send intervention (API indicated failure)');
       }
-      alert(data.message || 'Intervention sent.');
+      notify.success(data.message || 'Intervention sent.');
       fetchProjectStatus(); // Refresh status after intervention
     } catch (err) {
+      // apiService already notifies, so setError for local UI update and console.error is fine
       const errorMsg = err instanceof Error ? err.message : String(err);
-      setError(errorMsg); // Show error
+      setError(errorMsg); 
       console.error(`Error sending intervention for project ${projectId}:`, errorMsg);
     }
   };

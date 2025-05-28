@@ -1,7 +1,7 @@
 import os
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from tinydb import TinyDB, Query, where
 from tinydb.operations import set as tinydb_set
 from typing import Dict, List, Optional, Any, Union
@@ -88,7 +88,7 @@ class ScoutProjectLogger:
         self._metadata_table = self._db.table('metadata') # For project-level info
 
     def _now_iso(self) -> str:
-        return datetime.utcnow().isoformat() + "Z"
+        return datetime.now(timezone.utc).isoformat()
 
     def log_entry(self,
                   message: str,
@@ -249,7 +249,8 @@ if __name__ == '__main__':
     project1_logger.update_plan_step_status("1.0", "Initialize Environment", "in_progress")
     project1_logger.set_active_step("1.0")
 
-    time.sleep(0.1) # Ensure timestamps differ slightly
+    # import time # Ensure time is imported if using sleep
+    # time.sleep(0.1) # Ensure timestamps differ slightly
 
     project1_logger.log_entry(
         message="VM created successfully.",
@@ -290,6 +291,9 @@ if __name__ == '__main__':
     # Clean up test log directory (optional)
     # import shutil
     # shutil.rmtree("./test_scout_logs")
+
+# Ensure time is imported for the sleep call in the example
+import time
 ```
 
 **Explanation of `scout_logger.py`:**

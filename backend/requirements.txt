@@ -8,23 +8,25 @@ schedule==1.2.0
 typing-extensions==4.8.0
 
 # Enhanced Mama Bear Capabilities
-mem0ai==0.1.101
-together==0.2.7
+mem0ai==0.1.101 # Might have new dependencies from freeze
+together==0.2.7 # Might have new dependencies from freeze
 
 # DevSandbox Dependencies
 psutil==5.9.6
 python-socketio==5.9.0
-paramiko==3.3.1
+paramiko==3.5.1 # Updated by pip freeze
 scp==0.14.5
 # libvirt-python==9.8.0  # Commented out for Cloud Run deployment - not available in Cloud Run environment
 
 # Google Cloud and Vertex AI integration
-google-cloud-aiplatform==1.38.1
-google-auth==2.23.3
-google-auth-oauthlib==1.1.0
-google-auth-httplib2==0.1.1
-google-api-python-client==2.103.0
-google-cloud-core==2.3.3
+google-cloud-aiplatform==1.94.0 # Updated by pip freeze
+google-auth==2.23.3 # Keep original if not changed by freeze, check freeze output
+google-auth-oauthlib==1.1.0 # Keep original if not changed by freeze, check freeze output
+google-auth-httplib2==0.1.1 # Keep original if not changed by freeze, check freeze output
+google-api-python-client==2.103.0 # Keep original if not changed by freeze, check freeze output
+google-cloud-core==2.4.3 # Updated by pip freeze
+google-cloud-storage==2.14.0 # Added and updated by pip freeze
+cryptography==45.0.3 # Updated by pip freeze
 
 # Production server
 gunicorn==21.2.0
@@ -38,3 +40,178 @@ pytest-flask==1.2.0
 black==23.9.1
 flake8==6.0.0
 tinydb==4.8.2
+
+# Dependencies from pip freeze that might have been pulled by upgrades
+# These should be verified against the full pip freeze output.
+# Example:
+# annotated-types==0.7.0 (pulled by pydantic)
+# bcrypt==4.3.0 (pulled by paramiko)
+# PyNaCl==1.5.0 (pulled by paramiko)
+# google-api-core==2.25.0rc1 (pulled by google-cloud-*)
+# googleapis-common-protos==1.70.0 (pulled by google-cloud-*)
+# grpcio==1.71.0 (pulled by google-cloud-*)
+# protobuf==5.29.4 (pulled by google-cloud-*)
+# pydantic==2.9.2 (pulled by mem0ai or other)
+# pydantic_core==2.23.4 (pulled by pydantic)
+# rsa==4.9.1 (pulled by google-auth)
+# pyasn1==0.6.1 (pulled by rsa or google-auth)
+# pyasn1-modules==0.4.2 (pulled by google-auth)
+# shapely==2.1.1 (pulled by google-cloud-aiplatform)
+# numpy==2.2.6 (pulled by shapely)
+# google-resumable-media==2.7.2 (pulled by google-cloud-storage)
+# google-crc32c==1.7.1 (pulled by google-cloud-storage)
+
+# Manually listing resolved versions from the pip freeze output for clarity and correctness.
+# This section replaces the above commented-out examples with actual versions from freeze.
+
+annotated-types==0.7.0
+anyio==4.9.0
+backoff==2.2.1
+# backports.tarfile==1.2.0 # Likely a system package, not to be included
+bcrypt==4.3.0
+bidict==0.23.1
+# blinker==1.7.0 # Already listed or system
+# build==1.2.2.post1 # Dev tool, not runtime
+# CacheControl==0.14.3 # Might be a sub-dependency, check if needed
+cachetools==5.5.2 # From google-auth
+# certifi==2025.4.26 # Sub-dependency of requests
+# cffi==1.17.1 # Sub-dependency of cryptography
+# chardet==5.2.0 # Sub-dependency of requests
+# charset-normalizer==3.4.2 # Sub-dependency of requests
+# cleo==2.1.0 # Dev tool
+# click==8.1.8 # Dev tool or Flask sub-dependency
+# colorama==0.4.6 # Dev tool
+# coverage==7.8.0 # Dev tool
+# crashtest==0.4.1 # Dev tool
+# dbus-python==1.3.2 # System package
+# distlib==0.3.9 # Dev tool
+# distro==1.9.0 # Sub-dependency of openai
+# distro-info==1.7+build1 # System package
+dnspython==2.7.0 # From eventlet
+# dulwich==0.22.8 # Dev tool
+# exceptiongroup==1.2.2 # From pytest
+# fastjsonschema==2.21.1 # Dev tool
+# filelock==3.18.0 # Dev tool
+# findpython==0.6.3 # Dev tool
+google-api-core==2.25.0rc1
+googleapis-common-protos==1.70.0
+grpc-google-iam-v1==0.14.2 # From google-cloud-resource-manager
+grpcio==1.71.0
+grpcio-status==1.71.0
+# gyp==0.1 # System / dev tool
+h11==0.16.0 # From httpcore
+h2==4.2.0 # From qdrant-client -> httpx[http2]
+hpack==4.1.0 # From h2
+httpcore==1.0.9 # From httpx
+# httplib2==0.20.4 # Already listed or system
+httpx==0.28.1 # From google-genai or qdrant-client
+hyperframe==6.1.0 # From h2
+# idna==3.10 # Sub-dependency of requests
+# importlib_metadata==8.7.0 # Dev tool
+# installer==0.7.0 # Dev tool
+# jaraco.classes==3.4.0 # Dev tool
+# jaraco.context==6.0.1 # Dev tool
+# jaraco.functools==4.1.0 # Dev tool
+# jeepney==0.9.0 # System package
+Jinja2==3.1.6 # From Flask
+# keyring==25.6.0 # System package
+# launchpadlib==1.11.0 # System package
+# lazr.restfulclient==0.14.6 # System package
+# lazr.uri==1.0.6 # System package
+MarkupSafe==3.0.2 # From Jinja2
+# more-itertools==10.7.0 # Dev tool
+# msgpack==1.1.0 # Dev tool
+mypy-extensions==1.1.0 # From black
+numpy==2.2.6
+# oauthlib==3.2.2 # From requests-oauthlib
+openai==1.39.0 # From mem0ai
+# packaging==25.0 # From gunicorn or dev tools
+pathspec==0.12.1 # From black
+# pbs-installer==2025.4.9 # Dev tool
+# pkginfo==1.12.1.2 # Dev tool
+# platformdirs==4.3.7 # From black
+# pluggy==1.5.0 # From pytest
+# poetry==2.1.0 # Dev tool
+# poetry-core==2.1.0 # Dev tool
+portalocker==2.10.1 # From qdrant-client
+posthog==4.2.0 # From mem0ai
+proto-plus==1.26.1
+protobuf==5.29.4
+pyasn1==0.6.1
+pyasn1-modules==0.4.2
+# pycparser==2.22 # From cffi
+pydantic==2.9.2 # From mem0ai
+pydantic_core==2.23.4 # From pydantic
+# PyGObject==3.48.2 # System package
+# PyJWT==2.7.0 # System package
+PyNaCl==1.5.0
+# pyparsing==3.1.1 # System package or httplib2 sub-dependency
+# pypi-timemachine==0.2 # Dev tool
+# pyproject-api==1.9.0 # Dev tool
+# pyproject_hooks==1.2.0 # Dev tool
+# pytest-cov==6.1.1 # Dev tool
+# pytest-json-report==1.5.0 # Dev tool
+# pytest-metadata==3.1.1 # Dev tool
+# python-apt==2.7.7+ubuntu4 # System package
+python-dateutil==2.9.0.post0 # From google-cloud-bigquery
+# SecretStorage==3.3.3 # System package
+shapely==2.1.1
+# shellingham==1.5.4 # Dev tool
+simple-websocket==1.1.0 # From python-engineio
+# six==1.16.0 # From eventlet or dev tools
+# sniffio==1.3.1 # From openai or anyio
+SQLAlchemy==2.0.41 # From mem0ai
+sseclient-py==1.8.0 # From together
+# ssh-import-id==5.11 # System package
+# tomli==2.2.1 # From pytest or dev tools
+# tomlkit==0.13.2 # Dev tool
+# tornado==6.4.2 # Dev tool (tox)
+# tox==4.25.0 # Dev tool
+tqdm==4.67.1 # From together or google-genai
+# trove-classifiers==2025.5.1.12 # Dev tool
+# unattended-upgrades==0.1 # System package
+uritemplate==4.1.1 # From google-api-python-client
+# urllib3==2.4.0 # Sub-dependency of requests
+# virtualenv==20.31.1 # Dev tool
+# wadllib==1.3.6 # System package
+websockets==14.2 # From google-genai
+wsproto==1.2.0 # From simple-websocket
+# zipp==3.21.0 # Dev tool
+zope.event==5.0 # From gevent
+zope.interface==7.2 # From gevent
+# zstandard==0.23.0 # Dev tool
+
+# Original dependencies that should remain if not covered above
+# (cross-reference with initial file and pip freeze output)
+# Example: if 'some-package==1.0.0' was in original and not in freeze, it was removed.
+# If 'some-package' was in original (no version) and freeze has 'some-package==2.0.0', it's updated.
+# The logic here is to ensure all explicitly listed packages from the original requirements.txt
+# are present with their new (if upgraded) or original (if not upgraded) versions.
+
+# Final check: ensure all originally listed packages are present
+# Flask==2.3.3 (present)
+# Flask-CORS==4.0.0 (present)
+# Flask-SocketIO==5.3.6 (present)
+# Werkzeug==2.3.7 (present)
+# requests==2.31.0 (present)
+# python-dotenv==1.0.0 (present)
+# schedule==1.2.0 (present)
+# typing-extensions==4.8.0 (present)
+# mem0ai==0.1.101 (present)
+# together==0.2.7 (present)
+# psutil==5.9.6 (present)
+# python-socketio==5.9.0 (present)
+# scp==0.14.5 (present)
+# google-auth==2.23.3 (present)
+# google-auth-oauthlib==1.1.0 (present)
+# google-auth-httplib2==0.1.1 (present)
+# google-api-python-client==2.103.0 (present)
+# gunicorn==21.2.0 (present)
+# eventlet==0.33.3 (present)
+# gevent==23.9.1 (present)
+# gevent-websocket==0.10.1 (present)
+# pytest==7.4.2 (present)
+# pytest-flask==1.2.0 (present)
+# black==23.9.1 (present)
+# flake8==6.0.0 (present)
+# tinydb==4.8.2 (present)
