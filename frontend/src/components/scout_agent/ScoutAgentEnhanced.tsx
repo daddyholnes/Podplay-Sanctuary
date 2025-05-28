@@ -3,6 +3,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { buildDynamicApiUrl, API_ENDPOINTS } from '../../config/api';
+import MultimodalInput from '../MultimodalInput';
+import { MediaAttachment } from '../../ModelRegistry';
 import './ScoutAgentEnhanced.css';
 
 interface ChatMessage {
@@ -11,6 +13,7 @@ interface ChatMessage {
   content: string;
   timestamp: string;
   metadata?: any;
+  attachments?: MediaAttachment[];
 }
 
 interface WorkspaceData {
@@ -62,15 +65,15 @@ const ScoutAgentEnhanced: React.FC = () => {
   // State Management
   const [mode, setMode] = useState<'chat' | 'workspace'>('chat');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputValue, setInputValue] = useState('');
+  const [currentInput, setCurrentInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [workspaceData, setWorkspaceData] = useState<WorkspaceData | null>(null);
   const [projectId, /* setProjectId */] = useState<string>('test-project-alpha');
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [activePanel, setActivePanel] = useState<'files' | 'preview' | 'timeline'>('preview');
+  const [attachments, setAttachments] = useState<MediaAttachment[]>([]);
+  const [isTyping, setIsTyping] = useState(false);
 
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
 
   // Action buttons like scout.new
   const actionButtons = [
@@ -81,13 +84,7 @@ const ScoutAgentEnhanced: React.FC = () => {
     { id: 'learn', label: 'Learn', icon: '🧠', color: '#EF4444' }
   ];
 
-  // Emoji categories
-  const emojiCategories = {
-    recent: ['😊', '👍', '❤️', '😂', '🤔', '👋', '🚀', '💡'],
-    smileys: ['😀', '😃', '😄', '😁', '😆', '😅', '😂', '🤣', '😊', '😇'],
-    objects: ['💻', '📱', '⌨️', '🖱️', '🖥️', '⚡', '🔧', '⚙️', '🛠️', '📊'],
-    symbols: ['✅', '❌', '⚠️', '📝', '🔍', '💡', '🚀', '⭐', '🎯', '📌']
-  };
+
 
   useEffect(() => {
     // Initialize with welcome message
@@ -115,50 +112,62 @@ const ScoutAgentEnhanced: React.FC = () => {
 
     const prompt = actionPrompts[actionId as keyof typeof actionPrompts];
     if (prompt) {
-      addMessage('user', prompt);
-      handleSubmit(null, prompt);
+      handleSubmit(prompt);
     }
   };
 
-  const addMessage = (type: 'user' | 'assistant' | 'system', content: string, metadata?: any) => {
+  const addMessage = (type: 'user' | 'assistant' | 'system', content: string, metadata?: any, attachments?: MediaAttachment[]) => {
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
       type,
       content,
       timestamp: new Date().toISOString(),
-      metadata
+      metadata,
+      attachments
     };
     setMessages(prev => [...prev, newMessage]);
   };
 
-  const handleSubmit = async (e: React.FormEvent | null, customMessage?: string) => {
-    if (e) e.preventDefault();
-    
-    const message = customMessage || inputValue.trim();
-    if (!message && !customMessage) return;
+  const handleSubmit = async (message: string, files?: MediaAttachment[]) => {
+    if (!message.trim() && (!files || files.length === 0)) return;
 
-    if (!customMessage) {
-      addMessage('user', message);
-      setInputValue('');
-    }
+    // Add user message with attachments
+    addMessage('user', message, undefined, files);
+    setCurrentInput('');
+    setAttachments([]);
     setIsLoading(true);
+    setIsTyping(true);
 
     try {
+      const formData = new FormData();
+      formData.append('message', message);
+      formData.append('project_id', projectId);
+      formData.append('mode', 'scout_agent');
+      formData.append('context', JSON.stringify({ 
+        workspace_active: mode === 'workspace',
+        activePanel 
+      }));
+
+      // Add attachments to form data
+      if (files && files.length > 0) {
+        files.forEach((file, index) => {
+          if (file.file) {
+            formData.append(`file_${index}`, file.file);
+            formData.append(`file_${index}_type`, file.type);
+          }
+        });
+      }
+
       // Send to Scout Agent backend
       const response = await fetch('/api/mama-bear/chat', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          message,
-          project_id: projectId,
-          mode: 'scout_agent',
-          context: { workspace_active: mode === 'workspace' }
-        })
+        body: formData
       });
 
       if (!response.ok) throw new Error('Failed to send message');
       
       const data = await response.json();
+      setIsTyping(false);
       addMessage('assistant', data.response || 'I received your message!');
 
       // Check if response indicates we should transition to workspace
@@ -168,6 +177,7 @@ const ScoutAgentEnhanced: React.FC = () => {
 
     } catch (error) {
       console.error('Error sending message:', error);
+      setIsTyping(false);
       addMessage('system', 'Sorry, there was an error processing your message.');
     } finally {
       setIsLoading(false);
@@ -225,12 +235,6 @@ const ScoutAgentEnhanced: React.FC = () => {
     }
   };
 
-  const insertEmoji = (emoji: string) => {
-    setInputValue(prev => prev + emoji);
-    setShowEmojiPicker(false);
-    inputRef.current?.focus();
-  };
-
   const renderChatMode = () => (
     <div className="scout-chat-mode">
       <div className="scout-hero">
@@ -244,20 +248,53 @@ const ScoutAgentEnhanced: React.FC = () => {
       <div className="scout-messages">
         {messages.map((message) => (
           <div key={message.id} className={`scout-message scout-message-${message.type}`}>
+            <div className="scout-message-header">
+              <span className="scout-message-icon">
+                {message.type === 'user' ? '👤' : message.type === 'assistant' ? '🤖' : '⚙️'}
+              </span>
+              <span className="scout-message-sender">
+                {message.type === 'user' ? 'You' : message.type === 'assistant' ? 'Scout Agent' : 'System'}
+              </span>
+              <span className="scout-message-time">
+                {new Date(message.timestamp).toLocaleTimeString()}
+              </span>
+            </div>
             <div className="scout-message-content">
               {message.content.split('\n').map((line, i) => (
                 <p key={i}>{line}</p>
               ))}
-            </div>
-            <div className="scout-message-time">
-              {new Date(message.timestamp).toLocaleTimeString()}
+              {message.attachments && message.attachments.length > 0 && (
+                <div className="scout-message-attachments">
+                  {message.attachments.map((attachment, index) => (
+                    <div key={index} className="scout-attachment-preview">
+                      {attachment.type === 'image' && attachment.url && (
+                        <img src={attachment.url} alt="Uploaded image" className="scout-attachment-image" />
+                      )}
+                      {attachment.type === 'file' && (
+                        <div className="scout-attachment-file">
+                          📄 {attachment.file?.name || 'File'}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}
-        {isLoading && (
+        {isTyping && (
           <div className="scout-message scout-message-assistant">
-            <div className="scout-loading">
-              <span></span><span></span><span></span>
+            <div className="scout-message-header">
+              <span className="scout-message-icon">🤖</span>
+              <span className="scout-message-sender">Scout Agent</span>
+              <span className="scout-message-time">
+                {new Date().toLocaleTimeString()}
+              </span>
+            </div>
+            <div className="scout-message-content">
+              <div className="scout-typing-indicator">
+                <span></span><span></span><span></span>
+              </div>
             </div>
           </div>
         )}
@@ -366,56 +403,26 @@ const ScoutAgentEnhanced: React.FC = () => {
 
   const renderChatInput = () => (
     <div className="scout-chat-input-container">
-      <form onSubmit={handleSubmit} className="scout-chat-form">
-        <div className="scout-input-wrapper">
-          <input
-            ref={inputRef}
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="Type your message..."
-            className="scout-chat-input"
-            disabled={isLoading}
-          />
-          <div className="scout-input-controls">
-            <button
-              type="button"
-              className="scout-emoji-btn"
-              onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-            >
-              😊
-            </button>
-            <button
-              type="submit"
-              className="scout-send-btn"
-              disabled={!inputValue.trim() || isLoading}
-            >
-              {isLoading ? '⏳' : '🚀'}
-            </button>
-          </div>
-        </div>
-      </form>
-
-      {showEmojiPicker && (
-        <div className="scout-emoji-picker">
-          {Object.entries(emojiCategories).map(([category, emojis]) => (
-            <div key={category} className="scout-emoji-category">
-              <div className="scout-emoji-category-title">{category}</div>
-              <div className="scout-emoji-grid">
-                {emojis.map((emoji) => (
-                  <button
-                    key={emoji}
-                    className="scout-emoji-item"
-                    onClick={() => insertEmoji(emoji)}
-                  >
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      <div className="scout-multimodal-wrapper">
+        <MultimodalInput
+          value={currentInput}
+          onChange={setCurrentInput}
+          onSend={() => handleSubmit(currentInput, attachments)}
+          onAttachmentsChange={setAttachments}
+          attachments={attachments}
+          disabled={isLoading}
+          placeholder="Ask Scout Agent to research, create, plan, analyze, or learn something..."
+          showQuickActions={true}
+          quickActions={[
+            { label: '🔍 Research', action: () => handleActionClick('research') },
+            { label: '✨ Create', action: () => handleActionClick('create') },
+            { label: '📋 Plan', action: () => handleActionClick('plan') },
+            { label: '📊 Analyze', action: () => handleActionClick('analyze') },
+            { label: '🧠 Learn', action: () => handleActionClick('learn') }
+          ]}
+          className="scout-multimodal-input"
+        />
+      </div>
     </div>
   );
 

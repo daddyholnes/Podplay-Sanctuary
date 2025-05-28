@@ -2,6 +2,8 @@
 // Clean Version - No Placeholders, No TODOs, All Functions Implemented
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import MultimodalInput from '../MultimodalInput';
+import { MediaAttachment } from '../../ModelRegistry';
 import './ScoutDynamicWorkspace.css';
 import './WorkspaceAnimations.css';
 import WorkspaceLaunchAnimation from './WorkspaceLaunchAnimation';
@@ -14,6 +16,7 @@ interface ChatMessage {
   content: string;
   timestamp: string;
   metadata?: any;
+  attachments?: MediaAttachment[];
 }
 
 interface AgentAction {
@@ -68,8 +71,10 @@ interface ProjectContext {
 const ScoutDynamicWorkspace: React.FC = () => {
   // ==================== STATE MANAGEMENT ====================
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [inputValue, setInputValue] = useState('');
+  const [currentInput, setCurrentInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
+  const [attachments, setAttachments] = useState<MediaAttachment[]>([]);
   
   // Workspace State
   const [workspaceState, setWorkspaceState] = useState<WorkspaceState>({
@@ -94,13 +99,10 @@ const ScoutDynamicWorkspace: React.FC = () => {
   const [terminalOutput, setTerminalOutput] = useState<string[]>([]);
 
   // UI State
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showLaunchAnimation, setShowLaunchAnimation] = useState(false);
 
   // Refs
   const chatEndRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const chatInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const previewRef = useRef<HTMLIFrameElement>(null);
 
@@ -122,13 +124,14 @@ const ScoutDynamicWorkspace: React.FC = () => {
 
   // ==================== CORE FUNCTIONS ====================
 
-  const addMessage = (type: ChatMessage['type'], content: string, metadata?: any) => {
+  const addMessage = (type: ChatMessage['type'], content: string, metadata?: any, attachments?: MediaAttachment[]) => {
     const newMessage: ChatMessage = {
       id: Date.now().toString(),
       type,
       content,
       timestamp: new Date().toISOString(),
-      metadata
+      metadata,
+      attachments
     };
     setMessages(prev => [...prev, newMessage]);
   };
@@ -160,27 +163,52 @@ const ScoutDynamicWorkspace: React.FC = () => {
 
   // ==================== MESSAGE HANDLING ====================
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!inputValue.trim() || isLoading) return;
+  const sendMessage = async () => {
+    if (!currentInput.trim() && attachments.length === 0) return;
+    if (isLoading) return;
 
-    const userMessage = inputValue.trim();
-    addMessage('user', userMessage);
-    setInputValue('');
+    const message = currentInput.trim();
+    const files = [...attachments];
+
+    // Add user message with attachments
+    addMessage('user', message, undefined, files);
+    setCurrentInput('');
+    setAttachments([]);
     setIsLoading(true);
+    setIsTyping(true);
 
     try {
       // Check if this looks like a project request
-      const isProjectRequest = userMessage.toLowerCase().includes('build') || 
-                              userMessage.toLowerCase().includes('create') || 
-                              userMessage.toLowerCase().includes('make') ||
-                              userMessage.toLowerCase().includes('develop') ||
-                              userMessage.toLowerCase().includes('app') ||
-                              userMessage.toLowerCase().includes('website') ||
-                              userMessage.toLowerCase().includes('project');
+      const isProjectRequest = message.toLowerCase().includes('build') || 
+                              message.toLowerCase().includes('create') || 
+                              message.toLowerCase().includes('make') ||
+                              message.toLowerCase().includes('develop') ||
+                              message.toLowerCase().includes('app') ||
+                              message.toLowerCase().includes('website') ||
+                              message.toLowerCase().includes('project');
+
+      // Create FormData for multimodal support
+      const formData = new FormData();
+      formData.append('message', message);
+      formData.append('project_id', projectContext?.id || 'dynamic-workspace');
+      formData.append('mode', 'scout_dynamic');
+      formData.append('context', JSON.stringify({ 
+        workspace_mode: workspaceState.mode,
+        active_view: workspaceState.activeView
+      }));
+
+      // Add attachments to form data
+      if (files && files.length > 0) {
+        files.forEach((file, index) => {
+          if (file.file) {
+            formData.append(`file_${index}`, file.file);
+            formData.append(`file_${index}_type`, file.type);
+          }
+        });
+      }
 
       await new Promise(resolve => setTimeout(resolve, 1000));
+      setIsTyping(false);
 
       if (isProjectRequest && workspaceState.mode === 'chat') {
         addMessage('assistant', `🐻 Perfect! I'll help you build that. Get ready for some development magic! 🚀✨`);
@@ -191,7 +219,7 @@ const ScoutDynamicWorkspace: React.FC = () => {
         
         if (workspaceState.mode !== 'chat') {
           response = `🐻 Great! I'm working on that in the background. You can see the progress in the workspace panels.`;
-          await simulateWorkspaceActivity(userMessage);
+          await simulateWorkspaceActivity(message);
         } else {
           response = `🐻 I hear you! That sounds interesting. Want me to set up a full development workspace? Just say "build" or "create" something!`;
         }
@@ -201,10 +229,17 @@ const ScoutDynamicWorkspace: React.FC = () => {
 
     } catch (error) {
       console.error('Error processing message:', error);
+      setIsTyping(false);
       addMessage('assistant', '🐻 Oops! Something went wrong, but I\'m still here to help!');
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleSubmit = async (message: string, files?: MediaAttachment[]) => {
+    setCurrentInput(message);
+    if (files) setAttachments(files);
+    await sendMessage();
   };
 
   // ==================== WORKSPACE MANAGEMENT ====================
@@ -505,47 +540,47 @@ const ScoutDynamicWorkspace: React.FC = () => {
         <div className="scout-logo">
           <span className="scout-icon">🐻</span>
           <h1>Mama Bear Development Agent</h1>
+          <div className="scout-status-indicator">
+            <span className="scout-status-dot"></span>
+            <span>Ready to build amazing things</span>
+          </div>
         </div>
-        <p className="scout-tagline">Your AI-powered development conductor</p>
+        <p className="scout-tagline">Your AI-powered development conductor • Scout.new inspired interface</p>
         
         <div className="scout-quick-start">
-          <h3>✨ Quick Start Ideas:</h3>
+          <h3>✨ Tell me what you want to build:</h3>
           <div className="scout-quick-buttons">
             <button 
-              className="scout-quick-btn"
-              onClick={() => {
-                setInputValue("Build a React todo app with modern UI");
-                handleSubmit(new Event('submit') as any);
-              }}
+              className="scout-quick-btn scout-btn-primary"
+              onClick={() => handleSubmit("Build a modern React todo app with drag & drop")}
             >
-              📝 Todo App
+              <div className="scout-btn-icon">📝</div>
+              <div className="scout-btn-label">React Todo App</div>
+              <div className="scout-btn-desc">Modern UI with features</div>
             </button>
             <button 
-              className="scout-quick-btn"
-              onClick={() => {
-                setInputValue("Create a Python API for weather data");
-                handleSubmit(new Event('submit') as any);
-              }}
+              className="scout-quick-btn scout-btn-secondary"
+              onClick={() => handleSubmit("Create a FastAPI weather service with real-time data")}
             >
-              🌤️ Weather API
+              <div className="scout-btn-icon">🌤️</div>
+              <div className="scout-btn-label">Weather API</div>
+              <div className="scout-btn-desc">FastAPI + real-time data</div>
             </button>
             <button 
-              className="scout-quick-btn"
-              onClick={() => {
-                setInputValue("Build a data dashboard with charts");
-                handleSubmit(new Event('submit') as any);
-              }}
+              className="scout-quick-btn scout-btn-accent"
+              onClick={() => handleSubmit("Build an interactive data dashboard with charts and analytics")}
             >
-              📊 Dashboard
+              <div className="scout-btn-icon">📊</div>
+              <div className="scout-btn-label">Data Dashboard</div>
+              <div className="scout-btn-desc">Charts & analytics</div>
             </button>
             <button 
-              className="scout-quick-btn"
-              onClick={() => {
-                setInputValue("Make a portfolio website");
-                handleSubmit(new Event('submit') as any);
-              }}
+              className="scout-quick-btn scout-btn-creative"
+              onClick={() => handleSubmit("Make a stunning portfolio website with animations")}
             >
-              🎨 Portfolio
+              <div className="scout-btn-icon">🎨</div>
+              <div className="scout-btn-label">Portfolio Site</div>
+              <div className="scout-btn-desc">Animated & responsive</div>
             </button>
           </div>
         </div>
@@ -554,17 +589,71 @@ const ScoutDynamicWorkspace: React.FC = () => {
       <div className="scout-messages">
         {messages.map((message) => (
           <div key={message.id} className={`scout-message scout-message-${message.type}`}>
+            <div className="scout-message-header">
+              <div className="scout-message-avatar">
+                {message.type === 'user' ? '👤' : '🐻'}
+              </div>
+              <div className="scout-message-info">
+                <span className="scout-message-sender">
+                  {message.type === 'user' ? 'You' : 'Mama Bear'}
+                </span>
+                <span className="scout-message-timestamp">
+                  {new Date(message.timestamp).toLocaleTimeString()}
+                </span>
+              </div>
+            </div>
             <div className="scout-message-content">
               {message.content.split('\n').map((line, i) => (
                 <p key={i}>{line}</p>
               ))}
-            </div>
-            <div className="scout-message-time">
-              {new Date(message.timestamp).toLocaleTimeString()}
+              
+              {/* Render attachments */}
+              {message.attachments && message.attachments.length > 0 && (
+                <div className="scout-message-attachments">
+                  {message.attachments.map((attachment, index) => (
+                    <div key={index} className="scout-attachment-preview">
+                      {attachment.type.startsWith('image/') ? (
+                        <div className="scout-image-attachment">
+                          <img 
+                            src={attachment.url || URL.createObjectURL(attachment.file!)} 
+                            alt={attachment.name}
+                            className="scout-attachment-image"
+                          />
+                          <span className="scout-attachment-name">{attachment.name}</span>
+                        </div>
+                      ) : (
+                        <div className="scout-file-attachment">
+                          <div className="scout-file-icon">📎</div>
+                          <div className="scout-file-info">
+                            <span className="scout-file-name">{attachment.name}</span>
+                            <span className="scout-file-size">
+                              {attachment.size ? `${(attachment.size / 1024 / 1024).toFixed(2)} MB` : ''}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}
-        {isLoading && (
+        {isTyping && (
+          <div className="scout-message scout-message-assistant">
+            <div className="scout-message-header">
+              <div className="scout-message-avatar">🐻</div>
+              <div className="scout-message-info">
+                <span className="scout-message-sender">Mama Bear</span>
+                <span className="scout-message-timestamp">typing...</span>
+              </div>
+            </div>
+            <div className="scout-typing-indicator">
+              <span></span><span></span><span></span>
+            </div>
+          </div>
+        )}
+        {isLoading && !isTyping && (
           <div className="scout-message scout-message-assistant">
             <div className="scout-loading-pulse">
               <span></span><span></span><span></span>
@@ -579,65 +668,42 @@ const ScoutDynamicWorkspace: React.FC = () => {
           <div className="scout-quick-start-buttons">
             <button 
               className="scout-quick-btn"
-              onClick={() => setInputValue("Build me a beautiful website")}
+              onClick={() => handleSubmit("Build me a beautiful website")}
             >
               🌐 Website
             </button>
             <button 
               className="scout-quick-btn"
-              onClick={() => setInputValue("Create a Python API")}
+              onClick={() => handleSubmit("Create a Python API")}
             >
               🐍 API
             </button>
             <button 
               className="scout-quick-btn"
-              onClick={() => setInputValue("Build a React app")}
+              onClick={() => handleSubmit("Build a React app")}
             >
               ⚛️ React App
             </button>
             <button 
               className="scout-quick-btn"
-              onClick={() => setInputValue("Make a Discord bot")}
+              onClick={() => handleSubmit("Make a Discord bot")}
             >
               🤖 Bot
             </button>
           </div>
           
-          <form onSubmit={handleSubmit} className="scout-chat-form-enhanced">
-            <div className="scout-input-container">
-              <textarea
-                ref={inputRef}
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                placeholder="🐻 Tell Mama Bear what amazing thing you want to build..."
-                className="scout-chat-input-large"
-                rows={3}
-                disabled={isLoading}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    handleSubmit(e);
-                  }
-                }}
-              />
-              <div className="scout-input-actions">
-                <button
-                  type="button"
-                  className="scout-emoji-btn-large"
-                  onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-                >
-                  😊
-                </button>
-                <button
-                  type="submit"
-                  className="scout-send-btn-large"
-                  disabled={!inputValue.trim() || isLoading}
-                >
-                  {isLoading ? '⏳ Mama Bear is thinking...' : '🚀 Build This!'}
-                </button>
-              </div>
-            </div>
-          </form>
+          <div className="scout-multimodal-input-wrapper">
+            <MultimodalInput
+              value={currentInput}
+              onChange={setCurrentInput}
+              onSend={sendMessage}
+              onAttachmentsChange={setAttachments}
+              attachments={attachments}
+              placeholder="🐻 Tell Mama Bear what amazing thing you want to build..."
+              disabled={isLoading}
+              className="scout-chat-input-enhanced"
+            />
+          </div>
         </div>
       </div>
 
@@ -649,10 +715,18 @@ const ScoutDynamicWorkspace: React.FC = () => {
     <div className="scout-hybrid-mode">
       <div className="scout-workspace-header">
         <div className="scout-project-info">
-          <h2>🚀 {projectContext?.name}</h2>
-          <span className={`scout-status scout-status-${projectContext?.status}`}>
-            {projectContext?.status}
-          </span>
+          <div className="scout-project-details">
+            <h2>🚀 {projectContext?.name}</h2>
+            <span className="scout-project-goal">{projectContext?.goal}</span>
+          </div>
+          <div className="scout-status-badge">
+            <span className={`scout-status scout-status-${projectContext?.status}`}>
+              {projectContext?.status}
+            </span>
+            <div className="scout-workspace-id" title="Workspace ID">
+              {projectContext?.workspaceId?.slice(-8)}
+            </div>
+          </div>
         </div>
         <div className="scout-view-controls">
           {(['chat', 'editor', 'preview', 'files', 'terminal'] as const).map((view) => (
@@ -661,11 +735,16 @@ const ScoutDynamicWorkspace: React.FC = () => {
               className={`scout-view-btn ${workspaceState.activeView === view ? 'active' : ''}`}
               onClick={() => switchView(view)}
             >
-              {getViewIcon(view)} {view.charAt(0).toUpperCase() + view.slice(1)}
+              <span className="scout-view-icon">{getViewIcon(view)}</span>
+              <span className="scout-view-label">{view.charAt(0).toUpperCase() + view.slice(1)}</span>
+              {view === 'chat' && messages.filter(m => m.type === 'user').length > 0 && (
+                <span className="scout-view-badge">{messages.length}</span>
+              )}
             </button>
           ))}
-          <button className="scout-layout-btn" onClick={toggleFullWorkspace}>
-            📐 Full Workspace
+          <button className="scout-layout-btn scout-btn-full" onClick={toggleFullWorkspace}>
+            <span className="scout-view-icon">📐</span>
+            <span className="scout-view-label">Full Workspace</span>
           </button>
         </div>
       </div>
@@ -743,20 +822,49 @@ const ScoutDynamicWorkspace: React.FC = () => {
   const renderLivePreview = () => (
     <div className="scout-live-preview">
       <div className="scout-preview-header">
-        <span>👁️ {livePreview?.title || 'Live Preview'}</span>
-        {livePreview?.isLoading && <span className="scout-loading-spinner">⏳</span>}
+        <div className="scout-preview-title">
+          <span>👁️ {livePreview?.title || 'Live Preview'}</span>
+          {livePreview?.isLoading && <span className="scout-loading-spinner">⏳</span>}
+        </div>
+        <div className="scout-preview-controls">
+          <button className="scout-preview-btn" title="Refresh">🔄</button>
+          <button className="scout-preview-btn" title="Open in new tab">🔗</button>
+          <button className="scout-preview-btn" title="Full screen">⛶</button>
+        </div>
       </div>
       <div className="scout-preview-content">
         {livePreview?.type === 'web' && livePreview.url ? (
-          <iframe 
-            ref={previewRef}
-            src={livePreview.url} 
-            className="scout-preview-iframe"
-            title="Live Preview"
-          />
+          <div className="scout-preview-frame">
+            <div className="scout-preview-url-bar">
+              <span className="scout-preview-url">{livePreview.url}</span>
+              <div className="scout-preview-status scout-status-live">● Live</div>
+            </div>
+            <iframe 
+              ref={previewRef}
+              src={livePreview.url} 
+              className="scout-preview-iframe"
+              title="Live Preview"
+            />
+          </div>
+        ) : livePreview?.type === 'plan' ? (
+          <div className="scout-preview-plan">
+            <div className="scout-plan-content">
+              <pre>{livePreview.content}</pre>
+            </div>
+          </div>
         ) : (
-          <div className="scout-preview-text">
-            <pre>{livePreview?.content || 'Preview content will appear here...'}</pre>
+          <div className="scout-preview-placeholder">
+            <div className="scout-placeholder-content">
+              <div className="scout-placeholder-icon">🚀</div>
+              <h3>Preview Window Ready</h3>
+              <p>Your application preview will appear here once Mama Bear starts building.</p>
+              <div className="scout-preview-types">
+                <span className="scout-preview-type">🌐 Web Apps</span>
+                <span className="scout-preview-type">📊 Dashboards</span>
+                <span className="scout-preview-type">📱 Mobile Views</span>
+                <span className="scout-preview-type">📝 Documentation</span>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -766,23 +874,63 @@ const ScoutDynamicWorkspace: React.FC = () => {
   const renderFileExplorer = () => (
     <div className="scout-file-explorer">
       <div className="scout-explorer-header">
-        <span>📁 Files</span>
+        <div className="scout-explorer-title">
+          <span>📁 Project Files</span>
+          <div className="scout-file-stats">
+            <span className="scout-file-count">
+              {fileTree.reduce((count, file) => count + (file.children?.length || 0) + 1, 0)} files
+            </span>
+          </div>
+        </div>
+        <div className="scout-explorer-controls">
+          <button className="scout-file-btn" title="New file">📄</button>
+          <button className="scout-file-btn" title="New folder">📁</button>
+          <button className="scout-file-btn" title="Refresh">🔄</button>
+        </div>
       </div>
       <div className="scout-file-tree">
-        {fileTree.map(file => renderFileNode(file))}
+        {fileTree.length > 0 ? (
+          fileTree.map(file => renderFileNode(file))
+        ) : (
+          <div className="scout-file-tree-empty">
+            <div className="scout-empty-icon">📂</div>
+            <div className="scout-empty-text">
+              <h4>Project files will appear here</h4>
+              <p>Mama Bear will create your project structure as she builds.</p>
+            </div>
+          </div>
+        )}
       </div>
+      {activeFile && (
+        <div className="scout-file-preview">
+          <div className="scout-preview-badge">
+            <span className="scout-preview-icon">{getFileIcon(activeFile.name)}</span>
+            <span className="scout-preview-name">{activeFile.name}</span>
+            {activeFile.modified && <span className="scout-modified-badge">●</span>}
+          </div>
+        </div>
+      )}
     </div>
   );
 
   const renderFileNode = (file: FileNode): React.ReactNode => (
-    <div key={file.id} className={`scout-file-node ${file.type}`}>
+    <div key={file.id} className={`scout-file-node ${file.type} ${activeFile?.id === file.id ? 'active' : ''}`}>
       <div 
         className="scout-file-label"
         onClick={() => file.type === 'file' ? handleFileSelect(file) : toggleFileExpanded(file.id)}
       >
-        <span className="scout-file-icon">{getFileIcon(file.name)}</span>
-        <span className="scout-file-name">{file.name}</span>
-        {file.modified && <span className="scout-modified-indicator">●</span>}
+        <div className="scout-file-info">
+          <span className="scout-file-icon">{getFileIcon(file.name)}</span>
+          <span className="scout-file-name">{file.name}</span>
+        </div>
+        <div className="scout-file-status">
+          {file.modified && <span className="scout-modified-indicator" title="Modified">●</span>}
+          {file.type === 'folder' && (
+            <span className="scout-folder-toggle">
+              {file.isExpanded ? '▼' : '▶'}
+            </span>
+          )}
+        </div>
       </div>
       {file.type === 'folder' && file.isExpanded && file.children && (
         <div className="scout-file-children">
@@ -810,21 +958,53 @@ const ScoutDynamicWorkspace: React.FC = () => {
   const renderAgentTimeline = () => (
     <div className="scout-agent-timeline">
       <div className="scout-timeline-header">
-        <span>🐻 Agent Activity</span>
+        <span>🐻 Live Agent Activity</span>
+        <div className="scout-timeline-stats">
+          <span className="scout-stat">
+            <span className="scout-stat-value">{agentActions.filter(a => a.status === 'completed').length}</span>
+            <span className="scout-stat-label">Completed</span>
+          </span>
+          <span className="scout-stat">
+            <span className="scout-stat-value">{agentActions.filter(a => a.status === 'running').length}</span>
+            <span className="scout-stat-label">Active</span>
+          </span>
+        </div>
       </div>
       <div className="scout-timeline-content">
-        {agentActions.slice(-5).map((action) => (
-          <div key={action.id} className={`scout-timeline-item ${action.status}`}>
-            <div className="scout-timeline-icon">{getActionIcon(action.type)}</div>
+        {agentActions.slice(-8).map((action) => (
+          <div key={action.id} className={`scout-timeline-item timeline-item ${action.status}`}>
+            <div className="scout-timeline-marker">
+              <div className="scout-timeline-icon">{getActionIcon(action.type)}</div>
+              {action.status === 'running' && <div className="scout-pulse-ring"></div>}
+            </div>
             <div className="scout-timeline-details">
-              <div className="scout-timeline-name">{action.name}</div>
+              <div className="scout-timeline-header-item">
+                <div className="scout-timeline-name">{action.name}</div>
+                <div className="scout-timeline-time">
+                  {new Date(action.timestamp).toLocaleTimeString([], { 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                  })}
+                </div>
+              </div>
               <div className="scout-timeline-description">{action.description}</div>
               {action.progress !== undefined && (
-                <div className="scout-progress-bar">
-                  <div 
-                    className="scout-progress-fill" 
-                    style={{ width: `${action.progress}%` }}
-                  />
+                <div className="scout-progress-container">
+                  <div className="scout-progress-bar">
+                    <div 
+                      className="scout-progress-fill" 
+                      style={{ width: `${action.progress}%` }}
+                    />
+                  </div>
+                  <span className="scout-progress-text">{action.progress}%</span>
+                </div>
+              )}
+              {action.output && (
+                <div className="scout-timeline-output">
+                  <details>
+                    <summary>View Output</summary>
+                    <pre>{JSON.stringify(action.output, null, 2)}</pre>
+                  </details>
                 </div>
               )}
             </div>
@@ -832,7 +1012,19 @@ const ScoutDynamicWorkspace: React.FC = () => {
         ))}
         {agentActions.length === 0 && (
           <div className="scout-timeline-empty">
-            No agent activity yet. Try asking Mama Bear to build something!
+            <div className="scout-empty-icon">🌟</div>
+            <div className="scout-empty-text">
+              <h4>Ready for Action!</h4>
+              <p>Agent activity will appear here as Mama Bear works on your project.</p>
+            </div>
+          </div>
+        )}
+        {currentAction && currentAction.status === 'running' && (
+          <div className="scout-current-action">
+            <div className="scout-action-indicator">
+              <div className="scout-action-spinner"></div>
+              <span>Mama Bear is working...</span>
+            </div>
           </div>
         )}
       </div>
@@ -846,7 +1038,7 @@ const ScoutDynamicWorkspace: React.FC = () => {
           <div key={message.id} className={`chat-message ${message.type}`}>
             <div className="message-header">
               <span className="message-icon">
-                {message.type === 'user' ? '👤' : '🤖'}
+                {message.type === 'user' ? '👤' : '🐻'}
               </span>
               <span className="message-sender">
                 {message.type === 'user' ? 'You' : 'Mama Bear'}
@@ -859,13 +1051,57 @@ const ScoutDynamicWorkspace: React.FC = () => {
               {message.content.split('\n').map((line, i) => (
                 <p key={i}>{line}</p>
               ))}
+              
+              {/* Render attachments */}
+              {message.attachments && message.attachments.length > 0 && (
+                <div className="message-attachments">
+                  {message.attachments.map((attachment, index) => (
+                    <div key={index} className="attachment-preview">
+                      {attachment.type.startsWith('image/') ? (
+                        <div className="image-attachment">
+                          <img 
+                            src={attachment.url || URL.createObjectURL(attachment.file!)} 
+                            alt={attachment.name}
+                            className="attachment-image"
+                          />
+                          <span className="attachment-name">{attachment.name}</span>
+                        </div>
+                      ) : (
+                        <div className="file-attachment">
+                          <div className="file-icon">📎</div>
+                          <div className="file-info">
+                            <span className="file-name">{attachment.name}</span>
+                            <span className="file-size">
+                              {attachment.size ? `${(attachment.size / 1024 / 1024).toFixed(2)} MB` : ''}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         ))}
-        {isLoading && (
+        {isTyping && (
           <div className="chat-message assistant">
             <div className="message-header">
-              <span className="message-icon">🤖</span>
+              <span className="message-icon">🐻</span>
+              <span className="message-sender">Mama Bear</span>
+              <span className="message-timestamp">typing...</span>
+            </div>
+            <div className="message-content">
+              <div className="scout-typing-indicator">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+          </div>
+        )}
+        {isLoading && !isTyping && (
+          <div className="chat-message assistant">
+            <div className="message-header">
+              <span className="message-icon">🐻</span>
               <span className="message-sender">Mama Bear</span>
               <span className="message-timestamp">
                 {new Date().toLocaleTimeString()}
@@ -882,41 +1118,18 @@ const ScoutDynamicWorkspace: React.FC = () => {
       </div>
       
       <div className="scout-chat-input-section">
-        <form onSubmit={handleSubmit} className="scout-chat-form">
-          <div className="scout-input-wrapper">
-            <textarea
-              ref={inputRef}
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              placeholder="Ask Mama Bear to build something amazing..."
-              className="scout-chat-input"
-              rows={2}
-              disabled={isLoading}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit(e);
-                }
-              }}
-            />
-            <div className="scout-input-controls">
-              <button
-                type="button"
-                className="scout-emoji-btn"
-                onClick={() => setShowEmojiPicker(!showEmojiPicker)}
-              >
-                😊
-              </button>
-              <button
-                type="submit"
-                className="scout-send-btn"
-                disabled={!inputValue.trim() || isLoading}
-              >
-                {isLoading ? '⏳' : '🚀'}
-              </button>
-            </div>
-          </div>
-        </form>
+        <div className="scout-multimodal-input-wrapper workspace">
+          <MultimodalInput
+            value={currentInput}
+            onChange={setCurrentInput}
+            onSend={sendMessage}
+            onAttachmentsChange={setAttachments}
+            attachments={attachments}
+            placeholder="Ask Mama Bear to build something amazing..."
+            disabled={isLoading}
+            className="scout-chat-input-workspace"
+          />
+        </div>
       </div>
     </div>
   );
@@ -965,42 +1178,18 @@ const ScoutDynamicWorkspace: React.FC = () => {
 
       {workspaceState.mode !== 'chat' && (
         <div className="scout-enhanced-chat">
-          <form onSubmit={handleSubmit} style={{ position: 'relative' }}>
-            <input
-              ref={chatInputRef}
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
+          <div className="scout-multimodal-input-wrapper enhanced">
+            <MultimodalInput
+              value={currentInput}
+              onChange={setCurrentInput}
+              onSend={sendMessage}
+              onAttachmentsChange={setAttachments}
+              attachments={attachments}
               placeholder="🐻 Tell Mama Bear what to build next..."
-              className="scout-enhanced-input"
               disabled={isLoading}
+              className="scout-enhanced-input"
             />
-            <button
-              type="submit"
-              className="scout-enhanced-send"
-              disabled={!inputValue.trim() || isLoading}
-            >
-              {isLoading ? '⏳' : '🚀'}
-            </button>
-          </form>
-        </div>
-      )}
-
-      {showEmojiPicker && (
-        <div className="scout-emoji-picker">
-          {['😊', '👍', '❤️', '🚀', '💡', '🎯', '✨', '🔥'].map((emoji) => (
-            <button
-              key={emoji}
-              className="scout-emoji-item"
-              onClick={() => {
-                setInputValue(prev => prev + emoji);
-                setShowEmojiPicker(false);
-                chatInputRef.current?.focus();
-              }}
-            >
-              {emoji}
-            </button>
-          ))}
+          </div>
         </div>
       )}
     </div>
