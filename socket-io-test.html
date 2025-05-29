@@ -77,9 +77,16 @@
     
     <h2>Connection Details</h2>
     <pre id="details">Waiting for connection...</pre>
-    
-    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+      <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
     <script>
+        // Helper function to parse URL params
+        function getUrlParameter(name) {
+            name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+            var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+            var results = regex.exec(location.search);
+            return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+        }
+        
         const statusEl = document.getElementById('status');
         const detailsEl = document.getElementById('details');
         const eventsEl = document.getElementById('events');
@@ -87,6 +94,10 @@
         const disconnectBtn = document.getElementById('disconnectBtn');
         const testEventBtn = document.getElementById('testEventBtn');
         const clearBtn = document.getElementById('clearBtn');
+        
+        // Check for URL params
+        const urlPort = getUrlParameter('port') || '5000';
+        const urlTransport = getUrlParameter('transport') || 'polling,websocket';
         
         let socket = null;
         
@@ -122,14 +133,24 @@
         
         connectBtn.addEventListener('click', () => {
             try {
-                updateStatus('Connecting...', 'info');
+                updateStatus('Connecting...', 'info');                // Create Socket.IO instance with explicit configuration
+                const url = `http://localhost:${urlPort}`;
+                const transports = urlTransport.split(',');
                 
-                // Create Socket.IO instance with explicit configuration
-                socket = io('http://localhost:5000', {
-                    transports: ['websocket', 'polling'],
+                logEvent(`Connecting to ${url} with transports: ${transports.join(', ')}`);
+                  socket = io(url, {
+                    transports: transports,
                     reconnectionAttempts: 5,
                     reconnectionDelay: 1000,
-                    timeout: 20000
+                    timeout: 20000,
+                    path: '/socket.io',   // Path without trailing slash
+                    upgrade: true,        // Allow transport upgrade
+                    forceNew: true,       // Force a new connection
+                    autoConnect: true,    // Connect immediately
+                    reconnection: true,   // Enable reconnection
+                    extraHeaders: {       // Add extra headers for compatibility
+                        "Access-Control-Allow-Origin": "*"
+                    }
                 });
                 
                 socket.on('connect', () => {

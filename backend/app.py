@@ -185,7 +185,17 @@ cors = CORS(app, resources={
 
 # Using threading as async_mode for Python 3.12 compatibility
 # eventlet has compatibility issues with Python 3.12's SSL module
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+socketio = SocketIO(
+    app, 
+    cors_allowed_origins="*", 
+    async_mode='threading',
+    engineio_logger=True,  # Enable engine.io logging
+    logger=True,           # Enable Socket.IO logging
+    ping_timeout=60,       # Increase ping timeout
+    ping_interval=25,      # Adjust ping interval
+    manage_session=False,  # Don't manage Flask sessions
+    path='/socket.io/'     # Explicitly set the Socket.IO path
+)
 
 # ==================== SOCKET.IO EVENT HANDLERS ====================
 
@@ -2661,13 +2671,13 @@ if __name__ == "__main__":
     print("📡 API endpoints ready for frontend connections")
     print("🔌 Socket.IO enabled for real-time communication")
     print("=" * 50)
-    
-    # Use socketio.run instead of app.run for Socket.IO support
+      # Use socketio.run instead of app.run for Socket.IO support
     socketio.run(
         app,
         host="0.0.0.0", 
         port=5000, 
         debug=True,
         use_reloader=False,  # Prevent double initialization
-        allow_unsafe_werkzeug=True  # Allow for development
+        allow_unsafe_werkzeug=True,  # Allow for development
+        log_output=True     # Enable logging of Socket.IO traffic
     )
