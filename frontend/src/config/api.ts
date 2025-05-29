@@ -1,16 +1,13 @@
 // API Configuration for Podplay Build Sanctuary
 
-// Detect if we're running in Docker containers
-const isDocker = window.location.hostname === 'localhost' && import.meta.env.VITE_API_BASE_URL;
-
-// Backend API base URL
+// Backend API base URL - always use localhost:5000 for development
 export const API_BASE_URL = process.env.NODE_ENV === 'development' 
-  ? (isDocker ? import.meta.env.VITE_API_BASE_URL || 'http://backend:5000' : '') // Docker or Vite proxy
+  ? 'http://localhost:5000' // Local development backend
   : 'https://mama-bear-backend-197406322381.us-central1.run.app'; // Deployed backend URL
 
 // Socket.io connection URL  
 export const SOCKET_URL = process.env.NODE_ENV === 'development'
-  ? (isDocker ? import.meta.env.VITE_API_BASE_URL || 'http://backend:5000' : '') // Docker or Vite proxy
+  ? 'http://localhost:5000' // Local development backend
   : 'https://mama-bear-backend-197406322381.us-central1.run.app';
 
 // Helper to build full API URLs
