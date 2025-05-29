@@ -158,12 +158,12 @@ const BackendConnectionManager: React.FC<{
   };
 
   useEffect(() => {
-    // Auto-detect backend on startup
+    // Use direct backend connection to bypass proxy issues
     const urls = [
-      '', // Use proxy via Vite dev server
-      '/api', // Fallback proxy test
-      'http://localhost:5000', // Direct connection fallback
-      'http://127.0.0.1:5000'
+      'http://localhost:5000', // Direct backend connection
+      'http://127.0.0.1:5000', // Alternative IP
+      'http://10.0.1.222:5000', // Network IP
+      '' // Last resort fallback
     ];
 
     const tryUrls = async () => {

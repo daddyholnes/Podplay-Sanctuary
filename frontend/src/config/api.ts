@@ -1,13 +1,13 @@
 // API Configuration for Podplay Build Sanctuary
 
-// Backend API base URL - Use relative URLs in development to leverage Vite proxy
+// Backend API base URL - Use direct connection in development
 export const API_BASE_URL = process.env.NODE_ENV === 'development' 
-  ? '/api' // Use relative URLs with /api prefix for Vite proxy
+  ? 'http://localhost:5000' // Direct connection to backend
   : 'https://mama-bear-backend-197406322381.us-central1.run.app'; // Deployed backend URL
 
 // Socket.io connection URL - Should also match your backend
 export const SOCKET_URL = process.env.NODE_ENV === 'development'
-  ? '' // Use relative URL for WebSocket through Vite proxy
+  ? 'http://localhost:5000' // Direct connection for WebSocket
   : 'https://mama-bear-backend-197406322381.us-central1.run.app';
 
 // Helper to build full API URLs
