@@ -1,100 +1,285 @@
+/* ScoutProjectView.css - Unified Scout Project View Styles */
+/* Uses the unified Scout-Sanctuary design system */
+
 .scout-project-view {
-  padding: 20px;
-  height: 100%;
+  height: 100vh;
   display: flex;
   flex-direction: column;
-  gap: 20px; /* Space between header, main content, and logs */
+  background: var(--sanctuary-background);
+  color: var(--sanctuary-text);
+  font-family: var(--font-family);
+  padding: var(--space-6);
+  gap: var(--space-6);
+  overflow-y: auto;
 }
 
+/* Project Header */
 .scout-project-header {
-  padding-bottom: 15px;
-  border-bottom: 1px solid var(--border-color-light);
+  background: var(--sanctuary-surface);
+  border: 1px solid var(--sanctuary-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sanctuary);
 }
 
-.scout-project-header h3 {
-  margin-top: 0;
-  margin-bottom: 5px;
-  color: var(--text-color-accent); /* Use accent for project title */
+.scout-project-header-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: var(--space-4);
 }
 
-.scout-project-header p {
-  margin: 5px 0;
-  font-size: 0.9em;
-  color: var(--text-color-secondary);
+.scout-project-title h3 {
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--scout-primary);
+  margin: 0 0 var(--space-2) 0;
+}
+
+.scout-project-title p {
+  font-size: var(--text-base);
+  color: var(--sanctuary-text-secondary);
+  margin: 0;
+}
+
+.scout-project-actions {
+  display: flex;
+  gap: var(--space-3);
+  flex-shrink: 0;
+}
+
+.scout-project-actions .scout-btn {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-lg);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  transition: all var(--duration-200) var(--ease-out);
+  border: none;
+  cursor: pointer;
+}
+
+.scout-project-actions .scout-btn.primary {
+  background: var(--scout-primary);
+  color: var(--sanctuary-background);
+}
+
+.scout-project-actions .scout-btn.primary:hover {
+  background: var(--scout-accent);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.scout-project-actions .scout-btn.secondary {
+  background: var(--sanctuary-surface-hover);
+  color: var(--sanctuary-text);
+  border: 1px solid var(--sanctuary-border);
+}
+
+.scout-project-actions .scout-btn.secondary:hover {
+  background: var(--sanctuary-text-secondary);
+  color: var(--sanctuary-background);
 }
 
 .scout-project-header .scout-refresh-toggle {
-    margin-top: 10px;
-    font-size: 0.85em;
-}
-.scout-project-header .scout-refresh-toggle select {
-    margin-left: 5px;
-    padding: 3px;
-    border-radius: 3px;
-    background-color: var(--background-color-base);
-    color: var(--text-color-primary);
-    border: 1px solid var(--border-color-base);
-}
-
-
-.scout-status-running { color: var(--info-color-dark); font-weight: bold; }
-.scout-status-completed { color: var(--success-color-dark); font-weight: bold; }
-.scout-status-failed { color: var(--error-color-dark); font-weight: bold; }
-.scout-status-paused { color: var(--warning-color-dark); font-weight: bold; }
-.scout-status-unknown { color: var(--text-color-secondary); font-weight: bold; }
-
-
-.scout-main-content {
   display: flex;
-  gap: 20px; /* Space between plan and intervention */
-  flex-wrap: wrap; /* Allow wrapping on smaller screens if needed */
+  align-items: center;
+  gap: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--sanctuary-text-secondary);
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--sanctuary-border);
 }
 
+.scout-project-header .scout-refresh-toggle select {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--sanctuary-surface);
+  color: var(--sanctuary-text);
+  border: 1px solid var(--sanctuary-border);
+  font-size: var(--text-sm);
+}
+
+.scout-project-header .scout-refresh-toggle button {
+  padding: var(--space-2) var(--space-3);
+  background: var(--scout-primary);
+  color: var(--sanctuary-background);
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--duration-200) var(--ease-out);
+}
+
+.scout-project-header .scout-refresh-toggle button:hover {
+  background: var(--scout-accent);
+  transform: translateY(-1px);
+}
+
+.scout-project-header .scout-refresh-toggle button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Status indicators */
+.scout-status-running { 
+  color: var(--scout-primary); 
+  font-weight: var(--font-bold); 
+}
+
+.scout-status-completed { 
+  color: var(--sanctuary-success); 
+  font-weight: var(--font-bold); 
+}
+
+.scout-status-failed { 
+  color: var(--scout-error); 
+  font-weight: var(--font-bold); 
+}
+
+.scout-status-paused { 
+  color: var(--sanctuary-warning); 
+  font-weight: var(--font-bold); 
+}
+
+.scout-status-unknown { 
+  color: var(--sanctuary-text-secondary); 
+  font-weight: var(--font-bold); 
+}
+
+/* Main content layout */
+.scout-main-content {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: var(--space-6);
+  margin-bottom: var(--space-6);
+}
+
+/* Plan section */
 .scout-plan-section {
-  flex: 2; /* Plan takes more space */
-  min-width: 300px; /* Minimum width before wrapping */
-  background-color: var(--background-color-secondary);
-  padding: 15px;
-  border-radius: 6px;
-  border: 1px solid var(--border-color-base);
+  background: var(--sanctuary-surface);
+  border: 1px solid var(--sanctuary-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sanctuary);
 }
 
+.scout-plan-section h4 {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: var(--scout-primary);
+  margin: 0 0 var(--space-4) 0;
+}
+
+/* Intervention section */
 .scout-intervention-section {
-  flex: 1; /* Intervention takes less space */
-  min-width: 250px;
-  background-color: var(--background-color-secondary);
-  padding: 15px;
-  border-radius: 6px;
-  border: 1px solid var(--border-color-base);
+  background: var(--sanctuary-surface);
+  border: 1px solid var(--sanctuary-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sanctuary);
 }
 
-.scout-plan-section h4,
-.scout-intervention-section h4,
-.scout-logs-section h4 {
-  margin-top: 0;
-  margin-bottom: 10px;
-  color: var(--text-color-primary);
-  border-bottom: 1px solid var(--border-color-light);
-  padding-bottom: 8px;
+.scout-intervention-section h4 {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: var(--scout-primary);
+  margin: 0 0 var(--space-4) 0;
 }
 
+/* Logs section */
 .scout-logs-section {
-  flex-grow: 1; /* Takes remaining vertical space */
-  background-color: var(--background-color-darker); /* Darker for logs */
-  padding: 15px;
-  border-radius: 6px;
-  border: 1px solid var(--border-color-base);
-  overflow-y: auto; /* Scroll for logs */
-  max-height: 400px; /* Example max height */
+  background: var(--sanctuary-surface);
+  border: 1px solid var(--sanctuary-border);
+  border-radius: var(--radius-xl);
+  padding: var(--space-6);
+  box-shadow: var(--shadow-sanctuary);
+  flex: 1;
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
 }
 
-.scout-loading,
-.scout-error-message,
-.scout-info {
-    text-align: center;
-    padding: 20px;
-    font-size: 1.1em;
+.scout-logs-section h4 {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: var(--scout-primary);
+  margin: 0 0 var(--space-4) 0;
 }
+
+/* Loading and error states */
+.scout-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  font-size: var(--text-lg);
+  color: var(--sanctuary-text-secondary);
+}
+
 .scout-error-message {
-    color: var(--error-color-dark);
+  color: var(--scout-error);
+  background: rgba(220, 38, 127, 0.1);
+  border: 1px solid rgba(220, 38, 127, 0.3);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  margin: var(--space-4) 0;
+  font-size: var(--text-sm);
 }
+
+.scout-info {
+  color: var(--sanctuary-text-secondary);
+  background: var(--sanctuary-surface-hover);
+  border: 1px solid var(--sanctuary-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  text-align: center;
+  font-size: var(--text-base);
+}
+
+/* Responsive design */
+@media (max-width: 1024px) {
+  .scout-main-content {
+    grid-template-columns: 1fr;
+    gap: var(--space-4);
+  }
+  
+  .scout-project-header-top {
+    flex-direction: column;
+    gap: var(--space-4);
+    align-items: stretch;
+  }
+  
+  .scout-project-actions {
+    justify-content: flex-end;
+  }
+}
+
+@media (max-width: 768px) {
+  .scout-project-view {
+    padding: var(--space-4);
+    gap: var(--space-4);
+  }
+  
+  .scout-project-header,
+  .scout-plan-section,
+  .scout-intervention-section,
+  .scout-logs-section {
+    padding: var(--space-4);
+  }
+  
+  .scout-project-actions {
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  
+  .scout-project-header .scout-refresh-toggle {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-2);
+  }
+}
+
+
+/* ==================== LEGACY CLEANUP COMPLETE ==================== */
