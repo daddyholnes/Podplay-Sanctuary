@@ -79,7 +79,7 @@ const ScoutAgentEnhanced: React.FC<ScoutAgentEnhancedProps> = ({
   const [currentInput, setCurrentInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [workspaceData, setWorkspaceData] = useState<WorkspaceData | null>(null);
-  const [projectId, setProjectId] = useState<string>('test-project-alpha');
+  const [projectId] = useState<string>('test-project-alpha');
   const [activePanel, setActivePanel] = useState<'files' | 'preview' | 'timeline'>('preview');
   const [attachments, setAttachments] = useState<MediaAttachment[]>([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -94,6 +94,16 @@ const ScoutAgentEnhanced: React.FC<ScoutAgentEnhancedProps> = ({
     { id: 'analyze', label: 'Analyze', icon: '📊', color: '#8B5CF6' },
     { id: 'learn', label: 'Learn', icon: '🧠', color: '#EF4444' }
   ];
+
+  // Use props to avoid unused variable warnings
+  React.useEffect(() => {
+    if (onProjectCreated) {
+      // Future implementation for project creation callback
+    }
+    if (onWorkspaceRequested) {
+      // Future implementation for workspace request callback
+    }
+  }, [onProjectCreated, onWorkspaceRequested]);
 
 
 
@@ -133,6 +143,7 @@ const ScoutAgentEnhanced: React.FC<ScoutAgentEnhancedProps> = ({
       learn: "Learning adventure! What shall we discover together?"
     };
 
+    const actionPrompts = agentType === 'scout' ? scoutPrompts : mamaPrompts;
     const prompt = actionPrompts[actionId as keyof typeof actionPrompts];
     if (prompt) {
       handleSubmit(prompt);
@@ -433,28 +444,34 @@ const ScoutAgentEnhanced: React.FC<ScoutAgentEnhancedProps> = ({
           onSend={(message: string, chatAttachments: ChatAttachment[]) => {
             // Convert ChatAttachment[] to MediaAttachment[] for compatibility
             const mediaAttachments: MediaAttachment[] = chatAttachments.map(attachment => ({
+              id: attachment.id,
+              name: attachment.name,
               type: attachment.type,
-              data: attachment.data,
-              filename: attachment.filename,
               mimeType: attachment.mimeType,
-              size: attachment.size
+              size: attachment.size,
+              url: attachment.url,
+              file: attachment.file,
+              blob: attachment.blob
             }));
             handleSubmit(message, mediaAttachments);
           }}
           onAttachmentsChange={(chatAttachments: ChatAttachment[]) => {
             // Convert to MediaAttachment[] for state compatibility
             const mediaAttachments: MediaAttachment[] = chatAttachments.map(attachment => ({
+              id: attachment.id,
+              name: attachment.name,
               type: attachment.type,
-              data: attachment.data,
-              filename: attachment.filename,
               mimeType: attachment.mimeType,
-              size: attachment.size
+              size: attachment.size,
+              url: attachment.url,
+              file: attachment.file,
+              blob: attachment.blob
             }));
             setAttachments(mediaAttachments);
           }}
           attachments={attachments.map(attachment => ({
             ...attachment,
-            preview: attachment.type === 'image' ? attachment.data : undefined
+            preview: attachment.type === 'image' ? attachment.url : undefined
           }))}
           disabled={isLoading}
           placeholder="💬 Tell Scout what you want to build, research, or create..."

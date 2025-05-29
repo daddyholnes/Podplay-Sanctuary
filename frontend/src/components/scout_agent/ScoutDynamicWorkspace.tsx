@@ -700,20 +700,28 @@ const ScoutDynamicWorkspace: React.FC = () => {
               onSend={(message: string, chatAttachments: ChatAttachment[]) => {
                 // Convert ChatAttachment[] to MediaAttachment[] for compatibility
                 const mediaAttachments: MediaAttachment[] = chatAttachments.map(attachment => ({
+                  id: attachment.id,
+                  name: attachment.name,
                   type: attachment.type,
-                  data: attachment.data,
-                  filename: attachment.filename,
+                  url: attachment.url,
+                  file: attachment.file,
+                  blob: attachment.blob,
                   mimeType: attachment.mimeType,
                   size: attachment.size
                 }));
-                sendMessage(message, mediaAttachments);
+                setCurrentInput(message);
+                setAttachments(mediaAttachments);
+                sendMessage();
               }}
               onAttachmentsChange={(chatAttachments: ChatAttachment[]) => {
                 // Convert to MediaAttachment[] for state compatibility
                 const mediaAttachments: MediaAttachment[] = chatAttachments.map(attachment => ({
+                  id: attachment.id,
+                  name: attachment.name,
                   type: attachment.type,
-                  data: attachment.data,
-                  filename: attachment.filename,
+                  url: attachment.url,
+                  file: attachment.file,
+                  blob: attachment.blob,
                   mimeType: attachment.mimeType,
                   size: attachment.size
                 }));
@@ -721,7 +729,7 @@ const ScoutDynamicWorkspace: React.FC = () => {
               }}
               attachments={attachments.map(attachment => ({
                 ...attachment,
-                preview: attachment.type === 'image' ? attachment.data : undefined
+                preview: attachment.type === 'image' ? attachment.url : undefined
               }))}
               placeholder="🐻 Tell Mama Bear what amazing thing you want to build..."
               disabled={isLoading}
@@ -1155,20 +1163,28 @@ const ScoutDynamicWorkspace: React.FC = () => {
             onSend={(message: string, chatAttachments: ChatAttachment[]) => {
               // Convert ChatAttachment[] to MediaAttachment[] for compatibility
               const mediaAttachments: MediaAttachment[] = chatAttachments.map(attachment => ({
+                id: attachment.id,
+                name: attachment.name,
                 type: attachment.type,
-                data: attachment.data,
-                filename: attachment.filename,
+                url: attachment.url,
+                file: attachment.file,
+                blob: attachment.blob,
                 mimeType: attachment.mimeType,
                 size: attachment.size
               }));
-              sendMessage(message, mediaAttachments);
+              setCurrentInput(message);
+              setAttachments(mediaAttachments);
+              sendMessage();
             }}
             onAttachmentsChange={(chatAttachments: ChatAttachment[]) => {
               // Convert to MediaAttachment[] for state compatibility
               const mediaAttachments: MediaAttachment[] = chatAttachments.map(attachment => ({
+                id: attachment.id,
+                name: attachment.name,
                 type: attachment.type,
-                data: attachment.data,
-                filename: attachment.filename,
+                url: attachment.url,
+                file: attachment.file,
+                blob: attachment.blob,
                 mimeType: attachment.mimeType,
                 size: attachment.size
               }));
@@ -1176,7 +1192,7 @@ const ScoutDynamicWorkspace: React.FC = () => {
             }}
             attachments={attachments.map(attachment => ({
               ...attachment,
-              preview: attachment.type === 'image' ? attachment.data : undefined
+              preview: attachment.type === 'image' ? attachment.url : undefined
             }))}
             placeholder="Ask Mama Bear to build something amazing..."
             disabled={isLoading}
@@ -1244,20 +1260,28 @@ const ScoutDynamicWorkspace: React.FC = () => {
               onSend={(message: string, chatAttachments: ChatAttachment[]) => {
                 // Convert ChatAttachment[] to MediaAttachment[] for compatibility
                 const mediaAttachments: MediaAttachment[] = chatAttachments.map(attachment => ({
+                  id: attachment.id,
+                  name: attachment.name,
                   type: attachment.type,
-                  data: attachment.data,
-                  filename: attachment.filename,
+                  url: attachment.url,
+                  file: attachment.file,
+                  blob: attachment.blob,
                   mimeType: attachment.mimeType,
                   size: attachment.size
                 }));
-                sendMessage(message, mediaAttachments);
+                setCurrentInput(message);
+                setAttachments(mediaAttachments);
+                sendMessage();
               }}
               onAttachmentsChange={(chatAttachments: ChatAttachment[]) => {
                 // Convert to MediaAttachment[] for state compatibility
                 const mediaAttachments: MediaAttachment[] = chatAttachments.map(attachment => ({
+                  id: attachment.id,
+                  name: attachment.name,
                   type: attachment.type,
-                  data: attachment.data,
-                  filename: attachment.filename,
+                  url: attachment.url,
+                  file: attachment.file,
+                  blob: attachment.blob,
                   mimeType: attachment.mimeType,
                   size: attachment.size
                 }));
@@ -1265,7 +1289,7 @@ const ScoutDynamicWorkspace: React.FC = () => {
               }}
               attachments={attachments.map(attachment => ({
                 ...attachment,
-                preview: attachment.type === 'image' ? attachment.data : undefined
+                preview: attachment.type === 'image' ? attachment.url : undefined
               }))}
               placeholder="🐻 Tell Mama Bear what to build next..."
               disabled={isLoading}
