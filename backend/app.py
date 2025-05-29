@@ -1,3 +1,8 @@
+
+# Add CORS patch at the beginning of app.py
+import cors_patch
+cors_patch.apply_cors_patch()
+
 #!/usr/bin/env python3
 """
 Podplay Build Backend - MCP Marketplace & Lead Developer Agent
