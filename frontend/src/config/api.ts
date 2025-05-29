@@ -2,7 +2,7 @@
 
 // Backend API base URL - Use relative URLs in Codespaces to avoid mixed content issues
 export const API_BASE_URL = process.env.NODE_ENV === 'development' 
-  ? '' // Use empty base URL for relative paths to work in Codespaces
+  ? '' // Use empty base URL for relative paths to work with Vite proxy
   : 'https://mama-bear-backend-197406322381.us-central1.run.app'; // Deployed backend URL
 
 // Socket.io connection URL - Same approach for WebSockets

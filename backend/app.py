@@ -1,4 +1,3 @@
-
 # Add CORS patch at the beginning of app.py
 import cors_patch
 cors_patch.apply_cors_patch()
@@ -1787,8 +1786,18 @@ def discover_mcp_servers():
         logger.error(f"Error discovering MCP servers: {e}")
         return jsonify({"error": "Failed to discover MCP servers"}), 500
 
+@app.route('/api/test-connection', methods=['GET'])
+def test_connection():
+    """Simple test endpoint to verify API connectivity"""
+    return jsonify({
+        "status": "success",
+        "message": "Successfully connected to the backend API",
+        "timestamp": datetime.utcnow().isoformat()
+    }), 200
+
+# Health check endpoint
 @app.route('/health', methods=['GET'])
-def health_check_endpoint():
+def health_check():
     """Health check endpoint for Docker and Cloud Run"""
     return jsonify({
         "status": "healthy",
@@ -1798,7 +1807,7 @@ def health_check_endpoint():
 
 # Root endpoint for health checks
 @app.route('/', methods=['GET'])
-def health_check():
+def root_health_check():
     """Health check endpoint"""
     return jsonify({
         "status": "ok",
@@ -1848,7 +1857,7 @@ def get_daily_briefing():
         logger.error(f"Error generating briefing: {e}", exc_info=True)
         return jsonify({
             "error": "Failed to generate briefing",
-            "details": str(e),
+ "details": str(e),
             "status": "error"
         }), 500
 
@@ -2114,7 +2123,6 @@ def get_scout_project(project_id):
     except Exception as e:
         logger.error(f"Error getting Scout project {project_id}: {e}")
         return jsonify({"error": "Failed to get project"}), 500
-
 # ==================== MAIN APP START ====================
 if __name__ == '__main__':
     # Set global logging level based on environment variable
