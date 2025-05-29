@@ -15,6 +15,9 @@ Enhanced with:
 - Together.ai for VM sandbox capabilities
 """
 
+# Import test API endpoints for connectivity debugging
+import test_api
+
 import os
 import sys
 import logging
@@ -2123,6 +2126,10 @@ def get_scout_project(project_id):
     except Exception as e:
         logger.error(f"Error getting Scout project {project_id}: {e}")
         return jsonify({"error": "Failed to get project"}), 500
+# ==================== TEST API ENDPOINTS ====================
+# Register test API endpoints for connectivity debugging
+app = test_api.register_test_endpoints(app)
+
 # ==================== MAIN APP START ====================
 if __name__ == '__main__':
     # Set global logging level based on environment variable
