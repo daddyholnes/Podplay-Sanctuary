@@ -6,30 +6,19 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5173,
-    host: true,
+    host: '0.0.0.0', // Allow external connections for Docker
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: process.env.VITE_API_BASE_URL || 'http://localhost:5000',
         changeOrigin: true,
-        secure: false,
-        // Log requests for debugging
-        configure: (proxy, _options) => {
-          proxy.on('error', (err, _req, _res) => {
-            console.log('proxy error', err);
-          });
-          proxy.on('proxyReq', (proxyReq, req, _res) => {
-            console.log('Sending Request:', req.method, req.url, '→', proxyReq.path);
-          });
-          proxy.on('proxyRes', (proxyRes, req, _res) => {
-            console.log('Received Response:', proxyRes.statusCode, req.url);
-          });
-        }
+        secure: false
       },
       '/socket.io': {
-        target: 'http://localhost:5000',
+        target: process.env.VITE_API_BASE_URL || 'http://localhost:5000',
         changeOrigin: true,
-        ws: true,
-      },
+        ws: true, // Enable WebSocket proxying
+        secure: false
+      }
     },
   },
   build: {

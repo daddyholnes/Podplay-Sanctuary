@@ -192,11 +192,36 @@ const ScoutAgentEnhanced: React.FC<ScoutAgentEnhancedProps> = ({
         });
       }
 
-      // Send to Scout Agent backend - use relative URL to work in Codespaces
-      const response = await fetch('/api/mama-bear/chat', {
+      // Send to Scout Agent backend - detect proper Codespaces URL
+      const getBackendUrl = () => {
+        if (window.location.hostname === 'localhost') {
+          return 'http://localhost:5000';
+        }
+        
+        // Codespaces URL pattern: name-port.preview.app.github.dev
+        if (window.location.hostname.includes('preview.app.github.dev')) {
+          const backendUrl = window.location.hostname.replace('-5173.', '-5000.');
+          return `https://${backendUrl}`;
+        }
+        
+        // Alternative Codespaces pattern: name-port.app.github.dev  
+        if (window.location.hostname.includes('app.github.dev')) {
+          const backendUrl = window.location.hostname.replace('-5173.', '-5000.');
+          return `https://${backendUrl}`;
+        }
+        
+        // Fallback for other environments
+        return window.location.origin.replace(':5173', ':5000');
+      };
+      
+      const backendUrl = getBackendUrl();
+      console.log('🚀 Connecting to backend:', backendUrl);
+      console.log('🌐 Current hostname:', window.location.hostname);
+      
+      const response = await fetch(`${backendUrl}/api/mama-bear/chat`, {
         method: 'POST',
         body: formData,
-        // Add CORS headers
+        mode: 'cors',
         headers: {
           'Accept': 'application/json'
         }

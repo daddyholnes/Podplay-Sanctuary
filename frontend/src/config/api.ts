@@ -1,13 +1,16 @@
 // API Configuration for Podplay Build Sanctuary
 
-// Backend API base URL - Use relative URLs in Codespaces to avoid mixed content issues
+// Detect if we're running in Docker containers
+const isDocker = window.location.hostname === 'localhost' && import.meta.env.VITE_API_BASE_URL;
+
+// Backend API base URL
 export const API_BASE_URL = process.env.NODE_ENV === 'development' 
-  ? '' // Use empty base URL for relative paths to work with Vite proxy
+  ? (isDocker ? import.meta.env.VITE_API_BASE_URL || 'http://backend:5000' : '') // Docker or Vite proxy
   : 'https://mama-bear-backend-197406322381.us-central1.run.app'; // Deployed backend URL
 
-// Socket.io connection URL - Same approach for WebSockets
+// Socket.io connection URL  
 export const SOCKET_URL = process.env.NODE_ENV === 'development'
-  ? '' // Use relative URL for socket.io as well
+  ? (isDocker ? import.meta.env.VITE_API_BASE_URL || 'http://backend:5000' : '') // Docker or Vite proxy
   : 'https://mama-bear-backend-197406322381.us-central1.run.app';
 
 // Helper to build full API URLs
