@@ -1,340 +1,436 @@
-const { app, BrowserWindow, Menu, Tray, ipcMain, shell, dialog } = require('electron');
-const path = require('path');
+const { app, BrowserWindow, Menu, shell, dialog } = require('electron');
 const { spawn } = require('child_process');
-const fs = require('fs');
-const http = require('http');
+const path = require('path');
+const Store = require('electron-store');
+
+// Initialize electron store for persistent settings
+const store = new Store();
 
 let mainWindow;
-let tray;
-let backendProcess = null;
-let isBackendRunning = false;
-const isDev = process.env.NODE_ENV === 'development';
-const isPackaged = app.isPackaged;
-const backendPort = 8000;
+let dockerProcess = null;
+let isQuitting = false;
 
-// Simple HTTP request helper
-function checkBackendHealth() {
-    return new Promise((resolve) => {
-        const req = http.get(`http://localhost:${backendPort}/`, (res) => {
-            resolve(res.statusCode === 200);
-        });
-        req.on('error', () => resolve(false));
-        req.setTimeout(3000, () => {
-            req.destroy();
-            resolve(false);
-        });
-    });
-}
+// Check if running in development mode
+const isDev = process.argv.includes('--dev') || process.env.NODE_ENV === 'development';
 
-// Create main window
 function createWindow() {
-    mainWindow = new BrowserWindow({
-        width: 1400,
-        height: 900,
-        minWidth: 1000,
-        minHeight: 600,
-        icon: getAppIcon(),
-        webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-            preload: path.join(__dirname, 'preload.js'),
-            webSecurity: true,
-            allowRunningInsecureContent: false,
-            experimentalFeatures: false
-        },
-        show: false
-    });
+  // Create the browser window
+  mainWindow = new BrowserWindow({
+    width: 1400,
+    height: 900,
+    minWidth: 800,
+    minHeight: 600,
+    icon: path.join(__dirname, 'assets', 'icon.png'), // Add icon later
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+      enableRemoteModule: false,
+      preload: path.join(__dirname, 'preload.js'),
+      webSecurity: !isDev // Disable web security in dev mode for localhost access
+    },
+    show: false, // Don't show until ready
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default'
+  });
 
-    // Set Content Security Policy
-    mainWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
-        callback({
-            responseHeaders: {
-                ...details.responseHeaders,
-                'Content-Security-Policy': [
-                    "default-src 'self' http://localhost:* ws://localhost:*; " +
-                    "script-src 'self' 'unsafe-inline' http://localhost:*; " +
-                    "style-src 'self' 'unsafe-inline' http://localhost:*; " +
-                    "img-src 'self' data: http://localhost:*; " +
-                    "connect-src 'self' http://localhost:* ws://localhost:*; " +
-                    "font-src 'self' data:;"
-                ]
-            }
-        });
-    });
+  // Restore window state
+  const windowState = store.get('windowState', {
+    width: 1400,
+    height: 900,
+    x: undefined,
+    y: undefined,
+    maximized: false
+  });
 
-    // Load frontend (backend serves it in production)
-    mainWindow.loadURL(`http://localhost:${backendPort}`);
+  mainWindow.setBounds({
+    x: windowState.x,
+    y: windowState.y,
+    width: windowState.width,
+    height: windowState.height
+  });
 
-    mainWindow.once('ready-to-show', () => {
-        mainWindow.show();
-        if (isDev) {
-            mainWindow.webContents.openDevTools();
-        }
-    });
+  if (windowState.maximized) {
+    mainWindow.maximize();
+  }
 
-    mainWindow.on('closed', () => {
-        mainWindow = null;
-    });
+  // Save window state on resize/move
+  mainWindow.on('resize', saveWindowState);
+  mainWindow.on('move', saveWindowState);
+  mainWindow.on('maximize', () => store.set('windowState.maximized', true));
+  mainWindow.on('unmaximize', () => store.set('windowState.maximized', false));
 
-    // Handle external links
-    mainWindow.webContents.setWindowOpenHandler(({ url }) => {
-        shell.openExternal(url);
-        return { action: 'deny' };
-    });
-}
-
-// Get app icon based on platform
-function getAppIcon() {
-    const iconsDir = path.join(__dirname, 'assets', 'icons');
+  // Show window when ready
+  mainWindow.once('ready-to-show', () => {
+    mainWindow.show();
     
-    if (process.platform === 'win32') {
-        return path.join(__dirname, 'assets', 'icons', 'icon.ico');
-    } else if (process.platform === 'darwin') {
-        return path.join(__dirname, 'assets', 'icons', 'icon.icns');
-    } else {
-        return path.join(iconsDir, 'icon-256x256.png');
+    if (isDev) {
+      mainWindow.webContents.openDevTools();
     }
+  });
+
+  // Handle window closed
+  mainWindow.on('closed', () => {
+    mainWindow = null;
+  });
+
+  // Handle external links
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
+  });
+
+  // Prevent navigation away from the app
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const appUrl = 'http://localhost:5173';
+    if (!url.startsWith(appUrl)) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
+  });
+
+  // Load the frontend application
+  loadApplication();
 }
 
-// Start Python backend (only in development or if backend files are available)
-function startBackend() {
-    return new Promise((resolve, reject) => {
-        // If packaged, assume backend is started externally
-        if (isPackaged) {
-            console.log('Packaged app detected - checking for external backend...');
-            // Just check if backend is already running
-            setTimeout(async () => {
-                try {
-                    const isHealthy = await checkBackendHealth();
-                    if (isHealthy) {
-                        console.log('✅ External backend is running');
-                        isBackendRunning = true;
-                        resolve();
-                    } else {
-                        console.log('❌ Backend not found. Please start backend manually first.');
-                        reject(new Error('Backend not running. Please start the backend manually first:\ncd backend && source venv/bin/activate && python app.py'));
-                    }
-                } catch (error) {
-                    reject(error);
-                }
-            }, 1000);
-            return;
-        }
-        
-        console.log('Starting Python backend...');
-        
-        const backendPath = path.join(__dirname, '..', 'backend');
-        const pythonPath = path.join(backendPath, 'venv', 'bin', 'python');
-        const appPath = path.join(backendPath, 'app.py');
-        
-        // Use virtual environment if it exists, otherwise use system Python
-        const pythonCommand = fs.existsSync(pythonPath) ? pythonPath : 'python3';
-        
-        backendProcess = spawn(pythonCommand, [appPath], {
-            cwd: backendPath,
-            stdio: ['pipe', 'pipe', 'pipe']
-        });
-
-        backendProcess.stdout.on('data', (data) => {
-            console.log(`Backend: ${data.toString().trim()}`);
-        });
-
-        backendProcess.stderr.on('data', (data) => {
-            console.error(`Backend Error: ${data.toString().trim()}`);
-        });
-
-        backendProcess.on('close', (code) => {
-            console.log(`Backend process exited with code ${code}`);
-            isBackendRunning = false;
-        });
-
-        backendProcess.on('error', (error) => {
-            console.error('Failed to start backend:', error);
-            reject(error);
-        });
-
-        // Wait for backend to be ready
-        let attempts = 0;
-        const maxAttempts = 30;
-        
-        const checkBackend = async () => {
-            try {
-                const isReady = await checkBackendHealth();
-                if (isReady) {
-                    console.log('✅ Backend is ready!');
-                    isBackendRunning = true;
-                    resolve();
-                } else {
-                    attempts++;
-                    if (attempts < maxAttempts) {
-                        setTimeout(checkBackend, 1000);
-                    } else {
-                        reject(new Error('Backend failed to start within timeout'));
-                    }
-                }
-            } catch (error) {
-                attempts++;
-                if (attempts < maxAttempts) {
-                    setTimeout(checkBackend, 1000);
-                } else {
-                    reject(error);
-                }
-            }
-        };
-        
-        setTimeout(checkBackend, 2000); // Give backend time to start
-    });
+function saveWindowState() {
+  if (!mainWindow) return;
+  
+  const bounds = mainWindow.getBounds();
+  store.set('windowState', {
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    maximized: mainWindow.isMaximized()
+  });
 }
 
-// Create system tray
-function createTray() {
-    const trayIcon = getAppIcon();
-    tray = new Tray(trayIcon);
+async function loadApplication() {
+  if (!mainWindow) return;
+
+  try {
+    // Check if Docker services are running
+    const isDockerRunning = await checkDockerServices();
     
-    const contextMenu = Menu.buildFromTemplate([
+    if (!isDockerRunning) {
+      // Show loading screen
+      mainWindow.loadFile(path.join(__dirname, 'loading.html'));
+      
+      // Start Docker services
+      await startDockerServices();
+      
+      // Wait for services to be ready
+      await waitForServices();
+    }
+    
+    // Load the main application
+    mainWindow.loadURL('http://localhost:5173');
+    
+  } catch (error) {
+    console.error('Failed to start application:', error);
+    showErrorDialog('Failed to start Podplay Sanctuary', error.message);
+  }
+}
+
+function checkDockerServices() {
+  return new Promise((resolve) => {
+    const checkProcess = spawn('curl', ['-f', 'http://localhost:5173'], {
+      stdio: 'ignore'
+    });
+    
+    checkProcess.on('close', (code) => {
+      resolve(code === 0);
+    });
+    
+    checkProcess.on('error', () => {
+      resolve(false);
+    });
+  });
+}
+
+function startDockerServices() {
+  return new Promise((resolve, reject) => {
+    console.log('Starting Docker services...');
+    
+    // Change to the project root directory
+    const projectRoot = path.resolve(__dirname, '..');
+    
+    dockerProcess = spawn('docker', ['compose', '-f', 'docker-compose.dev.yml', 'up', '--build'], {
+      cwd: projectRoot,
+      stdio: ['ignore', 'pipe', 'pipe']
+    });
+
+    let serviceStarted = false;
+    
+    dockerProcess.stdout.on('data', (data) => {
+      const output = data.toString();
+      console.log('Docker stdout:', output);
+      
+      // Check if services are ready
+      if (output.includes('ready in') && output.includes('5173')) {
+        serviceStarted = true;
+        resolve();
+      }
+    });
+
+    dockerProcess.stderr.on('data', (data) => {
+      const output = data.toString();
+      console.log('Docker stderr:', output);
+      
+      // Also check stderr for ready indicators
+      if (output.includes('ready in') && output.includes('5173')) {
+        serviceStarted = true;
+        resolve();
+      }
+    });
+
+    dockerProcess.on('error', (error) => {
+      console.error('Docker process error:', error);
+      reject(error);
+    });
+
+    dockerProcess.on('close', (code) => {
+      console.log('Docker process closed with code:', code);
+      if (!serviceStarted && code !== 0) {
+        reject(new Error(`Docker process exited with code ${code}`));
+      }
+    });
+
+    // Timeout after 60 seconds
+    setTimeout(() => {
+      if (!serviceStarted) {
+        reject(new Error('Timeout waiting for Docker services to start'));
+      }
+    }, 60000);
+  });
+}
+
+function waitForServices() {
+  return new Promise((resolve) => {
+    const checkInterval = setInterval(async () => {
+      try {
+        const frontendReady = await checkService('http://localhost:5173');
+        const backendReady = await checkService('http://localhost:5000/api/test-connection');
+        
+        if (frontendReady && backendReady) {
+          clearInterval(checkInterval);
+          resolve();
+        }
+      } catch (error) {
+        // Continue checking
+      }
+    }, 2000);
+  });
+}
+
+function checkService(url) {
+  return new Promise((resolve) => {
+    const checkProcess = spawn('curl', ['-f', '-s', url], {
+      stdio: 'ignore'
+    });
+    
+    checkProcess.on('close', (code) => {
+      resolve(code === 0);
+    });
+    
+    checkProcess.on('error', () => {
+      resolve(false);
+    });
+  });
+}
+
+function showErrorDialog(title, message) {
+  dialog.showErrorBox(title, message);
+}
+
+function stopDockerServices() {
+  return new Promise((resolve) => {
+    if (!dockerProcess) {
+      resolve();
+      return;
+    }
+
+    console.log('Stopping Docker services...');
+    
+    const projectRoot = path.resolve(__dirname, '..');
+    const stopProcess = spawn('docker', ['compose', '-f', 'docker-compose.dev.yml', 'down'], {
+      cwd: projectRoot,
+      stdio: 'ignore'
+    });
+
+    stopProcess.on('close', () => {
+      dockerProcess = null;
+      resolve();
+    });
+
+    stopProcess.on('error', () => {
+      resolve(); // Continue even if stop fails
+    });
+
+    // Force kill after 10 seconds
+    setTimeout(() => {
+      if (dockerProcess) {
+        dockerProcess.kill('SIGTERM');
+        dockerProcess = null;
+      }
+      resolve();
+    }, 10000);
+  });
+}
+
+function createMenu() {
+  const template = [
+    {
+      label: 'File',
+      submenu: [
         {
-            label: '🐻 Podplay Sanctuary',
-            enabled: false
+          label: 'Reload App',
+          accelerator: 'CmdOrCtrl+R',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.reload();
+            }
+          }
+        },
+        {
+          label: 'Force Reload',
+          accelerator: 'CmdOrCtrl+Shift+R',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.reloadIgnoringCache();
+            }
+          }
         },
         { type: 'separator' },
         {
-            label: 'Show Window',
-            click: () => {
-                if (mainWindow) {
-                    mainWindow.show();
-                    mainWindow.focus();
-                }
-            }
-        },
-        {
-            label: 'Hide Window',
-            click: () => {
-                if (mainWindow) {
-                    mainWindow.hide();
-                }
-            }
-        },
-        { type: 'separator' },
-        {
-            label: `Backend: ${isBackendRunning ? '✅ Running' : '❌ Stopped'}`,
-            enabled: false
-        },
-        {
-            label: 'Restart Backend',
-            click: () => restartBackend()
-        },
-        { type: 'separator' },
-        {
-            label: 'Quit',
-            click: () => app.quit()
+          label: 'Quit',
+          accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Ctrl+Q',
+          click: () => {
+            app.quit();
+          }
         }
-    ]);
+      ]
+    },
+    {
+      label: 'View',
+      submenu: [
+        {
+          label: 'Toggle Developer Tools',
+          accelerator: process.platform === 'darwin' ? 'Alt+Cmd+I' : 'Ctrl+Shift+I',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.toggleDevTools();
+            }
+          }
+        },
+        { type: 'separator' },
+        { role: 'resetzoom' },
+        { role: 'zoomin' },
+        { role: 'zoomout' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ]
+    },
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'close' }
+      ]
+    },
+    {
+      label: 'Help',
+      submenu: [
+        {
+          label: 'About Podplay Sanctuary',
+          click: () => {
+            dialog.showMessageBox(mainWindow, {
+              type: 'info',
+              title: 'About Podplay Sanctuary',
+              message: 'Podplay Sanctuary',
+              detail: 'Desktop application for podcast management\nVersion: 1.0.0'
+            });
+          }
+        }
+      ]
+    }
+  ];
 
-    tray.setContextMenu(contextMenu);
-    tray.setToolTip('Podplay Build Sanctuary');
-    
-    tray.on('click', () => {
-        if (mainWindow) {
-            if (mainWindow.isVisible()) {
-                mainWindow.hide();
-            } else {
-                mainWindow.show();
-                mainWindow.focus();
-            }
-        }
+  // macOS specific menu adjustments
+  if (process.platform === 'darwin') {
+    template.unshift({
+      label: app.getName(),
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideothers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' }
+      ]
     });
-}
 
-// Restart backend
-async function restartBackend() {
-    console.log('Restarting backend...');
-    
-    if (backendProcess) {
-        backendProcess.kill();
-        isBackendRunning = false;
-    }
-    
-    try {
-        await startBackend();
-        console.log('Backend restarted successfully');
-        
-        // Reload the main window
-        if (mainWindow) {
-            mainWindow.reload();
-        }
-    } catch (error) {
-        console.error('Failed to restart backend:', error);
-        dialog.showErrorBox('Backend Error', 'Failed to restart the backend. Please check the console for details.');
-    }
+    // Window menu
+    template[3].submenu = [
+      { role: 'close' },
+      { role: 'minimize' },
+      { role: 'zoom' },
+      { type: 'separator' },
+      { role: 'front' }
+    ];
+  }
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
 }
 
 // App event handlers
-app.whenReady().then(async () => {
-    try {
-        console.log('🚀 Starting Podplay Build Sanctuary...');
-        
-        // Start backend first
-        await startBackend();
-        
-        // Create main window
-        createWindow();
-        
-        // Create system tray
-        createTray();
-        
-        console.log('✅ Podplay Sanctuary loaded successfully!');
-        
-    } catch (error) {
-        console.error('❌ Failed to start application:', error);
-        dialog.showErrorBox('Startup Error', 'Failed to start the application. Please check the console for details.');
-        app.quit();
-    }
-});
+app.whenReady().then(() => {
+  createWindow();
+  createMenu();
 
-app.on('window-all-closed', () => {
-    if (process.platform !== 'darwin') {
-        app.quit();
-    }
-});
-
-app.on('activate', () => {
+  app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow();
+      createWindow();
     }
+  });
 });
 
-app.on('before-quit', () => {
-    console.log('Cleaning up...');
+app.on('window-all-closed', async () => {
+  isQuitting = true;
+  
+  // Stop Docker services before quitting
+  await stopDockerServices();
+  
+  if (process.platform !== 'darwin') {
+    app.quit();
+  }
+});
+
+app.on('before-quit', async (event) => {
+  if (!isQuitting) {
+    event.preventDefault();
+    isQuitting = true;
     
-    if (backendProcess) {
-        backendProcess.kill();
-    }
-    
-    if (tray) {
-        tray.destroy();
-    }
+    // Stop Docker services
+    await stopDockerServices();
+    app.quit();
+  }
 });
 
-// IPC handlers
-ipcMain.handle('get-app-info', () => ({
-    version: app.getVersion(),
-    name: app.getName(),
-    isBackendRunning: isBackendRunning,
-    backendUrl: `http://localhost:${backendPort}`
-}));
-
-ipcMain.handle('restart-backend', () => restartBackend());
-
-ipcMain.handle('check-backend-status', async () => {
-    const isHealthy = await checkBackendHealth();
-    return {
-        isRunning: isHealthy,
-        url: `http://localhost:${backendPort}`
-    };
+// Handle app activation on macOS
+app.on('activate', () => {
+  if (mainWindow === null) {
+    createWindow();
+  }
 });
 
-ipcMain.handle('open-external', (event, url) => {
-    shell.openExternal(url);
+// Security: Prevent new window creation
+app.on('web-contents-created', (event, contents) => {
+  contents.on('new-window', (event, navigationUrl) => {
+    event.preventDefault();
+    shell.openExternal(navigationUrl);
+  });
 });
-
-console.log('Electron main process initialized');
