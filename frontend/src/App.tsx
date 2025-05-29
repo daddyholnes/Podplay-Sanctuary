@@ -121,13 +121,17 @@ const BackendConnectionManager: React.FC<{
 
   const checkBackendConnection = async (url: string = backendUrl) => {
     setIsChecking(true);
+    console.log('Checking backend connection at:', `${url}/api/test-connection`);
     try {
-      const response = await fetch(`${url}/`, { 
+      const response = await fetch(`${url}/api/test-connection`, { 
         method: 'GET',
         timeout: 5000 
       } as any);
       
+      console.log('Backend connection response:', response);
       if (response.ok) {
+        const data = await response.json();
+        console.log('Backend connection data:', data);
         setIsConnected(true);
         onBackendStatus(true);
         return true;
