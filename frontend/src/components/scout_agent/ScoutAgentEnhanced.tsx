@@ -192,10 +192,14 @@ const ScoutAgentEnhanced: React.FC<ScoutAgentEnhancedProps> = ({
         });
       }
 
-      // Send to Scout Agent backend
+      // Send to Scout Agent backend - use relative URL to work in Codespaces
       const response = await fetch('/api/mama-bear/chat', {
         method: 'POST',
-        body: formData
+        body: formData,
+        // Add CORS headers
+        headers: {
+          'Accept': 'application/json'
+        }
       });
 
       if (!response.ok) throw new Error('Failed to send message');
