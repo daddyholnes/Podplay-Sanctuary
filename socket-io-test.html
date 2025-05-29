@@ -93,11 +93,13 @@
         const connectBtn = document.getElementById('connectBtn');
         const disconnectBtn = document.getElementById('disconnectBtn');
         const testEventBtn = document.getElementById('testEventBtn');
-        const clearBtn = document.getElementById('clearBtn');
-        
+        const clearBtn = document.getElementById('clearBtn');        
         // Check for URL params
         const urlPort = getUrlParameter('port') || '5000';
         const urlTransport = getUrlParameter('transport') || 'polling,websocket';
+        
+        // Get the browser's current origin, which we'll use if the "useOrigin" param is set
+        const useCurrentOrigin = getUrlParameter('useOrigin') === 'true';
         
         let socket = null;
         
@@ -132,25 +134,23 @@
         }
         
         connectBtn.addEventListener('click', () => {
-            try {
-                updateStatus('Connecting...', 'info');                // Create Socket.IO instance with explicit configuration
-                const url = `http://localhost:${urlPort}`;
+            try {                updateStatus('Connecting...', 'info');
+                
+                // Use current origin if useOrigin is true, otherwise use localhost
+                const url = useCurrentOrigin ? window.location.origin : `http://localhost:${urlPort}`;
                 const transports = urlTransport.split(',');
                 
                 logEvent(`Connecting to ${url} with transports: ${transports.join(', ')}`);
-                  socket = io(url, {
+                socket = io(url, {
                     transports: transports,
                     reconnectionAttempts: 5,
                     reconnectionDelay: 1000,
                     timeout: 20000,
-                    path: '/socket.io',   // Path without trailing slash
+                    // Using default Socket.IO path
                     upgrade: true,        // Allow transport upgrade
                     forceNew: true,       // Force a new connection
                     autoConnect: true,    // Connect immediately
-                    reconnection: true,   // Enable reconnection
-                    extraHeaders: {       // Add extra headers for compatibility
-                        "Access-Control-Allow-Origin": "*"
-                    }
+                    reconnection: true    // Enable reconnection
                 });
                 
                 socket.on('connect', () => {
