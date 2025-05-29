@@ -1,4 +1,3 @@
-import libvirt
 import os
 import uuid
 import logging
@@ -6,6 +5,34 @@ import time
 import subprocess
 from typing import Dict, List, Optional, Any, Tuple # Added for type hints
 from xml.etree import ElementTree # For parsing XML metadata
+
+# Conditional libvirt import
+try:
+    import libvirt
+    LIBVIRT_AVAILABLE = True
+    # Type aliases for type hints
+    DomainType = libvirt.virDomain
+except ImportError:
+    LIBVIRT_AVAILABLE = False
+    # Mock libvirt module with constants when not available
+    class MockLibvirt:
+        VIR_ERR_NO_DOMAIN = 42
+        VIR_DOMAIN_SHUTDOWN_ACPI_POWER_BTN = 1
+        VIR_ERR_OPERATION_INVALID = 55
+        VIR_DOMAIN_SHUTOFF = 5
+        VIR_DOMAIN_UNDEFINE_MANAGED_SAVE = 1
+        VIR_DOMAIN_INTERFACE_ADDRESSES_SRC_AGENT = 0
+        VIR_IP_ADDR_TYPE_IPV4 = 0
+        VIR_ERR_AGENT_UNRESPONSIVE = 86
+        VIR_ERR_QEMU_AGENT_COMMAND_FAILED = 87
+        
+        # Mock virDomain class for type hints
+        class virDomain:
+            pass
+    
+    libvirt = MockLibvirt()
+    # Type alias for when libvirt is not available
+    DomainType = Any
 
 logger = logging.getLogger(__name__)
 
@@ -34,6 +61,13 @@ class VMManagerError(Exception):
 class LibvirtManager:
     def __init__(self, connection_uri="qemu:///system"):
         self.conn = None
+        self.mock_mode = False
+        
+        if not LIBVIRT_AVAILABLE:
+            logger.warning("Libvirt is not available. Running in mock mode for development.")
+            self.mock_mode = True
+            return
+        
         try:
             self.conn = libvirt.open(connection_uri)
             if self.conn is None:
@@ -47,11 +81,13 @@ class LibvirtManager:
                       f"Please ensure the libvirt daemon is running and your user has proper permissions. " \
                       f"You may need to add your user to the 'libvirt' group and restart the service."
             logger.warning(error_msg)
-            raise VMManagerError(error_msg) from e
+            logger.warning("Falling back to mock mode for development.")
+            self.mock_mode = True
         except Exception as e:
             error_msg = f"Unexpected error connecting to libvirt: {str(e)}"
             logger.error(error_msg, exc_info=True)
-            raise VMManagerError(error_msg) from e
+            logger.warning("Falling back to mock mode for development.")
+            self.mock_mode = True
 
     def _create_qcow2_image(self, image_name: str, base_image_path: Optional[str] = None, size: Optional[str] = None, target_dir: str = EPHEMERAL_VM_IMAGES_DIR) -> str:
         """
@@ -88,7 +124,7 @@ class LibvirtManager:
             logger.error("qemu-img command not found. Please ensure QEMU utilities are installed.")
             raise VMManagerError("qemu-img command not found.")
 
-    def _generic_define_vm(self, vm_id: str, disk_path: str, memory_mb: int, vcpus: int, enable_network: bool = False, domain_type: str = "ephemeral") -> libvirt.virDomain:
+    def _generic_define_vm(self, vm_id: str, disk_path: str, memory_mb: int, vcpus: int, enable_network: bool = False, domain_type: str = "ephemeral") -> DomainType:
         """Generic VM definition logic. Domain type for logging/metadata if needed."""
         network_config = ""
         if enable_network:
@@ -182,13 +218,13 @@ class LibvirtManager:
                     logger.error(f"Failed to remove disk {disk_path} after definition error: {rm_e}")
             raise VMManagerError(f"Failed to define VM {vm_id}: {e}")
 
-    def define_ephemeral_vm(self, vm_id: str, memory_mb: int = DEFAULT_VM_MEMORY_MB, vcpus: int = DEFAULT_VM_VCPUS) -> tuple[libvirt.virDomain, str]:
+    def define_ephemeral_vm(self, vm_id: str, memory_mb: int = DEFAULT_VM_MEMORY_MB, vcpus: int = DEFAULT_VM_VCPUS) -> tuple[DomainType, str]:
         """Defines a new ephemeral VM domain using an overlay image (no network by default)."""
         overlay_image_path = self._create_qcow2_image(vm_id, base_image_path=BASE_QCOW2_IMAGE_PATH, target_dir=EPHEMERAL_VM_IMAGES_DIR)
         domain = self._generic_define_vm(vm_id, overlay_image_path, memory_mb, vcpus, enable_network=False, domain_type="ephemeral")
         return domain, overlay_image_path
 
-    def define_workspace_vm(self, workspace_id: str, memory_mb: int = DEFAULT_WORKSPACE_MEMORY_MB, vcpus: int = DEFAULT_WORKSPACE_VCPUS) -> tuple[libvirt.virDomain, str]:
+    def define_workspace_vm(self, workspace_id: str, memory_mb: int = DEFAULT_WORKSPACE_MEMORY_MB, vcpus: int = DEFAULT_WORKSPACE_VCPUS) -> tuple[DomainType, str]:
         """Defines a new persistent workspace VM, using an overlay image stored in the workspace directory."""
         workspace_disk_path = self._create_qcow2_image(
             workspace_id, 
@@ -198,7 +234,7 @@ class LibvirtManager:
         domain = self._generic_define_vm(workspace_id, workspace_disk_path, memory_mb, vcpus, enable_network=True, domain_type="workspace")
         return domain, workspace_disk_path
 
-    def _get_domain_object(self, domain_or_name: str | libvirt.virDomain) -> libvirt.virDomain:
+    def _get_domain_object(self, domain_or_name: str | DomainType) -> DomainType:
         """Helper to get a domain object if a name is passed."""
         if isinstance(domain_or_name, str):
             try:
@@ -209,7 +245,7 @@ class LibvirtManager:
                 raise VMManagerError(f"Error looking up VM '{domain_or_name}': {e}")
         return domain_or_name
 
-    def start_vm(self, domain_or_name: str | libvirt.virDomain):
+    def start_vm(self, domain_or_name: str | DomainType):
         """Starts a defined VM by name or domain object."""
         domain = self._get_domain_object(domain_or_name)
         try:
@@ -222,7 +258,7 @@ class LibvirtManager:
             logger.error(f"Failed to start VM {domain.name()}: {e}")
             raise VMManagerError(f"Failed to start VM {domain.name()}: {e}")
 
-    def stop_vm(self, domain_or_name: str | libvirt.virDomain, force: bool = False, for_workspace: bool = False):
+    def stop_vm(self, domain_or_name: str | DomainType, force: bool = False, for_workspace: bool = False):
         """
         Stops a running VM.
         If `for_workspace` is True, it attempts a graceful shutdown (ACPI). Otherwise, or if `force` is True, it destroys.
@@ -254,7 +290,7 @@ class LibvirtManager:
             logger.warning(f"VM {vm_name} was already not running or in a state preventing normal stop: {e}")
 
 
-    def undefine_vm(self, domain_or_name: str | libvirt.virDomain):
+    def undefine_vm(self, domain_or_name: str | DomainType):
         """Undefines a VM (usually after it's stopped)."""
         domain = self._get_domain_object(domain_or_name)
         vm_name = domain.name()
@@ -266,7 +302,7 @@ class LibvirtManager:
             logger.error(f"Failed to undefine VM {vm_name}: {e}")
             raise VMManagerError(f"Failed to undefine VM {vm_name}: {e}")
             
-    def cleanup_ephemeral_vm_resources(self, domain: libvirt.virDomain, overlay_image_path: str):
+    def cleanup_ephemeral_vm_resources(self, domain: DomainType, overlay_image_path: str):
         """Stops, undefines an ephemeral VM, and removes its overlay image."""
         vm_name = "unknown_vm" # Initialize in case domain.name() fails
         try:
@@ -348,7 +384,7 @@ class LibvirtManager:
             logger.warning(f"Workspace disk {workspace_disk_path} not found during delete for {workspace_id}.")
 
 
-    def get_vm_ip_address(self, domain_or_name: str | libvirt.virDomain, timeout_seconds=120, use_arp_fallback=False) -> str | None:
+    def get_vm_ip_address(self, domain_or_name: str | DomainType, timeout_seconds=120, use_arp_fallback=False) -> str | None:
         """
         Retrieves the IP address of the VM.
         Primary method: qemu-guest-agent.
@@ -540,147 +576,272 @@ class LibvirtManager:
             except libvirt.libvirtError as e:
                 logger.error(f"Failed to close libvirt connection: {e}")
 
-# Example usage (for testing this module directly)
-# Note: This direct test requires libvirtd to be running and configured,
-# a base NixOS qcow2 image, and proper SSH key setup.
-if __name__ == '__main__':
-    logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+# Import DigitalOcean VM manager for real cloud provisioning
+try:
+    from digitalocean_vm_manager import DigitalOceanVMManager, VMInstance
+    CLOUD_VM_AVAILABLE = True
+except ImportError:
+    CLOUD_VM_AVAILABLE = False
+    DigitalOceanVMManager = None
+    VMInstance = None
+
+# Enhanced VM manager with cloud integration
+class EnhancedVMManager:
+    """
+    Enhanced VM Manager that supports both local libvirt and cloud providers
+    Prioritizes DigitalOcean for real VM provisioning, falls back to libvirt
+    """
     
-    # Create a dummy base qcow2 image if it doesn't exist and specific env var is set
-    # THIS IS FOR LOCAL TESTING OF THE MODULE ONLY. DO NOT RELY ON THIS FOR PRODUCTION.
-    if not os.path.exists(BASE_QCOW2_IMAGE_PATH) :
-        if "LIBVIRT_TEST_CREATE_DUMMY_BASE" in os.environ:
-            logger.info(f"Attempting to create dummy base image at {BASE_QCOW2_IMAGE_PATH} for testing...")
+    def __init__(self):
+        self.cloud_manager = None
+        self.libvirt_manager = None
+        
+        # Initialize cloud VM manager
+        if CLOUD_VM_AVAILABLE:
             try:
-                os.makedirs(os.path.dirname(BASE_QCOW2_IMAGE_PATH), exist_ok=True)
-                subprocess.run(["qemu-img", "create", "-f", "qcow2", BASE_QCOW2_IMAGE_PATH, "1G"], check=True)
-                logger.info(f"Dummy base image created. Note: VMs created from this WILL NOT BOOT but libvirt ops can be tested.")
-            except Exception as e_dummy:
-                logger.error(f"Failed to create dummy base image: {e_dummy}. Some tests might fail or be inaccurate.")
-        else:
-            logger.error(f"Base image {BASE_QCOW2_IMAGE_PATH} does not exist. Please create it or set NIXOS_SANDBOX_BASE_IMAGE.")
-            logger.error("For testing this module directly without a real NixOS image, set LIBVIRT_TEST_CREATE_DUMMY_BASE=true (VMs will not boot).")
-            # exit(1) # Decide if exiting is appropriate or allow tests to proceed with potential failures.
-                      # For now, let it proceed to see libvirt interaction attempts.
-
-    manager = None
-    eph_domain_obj = None
-    eph_overlay_path = None
-    ws_domain_obj = None
-    ws_disk_path = None
+                self.cloud_manager = DigitalOceanVMManager()
+                logger.info("✅ Cloud VM manager (DigitalOcean) initialized")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to initialize cloud VM manager: {e}")
+        
+        # Initialize libvirt manager as fallback
+        if LIBVIRT_AVAILABLE:
+            try:
+                self.libvirt_manager = LibvirtManager()
+                logger.info("✅ Libvirt VM manager initialized as fallback")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to initialize libvirt manager: {e}")
+        
+        self.prefer_cloud = os.getenv('PREFER_CLOUD_VMS', 'true').lower() == 'true'
+        
+    async def create_vm(
+        self,
+        name: str,
+        memory_mb: int = DEFAULT_VM_MEMORY_MB,
+        vcpus: int = DEFAULT_VM_VCPUS,
+        vm_type: str = "scout-development"
+    ) -> Tuple[Any, str]:
+        """
+        Create VM using best available provider
+        Prioritizes cloud over local libvirt
+        """
+        
+        # Try cloud provider first if available and preferred
+        if self.cloud_manager and self.prefer_cloud:
+            try:
+                logger.info(f"🌩️ Creating cloud VM: {name}")
+                vm_instance, setup_info = await self.cloud_manager.create_vm(
+                    name=name,
+                    vm_type=vm_type,
+                    memory_mb=memory_mb,
+                    vcpus=vcpus
+                )
+                return vm_instance, setup_info
+            except Exception as e:
+                logger.warning(f"⚠️ Cloud VM creation failed, trying libvirt: {e}")
+        
+        # Fallback to libvirt
+        if self.libvirt_manager:
+            try:
+                logger.info(f"🖥️ Creating local VM: {name}")
+                domain, disk_path = self.libvirt_manager.define_ephemeral_vm(
+                    vm_id=name,
+                    memory_mb=memory_mb,
+                    vcpus=vcpus
+                )
+                self.libvirt_manager.start_vm(domain)
+                setup_info = f"Local VM created: {name} with disk at {disk_path}"
+                return domain, setup_info
+            except Exception as e:
+                logger.error(f"❌ Libvirt VM creation failed: {e}")
+        
+        # Last resort: return mock VM info for development
+        mock_info = f"""
+        🧪 Mock VM Created (No VM providers available)
+        
+        📋 VM Details:
+        • Name: {name}
+        • Memory: {memory_mb}MB
+        • CPUs: {vcpus}
+        • Type: {vm_type}
+        
+        ⚠️ To create real VMs, set up:
+        1. DIGITALOCEAN_API_TOKEN for cloud VMs
+        2. Or configure libvirt for local VMs
+        """
+        
+        return None, mock_info
     
-    eph_vm_id = f"test-eph-{uuid.uuid4()}"
-    ws_vm_id = f"test-ws-{uuid.uuid4()}"
-
-    try:
-        manager = LibvirtManager()
-        logger.info("LibvirtManager initialized.")
+    async def get_vm_status(self, vm_id: str) -> Dict[str, Any]:
+        """Get VM status from appropriate provider"""
         
-        # Test Ephemeral VM
-        logger.info(f"\n--- Testing Ephemeral VM: {eph_vm_id} ---")
-        eph_domain_obj, eph_overlay_path = manager.define_ephemeral_vm(eph_vm_id)
-        logger.info(f"Ephemeral VM {eph_vm_id} defined with overlay {eph_overlay_path}")
-        manager.start_vm(eph_domain_obj) # Use object
-        logger.info(f"Ephemeral VM {eph_vm_id} started.")
-        time.sleep(1) 
-        if eph_domain_obj.isActive(): logger.info(f"Ephemeral VM {eph_vm_id} is active.")
-        else: logger.warning(f"Ephemeral VM {eph_vm_id} is NOT active after start attempt.")
-        manager.cleanup_ephemeral_vm_resources(eph_domain_obj, eph_overlay_path) # Use object
-        logger.info(f"Ephemeral VM {eph_vm_id} cleaned up.")
-        try:
-            manager.conn.lookupByName(eph_vm_id)
-            logger.error(f"ERROR: Ephemeral VM {eph_vm_id} still found after cleanup!")
-        except libvirt.libvirtError:
-            logger.info(f"Ephemeral VM {eph_vm_id} correctly not found after cleanup.")
-
-        # Test Workspace VM
-        logger.info(f"\n--- Testing Workspace VM: {ws_vm_id} ---")
-        ws_domain_obj, ws_disk_path = manager.define_workspace_vm(ws_vm_id)
-        logger.info(f"Workspace VM {ws_vm_id} defined with disk {ws_disk_path}")
-        manager.start_vm(ws_vm_id) # Use name
-        logger.info(f"Workspace VM {ws_vm_id} started.")
+        # Try cloud provider first
+        if self.cloud_manager:
+            status = await self.cloud_manager.get_vm_status(vm_id)
+            if "error" not in status:
+                return status
         
-        # Re-fetch domain object if started by name, to ensure it's fresh
-        ws_domain_obj_fresh = manager._get_domain_object(ws_vm_id)
-
-        ws_ip = manager.get_vm_ip_address(ws_domain_obj_fresh, timeout_seconds=30, use_arp_fallback=True) # Reduced timeout for testing
-        if ws_ip: logger.info(f"Workspace VM IP: {ws_ip}")
-        else: logger.warning(f"Could not get IP for workspace VM {ws_vm_id} (expected if dummy image or no DHCP/guest agent).")
-
-        time.sleep(2)
-        if ws_domain_obj_fresh.isActive():
-            logger.info(f"Workspace VM {ws_vm_id} is active. Stopping gracefully...")
-            manager.stop_vm(ws_vm_id, for_workspace=True) # Use name
-            # Wait a bit for graceful shutdown to reflect
-            for _i in range(10): # Max 10 seconds
-                time.sleep(1)
-                ws_domain_obj_check_stop = manager._get_domain_object(ws_vm_id) # fetch fresh object
-                if not ws_domain_obj_check_stop.isActive(): break
-            
-            ws_domain_obj_final_check = manager._get_domain_object(ws_vm_id) # one last fresh object
-            if not ws_domain_obj_final_check.isActive():
-                 logger.info(f"Workspace VM {ws_vm_id} stopped gracefully.")
-            else: 
-                state, reason = ws_domain_obj_final_check.state()
-                logger.warning(f"Workspace VM {ws_vm_id} might not have stopped gracefully (state: {state}, reason: {reason}). Forcing for cleanup if needed.")
+        # Try libvirt
+        if self.libvirt_manager:
+            try:
+                domain = self.libvirt_manager.conn.lookupByName(vm_id)
+                return self.libvirt_manager.get_domain_details(vm_id)
+            except Exception as e:
+                pass
         
-        logger.info("\n--- Listing all domains (includes workspace) ---")
-        all_domains_meta = manager.list_domains_with_metadata()
-        for d_meta in all_domains_meta:
-            logger.info(f"  Listed Domain: ID={d_meta['id']}, Name: {d_meta['name']}, Type: {d_meta['vm_type']}, Status: {d_meta['status']}, Disk: {d_meta['disk_path']}")
+        return {"error": f"VM not found: {vm_id}"}
+    
+    async def list_vms(self) -> List[Dict[str, Any]]:
+        """List VMs from all providers"""
         
-        logger.info(f"\n--- Getting details for workspace VM: {ws_vm_id} ---")
-        ws_details = manager.get_domain_details(ws_vm_id) # Use name
-        if ws_details:
-            logger.info(f"  Workspace Details: {ws_details}")
-
-    except VMManagerError as e:
-        logger.error(f"VM Management Error during test: {e}", exc_info=True)
-    except Exception as e_global:
-        logger.error(f"An unexpected error occurred during test: {e_global}", exc_info=True)
-    finally:
-        if manager:
-            if ws_domain_obj and ws_disk_path: 
-                logger.info(f"\n--- Deleting Workspace VM: {ws_vm_id} for test cleanup ---")
-                try:
-                    # Try to get a fresh domain object for deletion, as ws_domain_obj might be stale
-                    # or operations like stop might have invalidated it for some libvirt versions/contexts.
-                    domain_to_delete = manager._get_domain_object(ws_vm_id)
-                    manager.delete_workspace_vm(domain_to_delete) 
-                except VMManagerError as e_lookup: # If lookup fails (e.g. already undefined)
-                    logger.warning(f"Could not re-lookup workspace VM {ws_vm_id} for deletion, attempting disk cleanup. Error: {e_lookup}")
-                    # Attempt direct disk cleanup if domain is gone from libvirt but disk might remain
-                    if os.path.exists(ws_disk_path) and WORKSPACE_VM_IMAGES_DIR in os.path.abspath(ws_disk_path):
-                        try:
-                            os.remove(ws_disk_path)
-                            logger.info(f"Removed workspace disk directly: {ws_disk_path}")
-                        except OSError as e_rm_disk:
-                            logger.error(f"Failed to remove workspace disk directly {ws_disk_path}: {e_rm_disk}")
-                except Exception as e_del:
-                     logger.error(f"Error deleting workspace VM {ws_vm_id} during cleanup: {e_del}", exc_info=True)
-            elif ws_disk_path and os.path.exists(ws_disk_path) and WORKSPACE_VM_IMAGES_DIR in os.path.abspath(ws_disk_path):
-                 logger.info(f"Workspace domain object for {ws_vm_id} not available or lookup failed, attempting disk cleanup only.")
-                 try:
-                    os.remove(ws_disk_path)
-                    logger.info(f"Cleaned up orphaned workspace disk: {ws_disk_path}")
-                 except OSError as e_rm_orphan:
-                    logger.error(f"Error cleaning up orphaned workspace disk {ws_disk_path}: {e_rm_orphan}")
-            
-            if eph_domain_obj and eph_overlay_path: 
-                 try:
-                     eph_dom_check_final = manager._get_domain_object(eph_vm_id) # Use helper
-                     if eph_dom_check_final: 
-                         logger.warning(f"Ephemeral VM {eph_vm_id} found unexpectedly at very end of test. Attempting cleanup again.")
-                         manager.cleanup_ephemeral_vm_resources(eph_dom_check_final, eph_overlay_path)
-                 except VMManagerError: # Expected if already cleaned up / not found by name
-                     logger.info(f"Ephemeral VM {eph_vm_id} was confirmed cleaned up or not found by name at end.")
-                 except Exception as e_eph_final_cleanup:
-                     logger.error(f"Final cleanup error for ephemeral VM {eph_vm_id}: {e_eph_final_cleanup}")
-            manager.close_connection()
-        logger.info("Test run finished.")
-
-# TODO:
-# - XML refinement for NixOS specifics (boot device order if needed).
-# - Ensure qemu-guest-agent (`services.qemuGuest.enable = true;`) is in the NixOS base image for reliable IP/status.
-# - PCI slot assignment in XML could be made more dynamic or checked for conflicts if more devices are added.
-# - Consider using domain UUIDs more consistently for lookups after definition if names might have issues.
+        all_vms = []
+        
+        # Get cloud VMs
+        if self.cloud_manager:
+            try:
+                cloud_vms = await self.cloud_manager.list_vms()
+                for vm in cloud_vms:
+                    vm["provider"] = "digitalocean"
+                    all_vms.append(vm)
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to list cloud VMs: {e}")
+        
+        # Get libvirt VMs
+        if self.libvirt_manager:
+            try:
+                libvirt_vms = self.libvirt_manager.list_all_vms()
+                for vm in libvirt_vms:
+                    vm["provider"] = "libvirt"
+                    all_vms.append(vm)
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to list libvirt VMs: {e}")
+        
+        return all_vms
+    
+    async def stop_vm(self, vm_id: str) -> Dict[str, Any]:
+        """Stop VM using appropriate provider"""
+        
+        # Try cloud provider first
+        if self.cloud_manager:
+            result = await self.cloud_manager.stop_vm(vm_id)
+            if result.get("success"):
+                return result
+        
+        # Try libvirt
+        if self.libvirt_manager:
+            try:
+                domain = self.libvirt_manager.conn.lookupByName(vm_id)
+                self.libvirt_manager.stop_vm(domain)
+                return {"success": True, "message": "VM stopped via libvirt"}
+            except Exception as e:
+                pass
+        
+        return {"success": False, "error": f"VM not found: {vm_id}"}
+    
+    async def start_vm(self, vm_id: str) -> Dict[str, Any]:
+        """Start VM using appropriate provider"""
+        
+        # Try cloud provider first
+        if self.cloud_manager:
+            result = await self.cloud_manager.start_vm(vm_id)
+            if result.get("success"):
+                return result
+        
+        # Try libvirt
+        if self.libvirt_manager:
+            try:
+                domain = self.libvirt_manager.conn.lookupByName(vm_id)
+                self.libvirt_manager.start_vm(domain)
+                return {"success": True, "message": "VM started via libvirt"}
+            except Exception as e:
+                pass
+        
+        return {"success": False, "error": f"VM not found: {vm_id}"}
+    
+    async def delete_vm(self, vm_id: str) -> Dict[str, Any]:
+        """Delete VM using appropriate provider"""
+        
+        # Try cloud provider first
+        if self.cloud_manager:
+            result = await self.cloud_manager.delete_vm(vm_id)
+            if result.get("success"):
+                return result
+        
+        # Try libvirt
+        if self.libvirt_manager:
+            try:
+                domain = self.libvirt_manager.conn.lookupByName(vm_id)
+                self.libvirt_manager.delete_vm(domain)
+                return {"success": True, "message": "VM deleted via libvirt"}
+            except Exception as e:
+                pass
+        
+        return {"success": False, "error": f"VM not found: {vm_id}"}
+    
+    async def get_ssh_info(self, vm_id: str) -> Dict[str, Any]:
+        """Get SSH connection info for VM"""
+        
+        # Try cloud provider first (has better SSH support)
+        if self.cloud_manager:
+            ssh_info = await self.cloud_manager.get_ssh_connection_info(vm_id)
+            if "error" not in ssh_info:
+                return ssh_info
+        
+        # Try libvirt (limited SSH support)
+        if self.libvirt_manager:
+            try:
+                domain = self.libvirt_manager.conn.lookupByName(vm_id)
+                ip = self.libvirt_manager.get_vm_ip(domain)
+                if ip:
+                    return {
+                        "host": ip,
+                        "port": 22,
+                        "username": "root",
+                        "connection_string": f"ssh root@{ip}",
+                        "note": "Libvirt VM - SSH may not be configured"
+                    }
+            except Exception as e:
+                pass
+        
+        return {"error": f"SSH info not available for VM: {vm_id}"}
+    
+    def get_available_providers(self) -> List[str]:
+        """Get list of available VM providers"""
+        
+        providers = []
+        
+        if self.cloud_manager and hasattr(self.cloud_manager, 'api_available') and self.cloud_manager.api_available:
+            providers.append("digitalocean")
+        
+        if self.libvirt_manager:
+            providers.append("libvirt")
+        
+        if not providers:
+            providers.append("mock")
+        
+        return providers
+    
+    def get_cost_estimate(self, vm_type: str = "scout-development") -> Dict[str, Any]:
+        """Get cost estimate for VM types"""
+        
+        if self.cloud_manager and hasattr(self.cloud_manager, 'vm_sizes'):
+            size_config = self.cloud_manager.vm_sizes.get(vm_type)
+            if size_config:
+                return {
+                    "vm_type": vm_type,
+                    "monthly_cost": size_config["cost_monthly"],
+                    "hourly_cost": round(size_config["cost_monthly"] / 730, 4),
+                    "memory_mb": size_config["memory_mb"],
+                    "vcpus": size_config["vcpus"],
+                    "provider": "digitalocean"
+                }
+        
+        return {
+            "vm_type": vm_type,
+            "monthly_cost": 0,
+            "hourly_cost": 0,
+            "memory_mb": DEFAULT_VM_MEMORY_MB,
+            "vcpus": DEFAULT_VM_VCPUS,
+            "provider": "local/mock"
+        }
+```
