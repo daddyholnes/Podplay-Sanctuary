@@ -2,12 +2,12 @@
 
 // Backend API base URL - Use relative URLs in development to leverage Vite proxy
 export const API_BASE_URL = process.env.NODE_ENV === 'development' 
-  ? '' // Use relative URLs to leverage Vite proxy that forwards /api to localhost:5000
+  ? '/api' // Use relative URLs with /api prefix for Vite proxy
   : 'https://mama-bear-backend-197406322381.us-central1.run.app'; // Deployed backend URL
 
 // Socket.io connection URL - Should also match your backend
 export const SOCKET_URL = process.env.NODE_ENV === 'development'
-  ? 'http://localhost:5000' // Direct connection for WebSocket (proxy doesn't handle WebSocket)
+  ? '' // Use relative URL for WebSocket through Vite proxy
   : 'https://mama-bear-backend-197406322381.us-central1.run.app';
 
 // Helper to build full API URLs
