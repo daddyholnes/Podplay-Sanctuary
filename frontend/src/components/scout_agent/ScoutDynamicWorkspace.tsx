@@ -2,8 +2,9 @@
 // Clean Version - No Placeholders, No TODOs, All Functions Implemented
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import MultimodalInput from '../MultimodalInput';
+import EnhancedChatBar, { ChatAttachment } from '../EnhancedChatBar';
 import { MediaAttachment } from '../../ModelRegistry';
+import '../../styles/unified-scout-sanctuary.css';
 import './ScoutDynamicWorkspace.css';
 import './WorkspaceAnimations.css';
 import WorkspaceLaunchAnimation from './WorkspaceLaunchAnimation';
@@ -692,15 +693,44 @@ const ScoutDynamicWorkspace: React.FC = () => {
             </button>
           </div>
           
-          <div className="scout-multimodal-input-wrapper">
-            <MultimodalInput
+          <div className="scout-enhanced-chat-input-wrapper">
+            <EnhancedChatBar
               value={currentInput}
               onChange={setCurrentInput}
-              onSend={sendMessage}
-              onAttachmentsChange={setAttachments}
-              attachments={attachments}
+              onSend={(message: string, chatAttachments: ChatAttachment[]) => {
+                // Convert ChatAttachment[] to MediaAttachment[] for compatibility
+                const mediaAttachments: MediaAttachment[] = chatAttachments.map(attachment => ({
+                  type: attachment.type,
+                  data: attachment.data,
+                  filename: attachment.filename,
+                  mimeType: attachment.mimeType,
+                  size: attachment.size
+                }));
+                sendMessage(message, mediaAttachments);
+              }}
+              onAttachmentsChange={(chatAttachments: ChatAttachment[]) => {
+                // Convert to MediaAttachment[] for state compatibility
+                const mediaAttachments: MediaAttachment[] = chatAttachments.map(attachment => ({
+                  type: attachment.type,
+                  data: attachment.data,
+                  filename: attachment.filename,
+                  mimeType: attachment.mimeType,
+                  size: attachment.size
+                }));
+                setAttachments(mediaAttachments);
+              }}
+              attachments={attachments.map(attachment => ({
+                ...attachment,
+                preview: attachment.type === 'image' ? attachment.data : undefined
+              }))}
               placeholder="🐻 Tell Mama Bear what amazing thing you want to build..."
               disabled={isLoading}
+              theme="sanctuary"
+              allowFileUpload={true}
+              allowImageUpload={true}
+              allowAudioRecording={true}
+              allowVideoRecording={true}
+              allowScreenCapture={true}
               className="scout-chat-input-enhanced"
             />
           </div>
@@ -1118,15 +1148,44 @@ const ScoutDynamicWorkspace: React.FC = () => {
       </div>
       
       <div className="scout-chat-input-section">
-        <div className="scout-multimodal-input-wrapper workspace">
-          <MultimodalInput
+        <div className="scout-enhanced-chat-input-wrapper workspace">
+          <EnhancedChatBar
             value={currentInput}
             onChange={setCurrentInput}
-            onSend={sendMessage}
-            onAttachmentsChange={setAttachments}
-            attachments={attachments}
+            onSend={(message: string, chatAttachments: ChatAttachment[]) => {
+              // Convert ChatAttachment[] to MediaAttachment[] for compatibility
+              const mediaAttachments: MediaAttachment[] = chatAttachments.map(attachment => ({
+                type: attachment.type,
+                data: attachment.data,
+                filename: attachment.filename,
+                mimeType: attachment.mimeType,
+                size: attachment.size
+              }));
+              sendMessage(message, mediaAttachments);
+            }}
+            onAttachmentsChange={(chatAttachments: ChatAttachment[]) => {
+              // Convert to MediaAttachment[] for state compatibility
+              const mediaAttachments: MediaAttachment[] = chatAttachments.map(attachment => ({
+                type: attachment.type,
+                data: attachment.data,
+                filename: attachment.filename,
+                mimeType: attachment.mimeType,
+                size: attachment.size
+              }));
+              setAttachments(mediaAttachments);
+            }}
+            attachments={attachments.map(attachment => ({
+              ...attachment,
+              preview: attachment.type === 'image' ? attachment.data : undefined
+            }))}
             placeholder="Ask Mama Bear to build something amazing..."
             disabled={isLoading}
+            theme="sanctuary"
+            allowFileUpload={true}
+            allowImageUpload={true}
+            allowAudioRecording={true}
+            allowVideoRecording={true}
+            allowScreenCapture={true}
             className="scout-chat-input-workspace"
           />
         </div>
@@ -1178,15 +1237,44 @@ const ScoutDynamicWorkspace: React.FC = () => {
 
       {workspaceState.mode !== 'chat' && (
         <div className="scout-enhanced-chat">
-          <div className="scout-multimodal-input-wrapper enhanced">
-            <MultimodalInput
+          <div className="scout-enhanced-chat-input-wrapper enhanced">
+            <EnhancedChatBar
               value={currentInput}
               onChange={setCurrentInput}
-              onSend={sendMessage}
-              onAttachmentsChange={setAttachments}
-              attachments={attachments}
+              onSend={(message: string, chatAttachments: ChatAttachment[]) => {
+                // Convert ChatAttachment[] to MediaAttachment[] for compatibility
+                const mediaAttachments: MediaAttachment[] = chatAttachments.map(attachment => ({
+                  type: attachment.type,
+                  data: attachment.data,
+                  filename: attachment.filename,
+                  mimeType: attachment.mimeType,
+                  size: attachment.size
+                }));
+                sendMessage(message, mediaAttachments);
+              }}
+              onAttachmentsChange={(chatAttachments: ChatAttachment[]) => {
+                // Convert to MediaAttachment[] for state compatibility
+                const mediaAttachments: MediaAttachment[] = chatAttachments.map(attachment => ({
+                  type: attachment.type,
+                  data: attachment.data,
+                  filename: attachment.filename,
+                  mimeType: attachment.mimeType,
+                  size: attachment.size
+                }));
+                setAttachments(mediaAttachments);
+              }}
+              attachments={attachments.map(attachment => ({
+                ...attachment,
+                preview: attachment.type === 'image' ? attachment.data : undefined
+              }))}
               placeholder="🐻 Tell Mama Bear what to build next..."
               disabled={isLoading}
+              theme="sanctuary"
+              allowFileUpload={true}
+              allowImageUpload={true}
+              allowAudioRecording={true}
+              allowVideoRecording={true}
+              allowScreenCapture={true}
               className="scout-enhanced-input"
             />
           </div>

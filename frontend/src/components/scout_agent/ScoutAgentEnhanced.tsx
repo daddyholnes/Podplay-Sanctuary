@@ -3,8 +3,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { buildDynamicApiUrl, API_ENDPOINTS } from '../../config/api';
-import MultimodalInput from '../MultimodalInput';
+import EnhancedChatBar, { ChatAttachment } from '../EnhancedChatBar';
 import { MediaAttachment } from '../../ModelRegistry';
+import '../../styles/unified-scout-sanctuary.css';
 import './ScoutAgentEnhanced.css';
 
 interface ChatMessage {
@@ -61,14 +62,24 @@ interface PlanStep {
   progress?: number;
 }
 
-const ScoutAgentEnhanced: React.FC = () => {
+interface ScoutAgentEnhancedProps {
+  onProjectCreated?: (projectId: string) => void;
+  onWorkspaceRequested?: () => void;
+  agentType?: 'scout' | 'mama-bear';
+}
+
+const ScoutAgentEnhanced: React.FC<ScoutAgentEnhancedProps> = ({
+  onProjectCreated,
+  onWorkspaceRequested,
+  agentType = 'scout'
+}) => {
   // State Management
   const [mode, setMode] = useState<'chat' | 'workspace'>('chat');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentInput, setCurrentInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [workspaceData, setWorkspaceData] = useState<WorkspaceData | null>(null);
-  const [projectId, /* setProjectId */] = useState<string>('test-project-alpha');
+  const [projectId, setProjectId] = useState<string>('test-project-alpha');
   const [activePanel, setActivePanel] = useState<'files' | 'preview' | 'timeline'>('preview');
   const [attachments, setAttachments] = useState<MediaAttachment[]>([]);
   const [isTyping, setIsTyping] = useState(false);
@@ -87,27 +98,39 @@ const ScoutAgentEnhanced: React.FC = () => {
 
 
   useEffect(() => {
-    // Initialize with welcome message
+    // Initialize with welcome message based on agent type
+    const welcomeContent = agentType === 'scout' 
+      ? "Hey there! 👋\n\nGot work? Let's jam! I'm your Scout Agent ready to help with autonomous research, creation, planning, analysis, and learning. I can work independently to bring your ideas to life. What would you like to work on today?"
+      : "Hello! 🐻\n\nI'm Mama Bear, your collaborative partner for research, planning, and development. I love working together to explore ideas, create amazing projects, and learn new things. Let's build something wonderful together! What's on your mind?";
+    
     const welcomeMessage: ChatMessage = {
       id: '1',
       type: 'assistant',
-      content: "Hey there! 👋\n\nGot work? Let's jam! I'm your Scout Agent ready to help with research, creation, planning, analysis, and learning. What would you like to work on today?",
+      content: welcomeContent,
       timestamp: new Date().toISOString()
     };
     setMessages([welcomeMessage]);
-  }, []);
+  }, [agentType]);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
   const handleActionClick = (actionId: string) => {
-    const actionPrompts = {
-      research: "Let's research something! What topic would you like me to investigate?",
-      create: "Time to create! What would you like me to help you build?",
-      plan: "Let's make a plan! Describe your project and I'll help you break it down.",
+    const scoutPrompts = {
+      research: "Let's research something! What topic would you like me to investigate autonomously?",
+      create: "Time to create! What would you like me to help you build from start to finish?",
+      plan: "Let's make a plan! Describe your project and I'll create a complete roadmap.",
       analyze: "Let's analyze! What data or information would you like me to examine?",
       learn: "Learning time! What would you like to understand better?"
+    };
+    
+    const mamaPrompts = {
+      research: "Let's research together! What topic shall we explore?",
+      create: "Time to create! What would you like us to build collaboratively?",
+      plan: "Let's plan together! Tell me about your project vision.",
+      analyze: "Let's analyze together! What would you like us to examine?",
+      learn: "Learning adventure! What shall we discover together?"
     };
 
     const prompt = actionPrompts[actionId as keyof typeof actionPrompts];
@@ -403,24 +426,46 @@ const ScoutAgentEnhanced: React.FC = () => {
 
   const renderChatInput = () => (
     <div className="scout-chat-input-container">
-      <div className="scout-multimodal-wrapper">
-        <MultimodalInput
+      <div className="scout-enhanced-chat-wrapper">
+        <EnhancedChatBar
           value={currentInput}
           onChange={setCurrentInput}
-          onSend={() => handleSubmit(currentInput, attachments)}
-          onAttachmentsChange={setAttachments}
-          attachments={attachments}
+          onSend={(message: string, chatAttachments: ChatAttachment[]) => {
+            // Convert ChatAttachment[] to MediaAttachment[] for compatibility
+            const mediaAttachments: MediaAttachment[] = chatAttachments.map(attachment => ({
+              type: attachment.type,
+              data: attachment.data,
+              filename: attachment.filename,
+              mimeType: attachment.mimeType,
+              size: attachment.size
+            }));
+            handleSubmit(message, mediaAttachments);
+          }}
+          onAttachmentsChange={(chatAttachments: ChatAttachment[]) => {
+            // Convert to MediaAttachment[] for state compatibility
+            const mediaAttachments: MediaAttachment[] = chatAttachments.map(attachment => ({
+              type: attachment.type,
+              data: attachment.data,
+              filename: attachment.filename,
+              mimeType: attachment.mimeType,
+              size: attachment.size
+            }));
+            setAttachments(mediaAttachments);
+          }}
+          attachments={attachments.map(attachment => ({
+            ...attachment,
+            preview: attachment.type === 'image' ? attachment.data : undefined
+          }))}
           disabled={isLoading}
-          placeholder="Ask Scout Agent to research, create, plan, analyze, or learn something..."
+          placeholder="💬 Tell Scout what you want to build, research, or create..."
           showQuickActions={true}
-          quickActions={[
-            { label: '🔍 Research', action: () => handleActionClick('research') },
-            { label: '✨ Create', action: () => handleActionClick('create') },
-            { label: '📋 Plan', action: () => handleActionClick('plan') },
-            { label: '📊 Analyze', action: () => handleActionClick('analyze') },
-            { label: '🧠 Learn', action: () => handleActionClick('learn') }
-          ]}
-          className="scout-multimodal-input"
+          theme="sanctuary"
+          allowFileUpload={true}
+          allowImageUpload={true}
+          allowAudioRecording={true}
+          allowVideoRecording={true}
+          allowScreenCapture={true}
+          className="scout-enhanced-chat-input"
         />
       </div>
     </div>
