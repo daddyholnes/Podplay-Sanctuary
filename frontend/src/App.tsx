@@ -11,6 +11,7 @@ import WorkspacesView from './components/workspaces/WorkspacesView';
 import ScoutProjectView from './components/scout_agent/ScoutProjectView';
 import ScoutDynamicWorkspace from './components/scout_agent/ScoutDynamicWorkspace';
 import MiniAppLauncher from './components/MiniAppLauncher';
+import MamaBearControlCenter from './components/MamaBearControlCenter';
 
 import { API_BASE_URL, buildApiUrl, API_ENDPOINTS } from './config/api';
 
@@ -617,7 +618,8 @@ type ActiveView =
   | 'Workspaces' // New View
   | 'ScoutAgentProject' // New View
   | 'ScoutDynamicWorkspace' // Dynamic Workspace
-  | 'MiniAppLauncher'; // Cherry Studio inspired mini apps
+  | 'MiniAppLauncher' // Cherry Studio inspired mini apps
+  | 'MamaBearControlCenter'; // Mama Bear Control Center
 
 const App: React.FC = () => {
   const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
@@ -688,11 +690,12 @@ const App: React.FC = () => {
       case 'Workspaces': // New Case
         return <WorkspacesView />;
       case 'ScoutAgentProject': // New Case
-        return <ScoutProjectView projectId={currentScoutProjectId} />;
-      case 'ScoutDynamicWorkspace': // Dynamic Workspace
+        return <ScoutProjectView projectId={currentScoutProjectId} />;      case 'ScoutDynamicWorkspace': // Dynamic Workspace
         return <ScoutDynamicWorkspace />;
       case 'MiniAppLauncher': // Cherry Studio inspired mini apps
         return <MiniAppLauncher />;
+      case 'MamaBearControlCenter': // Mama Bear Control Center
+        return <MamaBearControlCenter />;
       default:
         return <MamaBearGreeting briefing={briefing} />; // Fallback view
     }
@@ -799,14 +802,21 @@ const App: React.FC = () => {
           >
             <span className="nav-icon">🐻</span>
             {!sidebarCollapsed && <span className="nav-label">Dynamic Workspace</span>}
-          </button>
-          <button
+          </button>          <button
             className={`nav-tab ${activeView === 'MiniAppLauncher' ? 'active' : ''}`}
             onClick={() => setActiveView('MiniAppLauncher')}
             title="Mini App Launcher - Cherry Studio inspired"
           >
             <span className="nav-icon">🚀</span>
             {!sidebarCollapsed && <span className="nav-label">Mini Apps</span>}
+          </button>
+          <button
+            className={`nav-tab ${activeView === 'MamaBearControlCenter' ? 'active' : ''}`}
+            onClick={() => setActiveView('MamaBearControlCenter')}
+            title="Mama Bear Control Center - AI-powered code-server management"
+          >
+            <span className="nav-icon">🐻‍❄️</span>
+            {!sidebarCollapsed && <span className="nav-label">Control Center</span>}
           </button>
         </nav>
         
