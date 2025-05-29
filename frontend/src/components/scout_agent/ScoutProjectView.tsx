@@ -3,6 +3,7 @@ import { API_ENDPOINTS, buildDynamicApiUrl } from '../../config/api';
 import ScoutPlanDisplayComponent from './ScoutPlanDisplayComponent';
 import ScoutLogViewerComponent from './ScoutLogViewerComponent';
 import ScoutInterventionControlsComponent from './ScoutInterventionControlsComponent';
+import '../../styles/unified-scout-sanctuary.css';
 import './ScoutProjectView.css';
 
 // Define interfaces based on backend API response for project status
@@ -40,9 +41,15 @@ export interface ScoutProjectStatusSummary {
 
 interface ScoutProjectViewProps {
   projectId: string; // This will be passed as a prop or from router
+  onBackToChat?: () => void; // Router callback for navigation
+  onOpenWorkspace?: () => void; // Router callback for workspace
 }
 
-const ScoutProjectView: React.FC<ScoutProjectViewProps> = ({ projectId }) => {
+const ScoutProjectView: React.FC<ScoutProjectViewProps> = ({ 
+  projectId, 
+  onBackToChat,
+  onOpenWorkspace 
+}) => {
   const [projectStatus, setProjectStatus] = useState<ScoutProjectStatusSummary | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -127,8 +134,34 @@ const ScoutProjectView: React.FC<ScoutProjectViewProps> = ({ projectId }) => {
   return (
     <div className="scout-project-view">
       <div className="scout-project-header">
-        <h3>Scout Agent Project: {projectStatus.project_goal || projectId}</h3>
-        <p>Overall Status: <span className={`scout-status-${projectStatus.project_overall_status}`}>{projectStatus.project_overall_status || 'Unknown'}</span></p>
+        <div className="scout-project-header-top">
+          <div className="scout-project-title">
+            <h3>Scout Agent Project: {projectStatus.project_goal || projectId}</h3>
+            <p>Overall Status: <span className={`scout-status-${projectStatus.project_overall_status}`}>{projectStatus.project_overall_status || 'Unknown'}</span></p>
+          </div>
+          
+          <div className="scout-project-actions">
+            {onBackToChat && (
+              <button 
+                className="scout-btn secondary" 
+                onClick={onBackToChat}
+                title="Back to Scout Chat"
+              >
+                🏠 Back to Chat
+              </button>
+            )}
+            {onOpenWorkspace && (
+              <button 
+                className="scout-btn primary" 
+                onClick={onOpenWorkspace}
+                title="Open Dynamic Workspace"
+              >
+                🚀 Open Workspace
+              </button>
+            )}
+          </div>
+        </div>
+        
         {projectStatus.project_associated_workspace_id && (
           <p>Workspace: <a href={`/workspaces#${projectStatus.project_associated_workspace_id}`}>{projectStatus.project_associated_workspace_id}</a></p>
         )}
