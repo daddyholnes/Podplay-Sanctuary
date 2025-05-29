@@ -89,6 +89,12 @@ from flask import Flask, request, jsonify, render_template, send_from_directory,
 from flask_socketio import SocketIO, emit, join_room, leave_room, Namespace
 from flask_cors import CORS
 import requests
+
+# Configure Socket.IO and Engine.IO logging
+logging.getLogger('socketio').setLevel(logging.DEBUG)
+logging.getLogger('engineio').setLevel(logging.DEBUG)
+logging.getLogger('websockets').setLevel(logging.DEBUG)
+
 # --- End External Dependency Imports ---
 
 # --- Capability Imports with Error Handling ---
@@ -185,16 +191,16 @@ cors = CORS(app, resources={
 
 # Using threading as async_mode for Python 3.12 compatibility
 # eventlet has compatibility issues with Python 3.12's SSL module
+# Initialize with proper path and configuration for Socket.IO
 socketio = SocketIO(
     app, 
     cors_allowed_origins="*", 
     async_mode='threading',
-    engineio_logger=True,  # Enable engine.io logging
-    logger=True,           # Enable Socket.IO logging
-    ping_timeout=60,       # Increase ping timeout
-    ping_interval=25,      # Adjust ping interval
-    manage_session=False,  # Don't manage Flask sessions
-    path='/socket.io/'     # Explicitly set the Socket.IO path
+    engineio_logger=True,
+    logger=True,
+    ping_timeout=60,
+    ping_interval=25,
+    manage_session=False
 )
 
 # ==================== SOCKET.IO EVENT HANDLERS ====================
@@ -2671,13 +2677,19 @@ if __name__ == "__main__":
     print("📡 API endpoints ready for frontend connections")
     print("🔌 Socket.IO enabled for real-time communication")
     print("=" * 50)
-      # Use socketio.run instead of app.run for Socket.IO support
+    # Use socketio.run instead of app.run for Socket.IO support
+    # Adding explicit Socket.IO configuration
+    import logging
+    logging.getLogger('socketio').setLevel(logging.DEBUG)
+    logging.getLogger('engineio').setLevel(logging.DEBUG)
+    
+    # Important: When running with socketio.run, the socket.io path should match the one in socketio initialization
     socketio.run(
         app,
         host="0.0.0.0", 
         port=5000, 
         debug=True,
-        use_reloader=False,  # Prevent double initialization
-        allow_unsafe_werkzeug=True,  # Allow for development
-        log_output=True     # Enable logging of Socket.IO traffic
+        use_reloader=False,
+        allow_unsafe_werkzeug=True,
+        log_output=True
     )
