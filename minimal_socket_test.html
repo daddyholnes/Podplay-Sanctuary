@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.IO Minimal Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        #status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .connected { background-color: #d4edda; color: #155724; }
+        .disconnected { background-color: #f8d7da; color: #721c24; }
+        .connecting { background-color: #d1ecf1; color: #0c5460; }
+        #log {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ccc;
+            padding: 10px;
+            font-family: monospace;
+        }
+        button {
+            padding: 8px 12px;
+            margin-right: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Socket.IO Minimal Test</h1>
+    
+    <div>
+        <label for="serverUrl">Server URL:</label>
+        <input type="text" id="serverUrl" value="http://localhost:5005">
+        <button id="connectBtn">Connect</button>
+        <button id="disconnectBtn">Disconnect</button>
+        <button id="sendTestBtn">Send Test</button>
+    </div>
+    
+    <div id="status" class="connecting">Not connected</div>
+    
+    <h3>Event Log:</h3>
+    <div id="log"></div>
+
+    <script src="https://cdn.socket.io/4.6.0/socket.io.min.js"></script>
+    <script>
+        // DOM elements
+        const serverUrlInput = document.getElementById('serverUrl');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const sendTestBtn = document.getElementById('sendTestBtn');
+        const statusDiv = document.getElementById('status');
+        const logDiv = document.getElementById('log');
+        
+        // Socket.IO connection
+        let socket = null;
+        
+        // Add log entry
+        function log(message, type = 'info') {
+            const entry = document.createElement('div');
+            entry.className = type;
+            entry.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(`[${type}] ${message}`);
+        }
+        
+        // Update connection status
+        function updateStatus(status, message) {
+            statusDiv.className = status;
+            statusDiv.textContent = message;
+        }
+        
+        // Connect to server
+        function connect() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+            }
+            
+            const url = serverUrlInput.value;
+            updateStatus('connecting', `Connecting to ${url}...`);
+            log(`Attempting connection to ${url}`);
+            
+            try {
+                // Create connection with debug options
+                socket = io(url, {
+                    transports: ['polling', 'websocket'],
+                    reconnectionAttempts: 5,
+                    reconnectionDelay: 1000,
+                    timeout: 20000
+                });
+                
+                // Connection events
+                socket.on('connect', () => {
+                    updateStatus('connected', `Connected (ID: ${socket.id})`);
+                    log(`Connected with socket ID: ${socket.id}`);
+                });
+                
+                socket.on('disconnect', (reason) => {
+                    updateStatus('disconnected', `Disconnected: ${reason}`);
+                    log(`Disconnected: ${reason}`, 'error');
+                });
+                
+                socket.on('connect_error', (error) => {
+                    updateStatus('disconnected', `Connection error: ${error.message}`);
+                    log(`Connection error: ${error.message}`, 'error');
+                });
+                
+                // Custom events
+                socket.on('connected', (data) => {
+                    log(`Server welcome: ${JSON.stringify(data)}`);
+                });
+                
+                socket.on('test_response', (data) => {
+                    log(`Test response: ${JSON.stringify(data)}`);
+                });
+                
+                socket.on('error', (data) => {
+                    log(`Server error: ${JSON.stringify(data)}`, 'error');
+                });
+                
+            } catch (e) {
+                updateStatus('disconnected', `Error: ${e.message}`);
+                log(`Error creating connection: ${e.message}`, 'error');
+                socket = null;
+            }
+        }
+        
+        // Disconnect from server
+        function disconnect() {
+            if (socket) {
+                socket.disconnect();
+                updateStatus('disconnected', 'Manually disconnected');
+                log('Manually disconnected');
+            }
+        }
+        
+        // Send test event
+        function sendTest() {
+            if (socket && socket.connected) {
+                const testData = { message: 'Hello from test client!', timestamp: new Date().toISOString() };
+                socket.emit('test_event', testData);
+                log(`Sent test event: ${JSON.stringify(testData)}`);
+            } else {
+                log('Cannot send test - not connected', 'error');
+            }
+        }
+        
+        // Button event listeners
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        sendTestBtn.addEventListener('click', sendTest);
+    </script>
+</body>
+</html>
