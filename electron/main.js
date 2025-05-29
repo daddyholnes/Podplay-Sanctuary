@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Menu, shell, dialog } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
+const fs = require('fs');
 const Store = require('electron-store');
 
 // Initialize electron store for persistent settings
@@ -14,19 +15,20 @@ let isQuitting = false;
 const isDev = process.argv.includes('--dev') || process.env.NODE_ENV === 'development';
 
 function createWindow() {
-  // Create the browser window
-  mainWindow = new BrowserWindow({
+  // Create the browser window  mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     minWidth: 800,
     minHeight: 600,
-    icon: path.join(__dirname, 'assets', 'icon.png'), // Add icon later
+    icon: path.join(__dirname, 'assets', 'icon.ico'), // Updated to use icon.ico
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       enableRemoteModule: false,
       preload: path.join(__dirname, 'preload.js'),
-      webSecurity: !isDev // Disable web security in dev mode for localhost access
+      webSecurity: !isDev, // Disable web security in dev mode for localhost access
+      webviewTag: true, // Enable webview tags
+      allowRunningInsecureContent: isDev // Allow loading insecure content in dev mode
     },
     show: false, // Don't show until ready
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default'
@@ -77,7 +79,6 @@ function createWindow() {
     shell.openExternal(url);
     return { action: 'deny' };
   });
-
   // Prevent navigation away from the app
   mainWindow.webContents.on('will-navigate', (event, url) => {
     const appUrl = 'http://localhost:5173';
@@ -85,6 +86,29 @@ function createWindow() {
       event.preventDefault();
       shell.openExternal(url);
     }
+  });
+  
+  // Configure session to handle CORS and Socket.IO issues
+  const ses = mainWindow.webContents.session;
+  ses.webRequest.onBeforeSendHeaders((details, callback) => {
+    const { requestHeaders } = details;
+    
+    // Add CORS headers for all requests
+    requestHeaders['Origin'] = 'http://localhost:5173';
+    
+    callback({ requestHeaders });
+  });
+  
+  // Handle backend API and Socket.IO connections
+  ses.webRequest.onHeadersReceived((details, callback) => {
+    const { responseHeaders } = details;
+    
+    // Add CORS headers for all responses
+    responseHeaders['Access-Control-Allow-Origin'] = ['*'];
+    responseHeaders['Access-Control-Allow-Methods'] = ['GET, PUT, POST, DELETE, HEAD, OPTIONS, PATCH'];
+    responseHeaders['Access-Control-Allow-Headers'] = ['Content-Type, Authorization, X-Requested-With, Accept, Origin'];
+    
+    callback({ responseHeaders });
   });
 
   // Load the frontend application
@@ -121,9 +145,49 @@ async function loadApplication() {
       // Wait for services to be ready
       await waitForServices();
     }
+      // Load the main application with additional options
+    const loadOptions = {
+      extraHeaders: 'pragma: no-cache\n',
+      userAgent: 'Podplay-Sanctuary-Electron'
+    };
     
-    // Load the main application
-    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.loadURL('http://localhost:5173', loadOptions);
+    
+    // Inject Socket.IO connection fix script    // Inject Socket.IO connection fix and debugger script
+    mainWindow.webContents.on('did-finish-load', () => {
+      // Load and inject the Socket.IO debug script
+      const debugScriptPath = path.join(__dirname, 'assets', 'socket-debug.js');
+      fs.readFile(debugScriptPath, 'utf8', (err, data) => {
+        if (!err) {
+          mainWindow.webContents.executeJavaScript(data);
+        }
+      });
+      
+      // Apply Socket.IO connection fix
+      mainWindow.webContents.executeJavaScript(`
+        // Fix Socket.IO connection issues by forcing transports
+        window.socketIOConnectionFix = function() {
+          if (window.io) {
+            console.log('Applying Socket.IO connection fix');
+            window.io.connect = function(url, options) {
+              const defaultOptions = { 
+                transports: ['websocket', 'polling'],
+                path: '/socket.io',
+                reconnectionAttempts: 5,
+                timeout: 20000,
+                reconnectionDelay: 1000,
+                reconnection: true
+              };
+              return window.io.Manager(url, Object.assign({}, defaultOptions, options)).socket('/');
+            };
+          }
+        };
+        // Call the fix when page loads
+        document.addEventListener('DOMContentLoaded', window.socketIOConnectionFix);
+        // Try to apply immediately if page already loaded
+        if (document.readyState === 'complete') window.socketIOConnectionFix();
+      `);
+    });
     
   } catch (error) {
     console.error('Failed to start application:', error);

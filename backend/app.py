@@ -1,6 +1,4 @@
-# Add CORS patch at the beginning of app.py
-import cors_patch
-cors_patch.apply_cors_patch()
+# CORS will be configured with flask-cors instead of patch
 
 #!/usr/bin/env python3
 """
@@ -189,6 +187,150 @@ cors = CORS(app, resources={
 # eventlet has compatibility issues with Python 3.12's SSL module
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
 
+# ==================== SOCKET.IO EVENT HANDLERS ====================
+
+@socketio.on('connect')
+def handle_connect():
+    """Handle client connection"""
+    logger.info(f"Client connected: {request.sid}")
+    emit('connected', {'status': 'success', 'message': 'Connected to Podplay Sanctuary'})
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Handle client disconnection"""
+    logger.info(f"Client disconnected: {request.sid}")
+
+@socketio.on('join_terminal')
+def handle_join_terminal(data):
+    """Join a terminal session room"""
+    try:
+        session_id = data.get('session_id')
+        if session_id:
+            join_room(session_id)
+            logger.info(f"Client {request.sid} joined terminal session {session_id}")
+            emit('terminal_joined', {'session_id': session_id, 'status': 'success'})
+        else:
+            emit('error', {'message': 'Session ID required'})
+    except Exception as e:
+        logger.error(f"Error joining terminal: {e}")
+        emit('error', {'message': str(e)})
+
+@socketio.on('leave_terminal')
+def handle_leave_terminal(data):
+    """Leave a terminal session room"""
+    try:
+        session_id = data.get('session_id')
+        if session_id:
+            leave_room(session_id)
+            logger.info(f"Client {request.sid} left terminal session {session_id}")
+            emit('terminal_left', {'session_id': session_id, 'status': 'success'})
+    except Exception as e:
+        logger.error(f"Error leaving terminal: {e}")
+        emit('error', {'message': str(e)})
+
+@socketio.on('terminal_input')
+def handle_terminal_input(data):
+    """Handle terminal input from client"""
+    try:
+        session_id = data.get('session_id')
+        command = data.get('command', '')
+        
+        logger.info(f"Terminal input for session {session_id}: {command}")
+        
+        # Mock terminal output - replace with actual terminal execution
+        output = f"$ {command}\nCommand executed successfully\n"
+        
+        # Emit output to all clients in the terminal session room
+        socketio.emit('terminal_output', {
+            'session_id': session_id,
+            'output': output,
+            'timestamp': datetime.now().isoformat()
+        }, room=session_id)
+        
+    except Exception as e:
+        logger.error(f"Error handling terminal input: {e}")
+        emit('error', {'message': str(e)})
+
+@socketio.on('workspace_subscribe')
+def handle_workspace_subscribe(data):
+    """Subscribe to workspace updates"""
+    try:
+        workspace_id = data.get('workspace_id')
+        if workspace_id:
+            join_room(f"workspace_{workspace_id}")
+            logger.info(f"Client {request.sid} subscribed to workspace {workspace_id}")
+            emit('workspace_subscribed', {'workspace_id': workspace_id, 'status': 'success'})
+        else:
+            emit('error', {'message': 'Workspace ID required'})
+    except Exception as e:
+        logger.error(f"Error subscribing to workspace: {e}")
+        emit('error', {'message': str(e)})
+
+@socketio.on('workspace_unsubscribe')
+def handle_workspace_unsubscribe(data):
+    """Unsubscribe from workspace updates"""
+    try:
+        workspace_id = data.get('workspace_id')
+        if workspace_id:
+            leave_room(f"workspace_{workspace_id}")
+            logger.info(f"Client {request.sid} unsubscribed from workspace {workspace_id}")
+            emit('workspace_unsubscribed', {'workspace_id': workspace_id, 'status': 'success'})
+    except Exception as e:
+        logger.error(f"Error unsubscribing from workspace: {e}")
+        emit('error', {'message': str(e)})
+
+@socketio.on('mama_bear_chat')
+def handle_mama_bear_chat(data):
+    """Handle real-time Mama Bear chat via Socket.IO"""
+    try:
+        message = data.get('message', '')
+        session_id = data.get('session_id', request.sid)
+        
+        logger.info(f"Mama Bear chat via Socket.IO: {message}")
+        
+        # Mock response - replace with actual Mama Bear integration
+        response = {
+            "message": f"🐻 Mama Bear received: {message}",
+            "timestamp": datetime.now().isoformat(),
+            "session_id": session_id,
+            "type": "mama_bear_response"
+        }
+        
+        emit('mama_bear_response', response)
+        
+    except Exception as e:
+        logger.error(f"Error handling Mama Bear chat: {e}")
+        emit('error', {'message': str(e)})
+
+@socketio.on('system_status_request')
+def handle_system_status_request():
+    """Handle system status requests"""
+    try:
+        status = {
+            "timestamp": datetime.now().isoformat(),
+            "services": {
+                "mama_bear": "running",
+                "scout": "running",
+                "nixos_orchestrator": "running" if NIXOS_INFRASTRUCTURE_AVAILABLE else "unavailable",
+                "mem0": "running" if MEM0_AVAILABLE else "unavailable",
+                "together_ai": "running" if TOGETHER_AVAILABLE else "unavailable"
+            },
+            "system": {
+                "cpu_usage": 25.5,
+                "memory_usage": 60.2,
+                "active_workspaces": 2,
+                "active_terminals": 3
+            }
+        }
+        
+        emit('system_status', status)
+        
+    except Exception as e:
+        logger.error(f"Error getting system status: {e}")
+        emit('error', {'message': str(e)})
+
+# ==================== END SOCKET.IO EVENT HANDLERS ====================
+
 try:
     import together
     TOGETHER_AVAILABLE = True
@@ -262,7 +404,7 @@ except ImportError as e:
     logger.warning(f"Agentic DevSandbox not available: {e}")
 
 app = Flask(__name__)
-CORS(app)
+# CORS configuration moved to later in the file
 
 # ==================== MCP MARKETPLACE DATA MODELS ====================
 
@@ -1947,6 +2089,8 @@ def list_scout_projects():
         ]
         
         
+
+        
         return jsonify({
             "success": True,
             "projects": projects,
@@ -2012,4 +2156,518 @@ def get_scout_project_metrics(project_id):
 
 # ==================== END SCOUT AGENT ENDPOINTS ====================
 
-// ...existing code...
+# ==================== NIXOS WORKSPACE MANAGEMENT ENDPOINTS ====================
+
+@app.route('/api/nixos/workspaces', methods=['GET'])
+def list_nixos_workspaces():
+    """List all NixOS workspaces"""
+    try:
+        # Mock data for now - replace with actual workspace management
+        workspaces = [
+            {
+                "id": "ws-001",
+                "name": "Development Environment",
+                "status": "running",
+                "type": "nixos",
+                "created_at": "2024-01-15T10:30:00Z",
+                "last_used": "2024-01-20T14:22:00Z",
+                "config": {
+                    "cpu": 4,
+                    "memory": "8GB",
+                    "disk": "50GB"
+                }
+            },
+            {
+                "id": "ws-002", 
+                "name": "Testing Environment",
+                "status": "stopped",
+                "type": "nixos",
+                "created_at": "2024-01-10T09:15:00Z",
+                "last_used": "2024-01-19T16:45:00Z",
+                "config": {
+                    "cpu": 2,
+                    "memory": "4GB", 
+                    "disk": "25GB"
+                }
+            }
+        ]
+        
+        return jsonify({
+            "success": True,
+            "workspaces": workspaces,
+            "total": len(workspaces)
+        })
+    except Exception as e:
+        logger.error(f"Error listing NixOS workspaces: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/nixos/workspaces', methods=['POST'])
+def create_nixos_workspace():
+    """Create a new NixOS workspace"""
+    try:
+        data = request.get_json()
+        workspace_id = f"ws-{uuid.uuid4().hex[:8]}"
+        
+        # Mock workspace creation - replace with actual implementation
+        workspace = {
+            "id": workspace_id,
+            "name": data.get('name', f'Workspace {workspace_id}'),
+            "status": "creating",
+            "type": "nixos",
+            "created_at": datetime.now().isoformat(),
+            "config": data.get('config', {
+                "cpu": 2,
+                "memory": "4GB",
+                "disk": "25GB"
+            })
+        }
+        
+        logger.info(f"Creating NixOS workspace: {workspace_id}")
+        
+        return jsonify({
+            "success": True,
+            "workspace": workspace
+        }), 201
+    except Exception as e:
+        logger.error(f"Error creating NixOS workspace: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>', methods=['GET'])
+def get_nixos_workspace(workspace_id):
+    """Get details of a specific NixOS workspace"""
+    try:
+        # Mock workspace data - replace with actual lookup
+        workspace = {
+            "id": workspace_id,
+            "name": f"Workspace {workspace_id}",
+            "status": "running",
+            "type": "nixos",
+            "created_at": "2024-01-15T10:30:00Z",
+            "last_used": datetime.now().isoformat(),
+            "config": {
+                "cpu": 4,
+                "memory": "8GB",
+                "disk": "50GB"
+            },
+            "metrics": {
+                "cpu_usage": 25.5,
+                "memory_usage": 60.2,
+                "disk_usage": 35.8,
+                "uptime": "2h 45m"
+            }
+        }
+        
+        return jsonify({
+            "success": True,
+            "workspace": workspace
+        })
+    except Exception as e:
+        logger.error(f"Error getting NixOS workspace {workspace_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>', methods=['PUT'])
+def update_nixos_workspace(workspace_id):
+    """Update a NixOS workspace configuration"""
+    try:
+        data = request.get_json()
+        
+        # Mock update - replace with actual implementation
+        workspace = {
+            "id": workspace_id,
+            "name": data.get('name', f'Workspace {workspace_id}'),
+            "status": "updating",
+            "type": "nixos",
+            "updated_at": datetime.now().isoformat(),
+            "config": data.get('config', {})
+        }
+        
+        logger.info(f"Updating NixOS workspace: {workspace_id}")
+        
+        return jsonify({
+            "success": True,
+            "workspace": workspace
+        })
+    except Exception as e:
+        logger.error(f"Error updating NixOS workspace {workspace_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>', methods=['DELETE'])
+def delete_nixos_workspace(workspace_id):
+    """Delete a NixOS workspace"""
+    try:
+        logger.info(f"Deleting NixOS workspace: {workspace_id}")
+        
+        return jsonify({
+            "success": True,
+            "message": f"Workspace {workspace_id} deleted successfully"
+        })
+    except Exception as e:
+        logger.error(f"Error deleting NixOS workspace {workspace_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>/start', methods=['POST'])
+def start_nixos_workspace(workspace_id):
+    """Start a NixOS workspace"""
+    try:
+        logger.info(f"Starting NixOS workspace: {workspace_id}")
+        
+        return jsonify({
+            "success": True,
+            "workspace_id": workspace_id,
+            "status": "starting",
+            "message": "Workspace start initiated"
+        })
+    except Exception as e:
+        logger.error(f"Error starting NixOS workspace {workspace_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>/stop', methods=['POST'])
+def stop_nixos_workspace(workspace_id):
+    """Stop a NixOS workspace"""
+    try:
+        logger.info(f"Stopping NixOS workspace: {workspace_id}")
+        
+        return jsonify({
+            "success": True,
+            "workspace_id": workspace_id,
+            "status": "stopping",
+            "message": "Workspace stop initiated"
+        })
+    except Exception as e:
+        logger.error(f"Error stopping NixOS workspace {workspace_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>/restart', methods=['POST'])
+def restart_nixos_workspace(workspace_id):
+    """Restart a NixOS workspace"""
+    try:
+        logger.info(f"Restarting NixOS workspace: {workspace_id}")
+        
+        return jsonify({
+            "success": True,
+            "workspace_id": workspace_id,
+            "status": "restarting",
+            "message": "Workspace restart initiated"
+        })
+    except Exception as e:
+        logger.error(f"Error restarting NixOS workspace {workspace_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>/status', methods=['GET'])
+def get_nixos_workspace_status(workspace_id):
+    """Get the current status of a NixOS workspace"""
+    try:
+        status = {
+            "workspace_id": workspace_id,
+            "status": "running",
+            "health": "healthy",
+            "uptime": "2h 45m",
+            "last_heartbeat": datetime.now().isoformat(),
+            "metrics": {
+                "cpu_usage": 25.5,
+                "memory_usage": 60.2,
+                "disk_usage": 35.8,
+                "network_io": {
+                    "bytes_in": 1024000,
+                    "bytes_out": 512000
+                }
+            }
+        }
+        
+        return jsonify({
+            "success": True,
+            "status": status
+        })
+    except Exception as e:
+        logger.error(f"Error getting NixOS workspace status {workspace_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>/config', methods=['GET'])
+def get_nixos_workspace_config(workspace_id):
+    """Get the configuration of a NixOS workspace"""
+    try:
+        config = {
+            "workspace_id": workspace_id,
+            "nixos_config": {
+                "system": {
+                    "stateVersion": "23.11",
+                    "autoUpgrade": True
+                },
+                "services": {
+                    "openssh": {"enable": True},
+                    "docker": {"enable": True},
+                    "code-server": {"enable": True}
+                },
+                "packages": [
+                    "git",
+                    "vim",
+                    "nodejs",
+                    "python3",
+                    "docker",
+                    "curl"
+                ]
+            },
+            "hardware": {
+                "cpu": 4,
+                "memory": "8GB",
+                "disk": "50GB"
+            }
+        }
+        
+        return jsonify({
+            "success": True,
+            "config": config
+        })
+    except Exception as e:
+        logger.error(f"Error getting NixOS workspace config {workspace_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>/config', methods=['PUT'])
+def update_nixos_workspace_config(workspace_id):
+    """Update the configuration of a NixOS workspace"""
+    try:
+        data = request.get_json()
+        logger.info(f"Updating NixOS workspace config: {workspace_id}")
+        
+        return jsonify({
+            "success": True,
+            "workspace_id": workspace_id,
+            "message": "Configuration updated successfully",
+            "config": data
+        })
+    except Exception as e:
+        logger.error(f"Error updating NixOS workspace config {workspace_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>/terminal', methods=['POST'])
+def create_nixos_workspace_terminal(workspace_id):
+    """Create a terminal session for a NixOS workspace"""
+    try:
+        session_id = f"term-{uuid.uuid4().hex[:8]}"
+        
+        terminal = {
+            "session_id": session_id,
+            "workspace_id": workspace_id,
+            "status": "active",
+            "created_at": datetime.now().isoformat(),
+            "connection_info": {
+                "type": "websocket",
+                "endpoint": f"/terminal/{session_id}"
+            }
+        }
+        
+        logger.info(f"Created terminal session {session_id} for workspace {workspace_id}")
+        
+        return jsonify({
+            "success": True,
+            "terminal": terminal
+        }), 201
+    except Exception as e:
+        logger.error(f"Error creating terminal for workspace {workspace_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>/files', methods=['GET'])
+def get_nixos_workspace_files(workspace_id):
+    """Get file listing for a NixOS workspace"""
+    try:
+        path = request.args.get('path', '/')
+        
+        # Mock file listing - replace with actual implementation
+        files = [
+            {
+                "name": "home",
+                "type": "directory",
+                "size": None,
+                "modified": "2024-01-20T10:30:00Z",
+                "permissions": "drwxr-xr-x"
+            },
+            {
+                "name": "projects",
+                "type": "directory", 
+                "size": None,
+                "modified": "2024-01-19T15:45:00Z",
+                "permissions": "drwxr-xr-x"
+            },
+            {
+                "name": "readme.txt",
+                "type": "file",
+                "size": 1024,
+                "modified": "2024-01-18T09:20:00Z",
+                "permissions": "-rw-r--r--"
+            }
+        ]
+        
+        return jsonify({
+            "success": True,
+            "workspace_id": workspace_id,
+            "path": path,
+            "files": files
+        })
+    except Exception as e:
+        logger.error(f"Error getting files for workspace {workspace_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>/logs', methods=['GET'])
+def get_nixos_workspace_logs(workspace_id):
+    """Get logs for a NixOS workspace"""
+    try:
+        limit = request.args.get('limit', 100, type=int)
+        level = request.args.get('level', 'info')
+        
+        # Mock logs - replace with actual implementation
+        logs = [
+            {
+                "timestamp": "2024-01-20T14:22:00Z",
+                "level": "info",
+                "service": "systemd",
+                "message": "Workspace started successfully"
+            },
+            {
+                "timestamp": "2024-01-20T14:21:45Z",
+                "level": "info",
+                "service": "nixos-rebuild",
+                "message": "System configuration applied"
+            },
+            {
+                "timestamp": "2024-01-20T14:21:30Z",
+                "level": "debug",
+                "service": "docker",
+                "message": "Docker daemon started"
+            }
+        ][:limit]
+        
+        return jsonify({
+            "success": True,
+            "workspace_id": workspace_id,
+            "logs": logs,
+            "total": len(logs)
+        })
+    except Exception as e:
+        logger.error(f"Error getting logs for workspace {workspace_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>/snapshots', methods=['GET'])
+def get_nixos_workspace_snapshots(workspace_id):
+    """Get snapshots for a NixOS workspace"""
+    try:
+        snapshots = [
+            {
+                "id": "snap-001",
+                "name": "Initial Setup",
+                "created_at": "2024-01-15T10:30:00Z",
+                "size": "2.5GB",
+                "description": "Fresh workspace setup"
+            },
+            {
+                "id": "snap-002", 
+                "name": "Development Ready",
+                "created_at": "2024-01-18T16:20:00Z",
+                "size": "3.1GB",
+                "description": "With development tools installed"
+            }
+        ]
+        
+        return jsonify({
+            "success": True,
+            "workspace_id": workspace_id,
+            "snapshots": snapshots
+        })
+    except Exception as e:
+        logger.error(f"Error getting snapshots for workspace {workspace_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>/snapshots', methods=['POST'])
+def create_nixos_workspace_snapshot(workspace_id):
+    """Create a snapshot of a NixOS workspace"""
+    try:
+        data = request.get_json()
+        snapshot_id = f"snap-{uuid.uuid4().hex[:8]}"
+        
+        snapshot = {
+            "id": snapshot_id,
+            "workspace_id": workspace_id,
+            "name": data.get('name', f'Snapshot {snapshot_id}'),
+            "description": data.get('description', ''),
+            "created_at": datetime.now().isoformat(),
+            "status": "creating"
+        }
+        
+        logger.info(f"Creating snapshot {snapshot_id} for workspace {workspace_id}")
+        
+        return jsonify({
+            "success": True,
+            "snapshot": snapshot
+        }), 201
+    except Exception as e:
+        logger.error(f"Error creating snapshot for workspace {workspace_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+# ==================== END NIXOS WORKSPACE ENDPOINTS ====================
+
+# ==================== FLASK APP STARTUP ====================
+
+if __name__ == "__main__":
+    print("🚀 Starting Podplay Sanctuary Backend Server...")
+    print("🐻 Mama Bear Control Center is ready!")
+    print("🌐 Server will be available at: http://127.0.0.1:5000")
+    print("📡 API endpoints ready for frontend connections")
+    print("🔌 Socket.IO enabled for real-time communication")
+    print("=" * 50)
+    
+    # Use socketio.run instead of app.run for Socket.IO support
+    socketio.run(
+        app,
+        host="0.0.0.0", 
+        port=5000, 
+        debug=True,
+        use_reloader=False,  # Prevent double initialization
+        allow_unsafe_werkzeug=True  # Allow for development
+    )
