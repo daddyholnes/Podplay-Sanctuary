@@ -160,8 +160,9 @@ const BackendConnectionManager: React.FC<{
   useEffect(() => {
     // Auto-detect backend on startup
     const urls = [
-      'http://localhost:5000',
-      API_BASE_URL,
+      '', // Use proxy via Vite dev server
+      '/api', // Fallback proxy test
+      'http://localhost:5000', // Direct connection fallback
       'http://127.0.0.1:5000'
     ];
 
