@@ -2,7 +2,7 @@
 // Routes between different Scout agent interfaces with consistent design
 // Uses the new unified Scout-Sanctuary theme and EnhancedChatBar
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import ScoutAgentEnhanced from './ScoutAgentEnhanced';
 import ScoutDynamicWorkspace from './ScoutDynamicWorkspace';
 import ScoutProjectView from './ScoutProjectView';
@@ -76,11 +76,7 @@ const ScoutUnifiedRouter: React.FC<ScoutUnifiedRouterProps> = ({
       
       case 'workspace':
         return (
-          <ScoutDynamicWorkspace
-            onModeChange={handleModeChange}
-            onProjectCreated={handleProjectCreated}
-            agentType={currentAgent}
-          />
+          <ScoutDynamicWorkspace />
         );
       
       case 'project':

@@ -844,4 +844,3 @@ class EnhancedVMManager:
             "vcpus": DEFAULT_VM_VCPUS,
             "provider": "local/mock"
         }
-```

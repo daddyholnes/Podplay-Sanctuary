@@ -63,7 +63,6 @@ const EnhancedChatBar: React.FC<ChatBarProps> = ({
   const audioInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingTimerRef = useRef<NodeJS.Timeout | null>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const chatBarRef = useRef<HTMLDivElement>(null);
 
   // ==================== EMOJI CATEGORIES ====================
