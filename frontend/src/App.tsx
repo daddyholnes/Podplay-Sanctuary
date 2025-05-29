@@ -158,12 +158,12 @@ const BackendConnectionManager: React.FC<{
   };
 
   useEffect(() => {
-    // Use direct backend connection to bypass proxy issues
+    // Use relative paths in Codespaces to avoid mixed content issues
     const urls = [
-      'http://localhost:5000', // Direct backend connection
-      'http://127.0.0.1:5000', // Alternative IP
-      'http://10.0.1.222:5000', // Network IP
-      '' // Last resort fallback
+      '', // Empty for relative paths through Vite proxy
+      '/api', // API path through proxy
+      '/api/', // API path with trailing slash
+      '/' // Root path fallback
     ];
 
     const tryUrls = async () => {
