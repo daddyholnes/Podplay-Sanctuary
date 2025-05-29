@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Socket.IO Connection Test - Podplay Sanctuary</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .error { background-color: #f8d7da; color: #721c24; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #messages {
+            height: 300px;
+            overflow-y: auto;
+            border: 1px solid #ddd;
+            padding: 10px;
+            margin: 10px 0;
+            background-color: #f9f9f9;
+        }
+        input[type="text"] {
+            width: 70%;
+            padding: 8px;
+            margin: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔌 Socket.IO Connection Test</h1>
+        <h2>Podplay Sanctuary Real-time Communication</h2>
+        
+        <div id="connection-status" class="status error">
+            ❌ Not Connected
+        </div>
+        
+        <div class="controls">
+            <button onclick="connectSocket()">Connect</button>
+            <button onclick="disconnectSocket()">Disconnect</button>
+            <button onclick="testSystemStatus()">Test System Status</button>
+            <button onclick="testWorkspaceSubscription()">Test Workspace Subscribe</button>
+        </div>
+        
+        <div>
+            <h3>💬 Mama Bear Chat Test</h3>
+            <input type="text" id="chatInput" placeholder="Type a message for Mama Bear..." onkeypress="handleChatKeyPress(event)">
+            <button onclick="sendMamaBearMessage()">Send to Mama Bear</button>
+        </div>
+        
+        <div>
+            <h3>🖥️ Terminal Test</h3>
+            <input type="text" id="terminalInput" placeholder="Enter terminal command..." onkeypress="handleTerminalKeyPress(event)">
+            <button onclick="sendTerminalCommand()">Send Command</button>
+            <button onclick="joinTerminal()">Join Terminal Session</button>
+        </div>
+        
+        <div>
+            <h3>📨 Messages</h3>
+            <div id="messages"></div>
+        </div>
+    </div>
+
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        let socket = null;
+        let currentTerminalSession = 'term-test-001';
+        let currentWorkspace = 'ws-001';
+        
+        function addMessage(message, type = 'info') {
+            const messagesDiv = document.getElementById('messages');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `status ${type}`;
+            messageDiv.innerHTML = `<strong>${new Date().toLocaleTimeString()}</strong>: ${message}`;
+            messagesDiv.appendChild(messageDiv);
+            messagesDiv.scrollTop = messagesDiv.scrollHeight;
+        }
+        
+        function updateConnectionStatus(connected) {
+            const statusDiv = document.getElementById('connection-status');
+            if (connected) {
+                statusDiv.className = 'status success';
+                statusDiv.innerHTML = '✅ Connected to Podplay Sanctuary';
+            } else {
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = '❌ Not Connected';
+            }
+        }
+        
+        function connectSocket() {
+            if (socket) {
+                socket.disconnect();
+            }
+            
+            addMessage('🔌 Attempting to connect to Socket.IO server...');
+            socket = io('http://127.0.0.1:5000');
+            
+            socket.on('connect', () => {
+                addMessage('🎉 Successfully connected to Podplay Sanctuary!', 'success');
+                updateConnectionStatus(true);
+            });
+            
+            socket.on('disconnect', () => {
+                addMessage('❌ Disconnected from server', 'error');
+                updateConnectionStatus(false);
+            });
+            
+            socket.on('connected', (data) => {
+                addMessage(`🏠 Server says: ${data.message}`, 'success');
+            });
+            
+            socket.on('mama_bear_response', (data) => {
+                addMessage(`🐻 Mama Bear: ${data.message}`, 'success');
+            });
+            
+            socket.on('terminal_output', (data) => {
+                addMessage(`🖥️ Terminal Output: ${data.output}`, 'info');
+            });
+            
+            socket.on('terminal_joined', (data) => {
+                addMessage(`🖥️ Joined terminal session: ${data.session_id}`, 'success');
+            });
+            
+            socket.on('workspace_subscribed', (data) => {
+                addMessage(`📁 Subscribed to workspace: ${data.workspace_id}`, 'success');
+            });
+            
+            socket.on('system_status', (data) => {
+                addMessage(`📊 System Status: ${JSON.stringify(data.services, null, 2)}`, 'info');
+            });
+            
+            socket.on('error', (data) => {
+                addMessage(`❌ Error: ${data.message}`, 'error');
+            });
+        }
+        
+        function disconnectSocket() {
+            if (socket) {
+                socket.disconnect();
+                socket = null;
+                addMessage('🔌 Manually disconnected');
+                updateConnectionStatus(false);
+            }
+        }
+        
+        function testSystemStatus() {
+            if (socket) {
+                addMessage('📊 Requesting system status...');
+                socket.emit('system_status_request');
+            } else {
+                addMessage('❌ Not connected to server', 'error');
+            }
+        }
+        
+        function testWorkspaceSubscription() {
+            if (socket) {
+                addMessage(`📁 Subscribing to workspace: ${currentWorkspace}`);
+                socket.emit('workspace_subscribe', { workspace_id: currentWorkspace });
+            } else {
+                addMessage('❌ Not connected to server', 'error');
+            }
+        }
+        
+        function sendMamaBearMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            
+            if (socket && message) {
+                addMessage(`💬 You: ${message}`);
+                socket.emit('mama_bear_chat', { 
+                    message: message,
+                    session_id: 'test-session-001'
+                });
+                input.value = '';
+            } else if (!socket) {
+                addMessage('❌ Not connected to server', 'error');
+            }
+        }
+        
+        function joinTerminal() {
+            if (socket) {
+                addMessage(`🖥️ Joining terminal session: ${currentTerminalSession}`);
+                socket.emit('join_terminal', { session_id: currentTerminalSession });
+            } else {
+                addMessage('❌ Not connected to server', 'error');
+            }
+        }
+        
+        function sendTerminalCommand() {
+            const input = document.getElementById('terminalInput');
+            const command = input.value.trim();
+            
+            if (socket && command) {
+                addMessage(`🖥️ Terminal Command: ${command}`);
+                socket.emit('terminal_input', { 
+                    session_id: currentTerminalSession,
+                    command: command
+                });
+                input.value = '';
+            } else if (!socket) {
+                addMessage('❌ Not connected to server', 'error');
+            }
+        }
+        
+        function handleChatKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendMamaBearMessage();
+            }
+        }
+        
+        function handleTerminalKeyPress(event) {
+            if (event.key === 'Enter') {
+                sendTerminalCommand();
+            }
+        }
+        
+        // Auto-connect on page load
+        window.onload = function() {
+            addMessage('🏠 Welcome to Podplay Sanctuary Socket.IO Test');
+            addMessage('🔌 Click "Connect" to establish real-time connection');
+        };
+    </script>
+</body>
+</html>

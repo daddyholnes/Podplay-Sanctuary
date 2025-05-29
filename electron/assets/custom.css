@@ -1,0 +1,105 @@
+/* Custom Electron CSS for Socket.IO integration */
+
+/* Fix for Socket.IO reconnection spinner */
+.socket-reconnecting {
+  animation: socket-spin 1.5s linear infinite;
+}
+
+@keyframes socket-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Fix for Socket.IO console messages */
+.socket-message {
+  font-family: monospace;
+  margin: 4px 0;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.socket-message.error {
+  background-color: rgba(255, 0, 0, 0.1);
+  color: #ff6347;
+}
+
+.socket-message.success {
+  background-color: rgba(0, 255, 0, 0.1);
+  color: #32cd32;
+}
+
+.socket-message.info {
+  background-color: rgba(0, 0, 255, 0.1);
+  color: #1e90ff;
+}
+
+/* Terminal output styling */
+.terminal-output {
+  background-color: #272822;
+  color: #f8f8f2;
+  border-radius: 4px;
+  padding: 12px;
+  overflow-x: auto;
+  font-family: 'Courier New', monospace;
+  white-space: pre-wrap;
+}
+
+/* Mama Bear chat styling */
+.mama-bear-message {
+  display: flex;
+  margin: 8px 0;
+}
+
+.mama-bear-message.from-user {
+  justify-content: flex-end;
+}
+
+.mama-bear-message-content {
+  max-width: 80%;
+  padding: 10px 12px;
+  border-radius: 18px;
+  position: relative;
+}
+
+.mama-bear-message.from-user .mama-bear-message-content {
+  background-color: #0084ff;
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.mama-bear-message.from-mama-bear .mama-bear-message-content {
+  background-color: #f1f0f0;
+  color: black;
+  border-bottom-left-radius: 4px;
+}
+
+/* Scout project status styling */
+.scout-project {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  padding: 12px;
+}
+
+.scout-project-status {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: bold;
+}
+
+.scout-project-status.success {
+  background-color: #dff0d8;
+  color: #3c763d;
+}
+
+.scout-project-status.warning {
+  background-color: #fcf8e3;
+  color: #8a6d3b;
+}
+
+.scout-project-status.error {
+  background-color: #f2dede;
+  color: #a94442;
+}

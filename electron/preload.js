@@ -1,4 +1,22 @@
 const { contextBridge, ipcRenderer } = require('electron');
+const path = require('path');
+const fs = require('fs');
+
+// Inject custom CSS for Socket.IO and other app components
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    const cssPath = path.join(__dirname, 'assets', 'custom.css');
+    if (fs.existsSync(cssPath)) {
+      const css = fs.readFileSync(cssPath, 'utf8');
+      const style = document.createElement('style');
+      style.textContent = css;
+      document.head.appendChild(style);
+      console.log('Custom CSS injected');
+    }
+  } catch (error) {
+    console.error('Failed to inject custom CSS:', error);
+  }
+});
 
 // Expose protected methods that allow the renderer process to use
 // the ipcRenderer without exposing the entire object
@@ -35,9 +53,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Event listeners
   onAppUpdate: (callback) => ipcRenderer.on('app-update', callback),
   onDockerStatus: (callback) => ipcRenderer.on('docker-status', callback),
+    // Remove listeners
+  removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel),
   
-  // Remove listeners
-  removeAllListeners: (channel) => ipcRenderer.removeAllListeners(channel)
+  // Socket.IO connection helpers
+  socketConnect: (url, options) => ipcRenderer.invoke('socket-connect', url, options),
+  socketDisconnect: (id) => ipcRenderer.invoke('socket-disconnect', id),
+  socketStatus: () => ipcRenderer.invoke('socket-status'),
+  onSocketStatus: (callback) => ipcRenderer.on('socket-status-update', callback)
 });
 
 // Expose development tools in dev mode

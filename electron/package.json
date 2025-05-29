@@ -2,10 +2,10 @@
   "name": "podplay-sanctuary",
   "version": "1.0.0",
   "description": "Desktop application for Podplay Sanctuary podcast management",
-  "main": "main.js",
-  "scripts": {
+  "main": "main.js",  "scripts": {
     "start": "electron .",
-    "dev": "electron . --dev",
+    "dev": "set ELECTRON_ENABLE_LOGGING=true&&electron . --dev",
+    "debug": "set ELECTRON_ENABLE_LOGGING=true&&electron . --dev --inspect-brk",
     "build": "electron-builder",
     "dist": "electron-builder --publish=never",
     "pack": "electron-builder --dir"
