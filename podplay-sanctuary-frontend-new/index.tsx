@@ -3,6 +3,7 @@ import React, { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 import { HashRouter } from 'react-router-dom';
+import './src/index.css';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
