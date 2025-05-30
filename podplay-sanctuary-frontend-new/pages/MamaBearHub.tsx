@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { apiService } from '../services/api';
 import { ChatMessage, DailyBriefingResponse, MemorySearchResult, CodeAnalysisResponse } from '../types';
@@ -18,8 +18,8 @@ const MamaBearHub: React.FC = () => {
   const allChatHistory = useAppStore(state => state.chatHistory);
   const addMessage = useAppStore(state => state.addMessage);
   
-  // Filter chat history in component to avoid selector instability
-  const chatHistory = allChatHistory.filter(msg => msg.section === SECTION_ID);
+  // Filter chat history in component to avoid selector instability - MEMOIZED
+  const chatHistory = useMemo(() => allChatHistory.filter(msg => msg.section === SECTION_ID), [allChatHistory]);
 
   const [dailyBriefing, setDailyBriefing] = useState<DailyBriefingResponse | null>(null);
   const [memorySearchTerm, setMemorySearchTerm] = useState('');

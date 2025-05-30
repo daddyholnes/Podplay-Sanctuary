@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Podplay Sanctuary Debug Test</title>
+</head>
+<body>
+    <h1>🐻 Podplay Sanctuary - Frontend Debugging</h1>
+    
+    <div id="status">
+        <h2>Connection Status</h2>
+        <p id="backend-status">❓ Testing backend connection...</p>
+        <p id="file-status">❓ Testing file loading...</p>
+        <p id="socket-status">❓ Testing Socket.io...</p>
+    </div>
+
+    <script>
+        console.log('🧪 Podplay Debug Test Starting...');
+        
+        // Test 1: Backend API Connection
+        fetch('/api/health')
+            .then(response => {
+                document.getElementById('backend-status').textContent = 
+                    `✅ Backend API: ${response.status === 200 ? 'CONNECTED' : 'FAILED (' + response.status + ')'}`;
+                return response.text();
+            })
+            .catch(error => {
+                document.getElementById('backend-status').textContent = '❌ Backend API: FAILED - ' + error.message;
+            });
+
+        // Test 2: Socket.io Connection
+        if (window.io) {
+            const socket = io(window.location.origin, {
+                path: '/socket.io',
+                transports: ['websocket']
+            });
+            
+            socket.on('connect', () => {
+                document.getElementById('socket-status').textContent = '✅ Socket.io: CONNECTED';
+            });
+            
+            socket.on('connect_error', (error) => {
+                document.getElementById('socket-status').textContent = '❌ Socket.io: FAILED - ' + error.message;
+            });
+        } else {
+            document.getElementById('socket-status').textContent = '❌ Socket.io: Library not loaded';
+        }
+
+        // Test 3: File Loading
+        fetch('/src/index.tsx')
+            .then(response => {
+                document.getElementById('file-status').textContent = 
+                    `✅ React Entry Point: ${response.status === 200 ? 'FOUND' : 'NOT FOUND (' + response.status + ')'}`;
+            })
+            .catch(error => {
+                document.getElementById('file-status').textContent = '❌ React Entry Point: FAILED - ' + error.message;
+            });
+    </script>
+</body>
+</html>

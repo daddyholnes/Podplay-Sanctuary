@@ -59,14 +59,17 @@ class MCPDockerOrchestrator:
         self._load_default_servers()
         
         logger.info("🔌 MCP Docker Orchestrator initialized")
-    
-    def _initialize_docker(self):
+      def _initialize_docker(self):
         """Initialize Docker client"""
         try:
-            self.docker_client = docker.from_env()
+            import docker
+            self.docker_client = docker.DockerClient.from_env()
             # Test connection
             self.docker_client.ping()
             logger.info("🐳 Docker client connected successfully")
+        except ImportError:
+            logger.warning("🐳 Docker package not available - running in mock mode")
+            self.docker_client = None
         except Exception as e:
             logger.error(f"Docker initialization failed: {e}")
             self.docker_client = None

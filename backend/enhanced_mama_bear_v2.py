@@ -21,7 +21,7 @@ class VertexAIMamaBear:
     
     def __init__(self):
         # Configuration
-        self.service_account_path = "/home/woody/Desktop/podplay-build-beta/podplay-build-beta-10490f7d079e.json"
+        self.service_account_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "podplay-build-beta-10490f7d079e.json")
         self.project_id = "podplay-build-beta"  # Will be extracted from service account
         self.location = "us-central1"
         
