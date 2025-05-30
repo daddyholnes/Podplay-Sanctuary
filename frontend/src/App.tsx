@@ -161,10 +161,10 @@ const BackendConnectionManager: React.FC<{
       alert('Please start the backend manually:\n\ncd backend\nsource venv/bin/activate\npython app.py');
     }
   };
-
   useEffect(() => {
-    // Use relative paths in Codespaces to avoid mixed content issues
+    // Try direct backend connection first, then fallback to proxy paths
     const urls = [
+      'http://localhost:5000', // Direct backend connection
       '', // Empty for relative paths through Vite proxy
       '/api', // API path through proxy
       '/api/', // API path with trailing slash

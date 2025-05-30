@@ -42,19 +42,39 @@ export const getTerminalWebSocketBaseUrl = (): string => {
 
 // Comprehensive API endpoint mapping for all systems
 export const API_ENDPOINTS = {
-  // Mama Bear endpoints
+  // Mama Bear Chat endpoints (Updated for modular backend)
   MAMA_BEAR: {
-    CHAT: '/api/mama-bear/chat',
-    BRIEFING: '/api/mama-bear/briefing',
+    CHAT: '/api/chat/mama-bear',
+    BRIEFING: '/api/chat/daily-briefing',
+    VERTEX_GARDEN: '/api/chat/vertex-garden',
+    ANALYZE_CODE: '/api/chat/analyze-code',
+    MEMORIES_SEARCH: '/api/chat/memories/search',
+    SESSIONS: '/api/chat/sessions',
+    MODELS: '/api/chat/models',
   },
   
-  // MCP endpoints
+  // MCP endpoints (Updated for modular backend)
   MCP: {
-    MANAGE: '/api/mcp/manage',
     SEARCH: '/api/mcp/search',
     INSTALL: '/api/mcp/install',
     CATEGORIES: '/api/mcp/categories',
-    DISCOVER: '/api/mcp/discover',
+    TRENDING: '/api/mcp/trending',
+    SERVER: '/api/mcp/server',
+    RECOMMENDATIONS: '/api/mcp/recommendations',
+  },
+  
+  // Control Center endpoints (New modular backend)
+  CONTROL_CENTER: {
+    HEALTH: '/api/mama-bear/health',
+    INSTANCES: '/api/mama-bear/code-server/instances',
+    TEMPLATES: '/api/mama-bear/code-server/templates',
+    CREATE_INSTANCE: '/api/mama-bear/code-server/create',
+    CONTROL_INSTANCE: '/api/mama-bear/code-server/control',
+    AGENT_COMMANDS: '/api/mama-bear/agent/commands',
+    EXECUTE_COMMAND: '/api/mama-bear/agent/execute',
+    SYSTEM_METRICS: '/api/mama-bear/system/metrics',
+    WORKSPACE_LIST: '/api/mama-bear/workspace/list',
+    EXTENSIONS_LIST: '/api/mama-bear/extensions/list',
   },
   
   // Vertex Garden endpoints

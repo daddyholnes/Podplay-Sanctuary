@@ -47,14 +47,13 @@ class MamaBearService:
                 {"type": "chat_response", "user_id": user_id, "timestamp": datetime.now().isoformat()}
             )
             
-            return {
-                "success": True,
+            return {                "success": True,
                 "response": response_content,
                 "metadata": {
                     "user_id": user_id,
                     "timestamp": datetime.now().isoformat(),
                     "memory_active": bool(self.memory),
-                    "mcp_servers_available": len(self.marketplace_service.marketplace_data) if self.marketplace_service else 0
+                    "mcp_servers_available": len(self.marketplace_service.search_servers()) if self.marketplace_service else 0
                 }
             }
             
@@ -99,7 +98,7 @@ Remember: You're running in Nathan's Podplay Build sanctuary with access to memo
         message_lower = message.lower()
         
         if any(word in message_lower for word in ['help', 'assist', 'what can you do']):
-            mcp_count = len(self.marketplace_service.marketplace_data) if self.marketplace_service else 0
+            mcp_count = len(self.marketplace_service.search_servers()) if self.marketplace_service else 0
             return f"🐻 Hello! I'm Mama Bear Gem, your lead developer agent. I'm here to help with your Podplay Build sanctuary. What can I assist you with today? I have access to:\n\n" \
                    f"• 🏪 MCP Marketplace with {mcp_count} servers\n" \
                    f"• 🧠 Memory system ({'active' if self.memory else 'local only'})\n" \
@@ -214,7 +213,7 @@ Remember: You're running in Nathan's Podplay Build sanctuary with access to memo
                 "user_id": user_id,
                 "sanctuary_status": "🏡 Active and ready",
                 "memory_summary": f"📝 {len(self.memory)} interactions stored",
-                "mcp_status": f"🏪 {len(self.marketplace_service.marketplace_data) if self.marketplace_service else 0} servers available",
+                "mcp_status": f"🏪 {len(self.marketplace_service.search_servers()) if self.marketplace_service else 0} servers available",
                 "recommendations": [
                     "🌟 Consider exploring new MCP servers for enhanced capabilities",
                     "🔧 Review recent code for optimization opportunities",
