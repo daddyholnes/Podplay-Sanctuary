@@ -14,10 +14,12 @@ import { getFileIcon } from '../utils/fileUtils';
 const SECTION_ID = 'mama-bear';
 
 const MamaBearHub: React.FC = () => {
-  const { chatHistory, addMessage } = useAppStore(state => ({
-    chatHistory: state.chatHistory.filter(msg => msg.section === SECTION_ID),
-    addMessage: state.addMessage,
-  }));
+  // Use separate selectors to avoid infinite re-renders
+  const allChatHistory = useAppStore(state => state.chatHistory);
+  const addMessage = useAppStore(state => state.addMessage);
+  
+  // Filter chat history in component to avoid selector instability
+  const chatHistory = allChatHistory.filter(msg => msg.section === SECTION_ID);
 
   const [dailyBriefing, setDailyBriefing] = useState<DailyBriefingResponse | null>(null);
   const [memorySearchTerm, setMemorySearchTerm] = useState('');
