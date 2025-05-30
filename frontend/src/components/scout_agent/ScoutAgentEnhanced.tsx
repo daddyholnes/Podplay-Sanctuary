@@ -218,7 +218,7 @@ const ScoutAgentEnhanced: React.FC<ScoutAgentEnhancedProps> = ({
       console.log('🚀 Connecting to backend:', backendUrl);
       console.log('🌐 Current hostname:', window.location.hostname);
       
-      const response = await fetch(`${backendUrl}/api/mama-bear/chat`, {
+      const response = await fetch(`${backendUrl}/api/chat/mama-bear`, {
         method: 'POST',
         body: formData,
         mode: 'cors',

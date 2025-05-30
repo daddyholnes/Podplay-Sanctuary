@@ -84,3 +84,27 @@ def services_health():
             "status": "unhealthy",
             "error": str(e)
         }), 500
+
+@health_bp.route('/api/test-connection', methods=['GET'])
+def test_connection():
+    """Test connection endpoint for frontend"""
+    try:
+        return jsonify({
+            "status": "connected",
+            "service": "podplay-sanctuary",
+            "version": "2.0.0",
+            "backend": "modular-architecture",
+            "features": [
+                "mcp-marketplace",
+                "mama-bear-chat",
+                "vertex-ai",
+                "control-center",
+                "socket-io"
+            ]
+        })
+    except Exception as e:
+        logger.error(f"Test connection failed: {e}")
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 500

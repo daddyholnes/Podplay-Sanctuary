@@ -29,33 +29,29 @@ def create_app(config_name='default'):
     # Initialize extensions
     CORS(app, origins="*")
     socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
-    
-    # Initialize database
+      # Initialize database
     from .models.database import SanctuaryDB
     db = SanctuaryDB(app.config['DATABASE_PATH'])
     app.config['DATABASE_INSTANCE'] = db
-      # Initialize marketplace service
+    
+    # Initialize marketplace service
     from .services.marketplace_manager import MCPMarketplaceManager
     marketplace = MCPMarketplaceManager(
         db=db, 
         data_path=str(app.config['MCP_SERVERS_DATA_PATH'])
     )
     app.config['MARKETPLACE_INSTANCE'] = marketplace
-    
-    # Initialize AI services
+      # Initialize AI services
     from .services.vertex_ai_service import VertexAIService
     from .services.mama_bear_service import MamaBearService
-    
-    # Create database service wrapper
-    from .models.database import DatabaseService
-    db_service = DatabaseService(db)
     
     # Initialize Vertex AI service
     vertex_ai_service = VertexAIService()
     app.config['VERTEX_AI_INSTANCE'] = vertex_ai_service
-      # Initialize Mama Bear service with dependencies
+    
+    # Initialize Mama Bear service with dependencies
     mama_bear_service = MamaBearService(
-        db_service=db_service,
+        db_service=db,
         marketplace_service=marketplace
     )
     app.config['MAMA_BEAR_INSTANCE'] = mama_bear_service
@@ -66,18 +62,31 @@ def create_app(config_name='default'):
         marketplace_service=marketplace,
         mama_bear_service=mama_bear_service
     )
-    app.config['DISCOVERY_AGENT_INSTANCE'] = discovery_agent
-      # Register blueprints
+    app.config['DISCOVERY_AGENT_INSTANCE'] = discovery_agent    # Register blueprints
     from .api.blueprints.health import health_bp
     from .api.blueprints.mcp_api import mcp_bp
     from .api.blueprints.chat_api import chat_bp, init_chat_services
+    from .api.blueprints.control_center_api import control_center_bp
+    from .api.blueprints.scout_api import scout_bp
+    from .api.blueprints.nixos_api import nixos_bp
     
     app.register_blueprint(health_bp)
     app.register_blueprint(mcp_bp)
     app.register_blueprint(chat_bp)
-    
-    # Initialize chat services
+    app.register_blueprint(control_center_bp)
+    app.register_blueprint(scout_bp)
+    app.register_blueprint(nixos_bp)
+      # Initialize chat services
     init_chat_services(mama_bear_service, vertex_ai_service)
+    
+    # Add middleware to inject services into request context
+    @app.before_request
+    def inject_services():
+        from flask import request
+        request.mama_bear_service = mama_bear_service
+        request.discovery_agent = discovery_agent
+        request.marketplace_service = marketplace
+        request.vertex_ai_service = vertex_ai_service
     
     # Register Socket.IO handlers
     from .api.blueprints.socket_handlers import register_socketio_handlers
@@ -92,11 +101,14 @@ def create_app(config_name='default'):
         return {
             "service": "Podplay Sanctuary",
             "version": "2.0.0",
-            "status": "running",
-            "endpoints": {
+            "status": "running",            "endpoints": {
                 "health": "/health",
                 "mcp_search": "/api/mcp/search",
-                "mcp_categories": "/api/mcp/categories"
+                "mcp_categories": "/api/mcp/categories",
+                "control_center": "/api/mama-bear/health",
+                "instances": "/api/mama-bear/code-server/instances",
+                "agent_commands": "/api/mama-bear/agent/commands",
+                "system_metrics": "/api/mama-bear/system/metrics"
             }
         }
     

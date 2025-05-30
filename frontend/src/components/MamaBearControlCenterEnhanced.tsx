@@ -163,7 +163,7 @@ const MamaBearControlCenter: React.FC = () => {
     setChatAttachments([]);
 
     try {
-      const response = await fetch(buildApiUrl('/api/mama-bear/chat'), {
+      const response = await fetch(buildApiUrl('/api/chat/mama-bear'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
