@@ -1899,6 +1899,12 @@ def mama_bear_chat():
             "vertex_ai": False,
             "memories_used": [],
             "metadata": {}
+        })
+        
+    except Exception as e:
+        logger.error(f"Error in Mama Bear chat: {e}")
+        return jsonify({
+            "success": False, 
             "error": str(e),
             "response": "🐻 I'm having a moment of technical difficulty. Let me try again in a moment."
         }), 500
