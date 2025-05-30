@@ -69,6 +69,7 @@ def create_app(config_name='default'):
     from .api.blueprints.control_center_api import control_center_bp
     from .api.blueprints.scout_api import scout_bp
     from .api.blueprints.nixos_api import nixos_bp
+    from .api.blueprints.adk_workflow_api import adk_workflow_bp, init_adk_workflow_services
     
     app.register_blueprint(health_bp)
     app.register_blueprint(mcp_bp)
@@ -76,8 +77,10 @@ def create_app(config_name='default'):
     app.register_blueprint(control_center_bp)
     app.register_blueprint(scout_bp)
     app.register_blueprint(nixos_bp)
-      # Initialize chat services
+    app.register_blueprint(adk_workflow_bp)      # Initialize chat services
     init_chat_services(mama_bear_service, vertex_ai_service)
+      # Initialize ADK workflow services
+    init_adk_workflow_services(None, mama_bear_service)  # ADK agent will be set externally
     
     # Add middleware to inject services into request context
     @app.before_request
@@ -108,7 +111,11 @@ def create_app(config_name='default'):
                 "control_center": "/api/mama-bear/health",
                 "instances": "/api/mama-bear/code-server/instances",
                 "agent_commands": "/api/mama-bear/agent/commands",
-                "system_metrics": "/api/mama-bear/system/metrics"
+                "system_metrics": "/api/mama-bear/system/metrics",
+                "adk_workflows": "/api/adk/workflows",
+                "adk_execute": "/api/adk/workflows/execute",
+                "adk_models": "/api/adk/models/status",
+                "adk_health": "/api/adk/system/health"
             }
         }
     

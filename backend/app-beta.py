@@ -64,6 +64,22 @@ except ImportError:
     ENHANCED_MAMA_AVAILABLE = False
     VertexAIMamaBear = None
 
+# ADK Mama Bear Integration
+try:
+    from adk_mama_bear import ADKMamaBearAgent
+    ADK_MAMA_AVAILABLE = True
+except ImportError:
+    ADK_MAMA_AVAILABLE = False
+    ADKMamaBearAgent = None
+    
+# MCP Docker Orchestrator
+try:
+    from mcp_docker_orchestrator import MCPDockerOrchestrator
+    MCP_DOCKER_AVAILABLE = True
+except ImportError:
+    MCP_DOCKER_AVAILABLE = False
+    MCPDockerOrchestrator = None
+
 # DevSandbox Integration
 try:
     from cloud_dev_sandbox import CloudDevSandboxManager as DevSandboxManager
@@ -1044,6 +1060,24 @@ if ENHANCED_MAMA_AVAILABLE and VertexAIMamaBear:
     except Exception as e:
         logger.warning(f"Enhanced Mama Bear not available: {e}")
 
+# Initialize ADK Mama Bear Agent with dynamic model switching
+adk_mama_bear = None
+if ADK_MAMA_AVAILABLE and ADKMamaBearAgent:
+    try:
+        adk_mama_bear = ADKMamaBearAgent()
+        logger.info("🤖 ADK Mama Bear Agent initialized with dynamic model switching")
+    except Exception as e:
+        logger.warning(f"ADK Mama Bear not available: {e}")
+
+# Initialize MCP Docker Orchestrator
+mcp_docker_orchestrator = None
+if MCP_DOCKER_AVAILABLE and MCPDockerOrchestrator:
+    try:
+        mcp_docker_orchestrator = MCPDockerOrchestrator()
+        logger.info("🐳 MCP Docker Orchestrator initialized")
+    except Exception as e:
+        logger.warning(f"MCP Docker Orchestrator not available: {e}")
+
 # Initialize enhanced mama bear for backward compatibility
 enhanced_mama_bear = mama_bear.enhanced_mama
 
@@ -1339,14 +1373,423 @@ def get_scout_logs():
         limit = request.args.get('limit', 50, type=int)
         project_id = request.args.get('project_id', 'default')
         
-        # Get project logger and retrieve logs
-        project_logger = scout_log_manager.get_project_logger(project_id)
+        # Get project logger and retrieve logs        project_logger = scout_log_manager.get_project_logger(project_id)
         logs = project_logger.get_logs(limit=limit)
         
         return jsonify({"success": True, "logs": logs, "project_id": project_id})
+        
     except Exception as e:
         logger.error(f"Error getting scout logs: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+# ==================== ADK WORKFLOW ORCHESTRATION ENDPOINTS ====================
+
+@app.route('/api/adk/workflows', methods=['GET'])
+def get_workflows():
+    """Get list of available workflows"""
+    try:
+        if not adk_mama_bear:
+            return jsonify({
+                "success": False,
+                "error": "ADK Mama Bear agent not available",
+                "workflows": []
+            }), 503
+            
+        # Basic workflow templates
+        workflows = [
+            {
+                "id": "research-analysis",
+                "name": "Research & Analysis",
+                "description": "Multi-model research and analysis workflow",
+                "models": ["claude-3.5-sonnet", "gpt-4o", "gemini-pro"],
+                "steps": ["data_gathering", "analysis", "synthesis", "report"]
+            },
+            {
+                "id": "code-review-multi",
+                "name": "Multi-Model Code Review",
+                "description": "Comprehensive code review using multiple AI models",
+                "models": ["claude-3.5-sonnet", "gpt-4o"],
+                "steps": ["syntax_check", "logic_review", "security_audit", "optimization"]
+            },
+            {
+                "id": "documentation-generation",
+                "name": "Documentation Generation",
+                "description": "Generate comprehensive documentation with multiple perspectives",
+                "models": ["claude-3.5-sonnet", "gemini-pro"],
+                "steps": ["code_analysis", "structure_docs", "examples", "finalization"]
+            }
+        ]
+        
+        return jsonify({
+            "success": True,
+            "workflows": workflows,
+            "adk_status": "active"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting workflows: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "workflows": []
+        }), 500
+
+@app.route('/api/adk/workflows/create', methods=['POST'])
+def create_workflow():
+    """Create a new workflow"""
+    try:
+        if not adk_mama_bear:
+            return jsonify({
+                "success": False,
+                "error": "ADK Mama Bear agent not available"
+            }), 503
+            
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "No workflow data provided"
+            }), 400
+            
+        workflow_id = f"workflow_{int(time.time())}"
+        
+        # Store workflow in a simple in-memory store for now
+        if not hasattr(app, 'workflows'):
+            app.workflows = {}
+            
+        app.workflows[workflow_id] = {
+            "id": workflow_id,
+            "name": data.get("name", "Custom Workflow"),
+            "description": data.get("description", ""),
+            "models": data.get("models", ["claude-3.5-sonnet"]),
+            "steps": data.get("steps", []),
+            "created_at": datetime.now().isoformat(),
+            "status": "created"
+        }
+        
+        return jsonify({
+            "success": True,
+            "workflow_id": workflow_id,
+            "workflow": app.workflows[workflow_id]
+        })
+        
+    except Exception as e:
+        logger.error(f"Error creating workflow: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/adk/workflows/execute', methods=['POST'])
+def execute_workflow():
+    """Execute a workflow with the ADK agent"""
+    try:
+        if not adk_mama_bear:
+            return jsonify({
+                "success": False,
+                "error": "ADK Mama Bear agent not available"
+            }), 503
+            
+        data = request.get_json()
+        if not data:
+            return jsonify({
+                "success": False,
+                "error": "No execution data provided"
+            }), 400
+            
+        workflow_type = data.get("workflow_type", "research-analysis")
+        task_description = data.get("task", "")
+        models = data.get("models", ["claude-3.5-sonnet"])
+        
+        if not task_description:
+            return jsonify({
+                "success": False,
+                "error": "Task description is required"
+            }), 400
+            
+        execution_id = f"exec_{int(time.time())}"
+        
+        # Store execution info
+        if not hasattr(app, 'executions'):
+            app.executions = {}
+            
+        app.executions[execution_id] = {
+            "id": execution_id,
+            "workflow_type": workflow_type,
+            "task": task_description,
+            "models": models,
+            "status": "running",
+            "started_at": datetime.now().isoformat(),
+            "results": []
+        }
+        
+        # Start async execution
+        def run_async_workflow():
+            try:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                
+                # Execute with ADK agent
+                result = loop.run_until_complete(
+                    adk_mama_bear.execute_multi_model_workflow(
+                        task=task_description,
+                        models=models
+                    )
+                )
+                
+                app.executions[execution_id]["status"] = "completed"
+                app.executions[execution_id]["completed_at"] = datetime.now().isoformat()
+                app.executions[execution_id]["results"] = result
+                
+                # Emit Socket.IO event for real-time updates
+                socketio.emit('workflow_completed', {
+                    "execution_id": execution_id,
+                    "status": "completed",
+                    "results": result
+                })
+                
+            except Exception as e:
+                logger.error(f"Workflow execution error: {e}")
+                app.executions[execution_id]["status"] = "failed"
+                app.executions[execution_id]["error"] = str(e)
+                app.executions[execution_id]["completed_at"] = datetime.now().isoformat()
+                
+                socketio.emit('workflow_failed', {
+                    "execution_id": execution_id,
+                    "status": "failed",
+                    "error": str(e)
+                })
+        
+        # Start in background thread
+        thread = threading.Thread(target=run_async_workflow)
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({
+            "success": True,
+            "execution_id": execution_id,
+            "status": "running",
+            "message": "Workflow execution started"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error executing workflow: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/adk/workflows/execution/<execution_id>', methods=['GET'])
+def get_execution_status(execution_id):
+    """Get status of a workflow execution"""
+    try:
+        if not hasattr(app, 'executions') or execution_id not in app.executions:
+            return jsonify({
+                "success": False,
+                "error": "Execution not found"
+            }), 404
+            
+        execution = app.executions[execution_id]
+        return jsonify({
+            "success": True,
+            "execution": execution
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting execution status: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/adk/models/status', methods=['GET'])
+def get_models_status():
+    """Get status of available models"""
+    try:
+        if not adk_mama_bear:
+            return jsonify({
+                "success": False,
+                "error": "ADK Mama Bear agent not available",
+                "models": []
+            }), 503
+            
+        models_status = {
+            "claude-3.5-sonnet": {"status": "available", "provider": "anthropic"},
+            "gpt-4o": {"status": "available", "provider": "openai"},
+            "gemini-pro": {"status": "available", "provider": "google"},
+            "llama-3.1": {"status": "available", "provider": "together"}
+        }
+        
+        current_model = getattr(adk_mama_bear, 'current_model', 'claude-3.5-sonnet')
+        
+        return jsonify({
+            "success": True,
+            "current_model": current_model,
+            "available_models": models_status,
+            "adk_status": "active"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting models status: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "models": []
+        }), 500
+
+@app.route('/api/adk/models/switch', methods=['POST'])
+def switch_model():
+    """Switch the active model for ADK agent"""
+    try:
+        if not adk_mama_bear:
+            return jsonify({
+                "success": False,
+                "error": "ADK Mama Bear agent not available"
+            }), 503
+            
+        data = request.get_json()
+        if not data or 'model' not in data:
+            return jsonify({
+                "success": False,
+                "error": "Model name is required"
+            }), 400
+            
+        model_name = data['model']
+        
+        # Switch model using ADK agent's dynamic switching
+        if hasattr(adk_mama_bear, 'switch_model'):
+            try:
+                # Run async method in a new event loop
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+                success = loop.run_until_complete(adk_mama_bear.switch_model(model_name))
+                loop.close()
+            except Exception as switch_error:
+                logger.error(f"Error in model switching: {switch_error}")
+                success = False
+        else:
+            # Fallback: set model directly if switch_model method not available
+            adk_mama_bear.current_model = model_name
+            success = True
+        
+        if success:
+            return jsonify({
+                "success": True,
+                "message": f"Successfully switched to {model_name}",
+                "current_model": model_name
+            })
+        else:
+            return jsonify({
+                "success": False,
+                "error": f"Failed to switch to {model_name}"
+            }), 400
+            
+    except Exception as e:
+        logger.error(f"Error switching model: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/adk/system/health', methods=['GET'])
+def get_adk_health():
+    """Get health status of ADK system"""
+    try:
+        health_status = {
+            "adk_agent": adk_mama_bear is not None,
+            "models_available": adk_mama_bear is not None,
+            "workflow_engine": True,
+            "last_check": datetime.now().isoformat()
+        }
+        
+        if adk_mama_bear:
+            health_status["current_model"] = getattr(adk_mama_bear, 'current_model', 'claude-3.5-sonnet')
+            health_status["agent_status"] = "active"
+        else:
+            health_status["agent_status"] = "unavailable"
+            
+        return jsonify({
+            "success": True,
+            "health": health_status,
+            "overall_status": "healthy" if health_status["adk_agent"] else "degraded"
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting ADK health: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "overall_status": "error"
+        }), 500
+
+@app.route('/api/adk/system/capabilities', methods=['GET'])
+def get_adk_capabilities():
+    """Get capabilities of the ADK system"""
+    try:
+        capabilities = {
+            "workflows": [
+                "research-analysis",
+                "code-review-multi", 
+                "documentation-generation",
+                "custom-workflow"
+            ],
+            "models": [
+                "claude-3.5-sonnet",
+                "gpt-4o",
+                "gemini-pro",
+                "llama-3.1"
+            ],
+            "features": [
+                "dynamic_model_switching",
+                "multi_model_workflows",
+                "real_time_execution",
+                "workflow_templates",
+                "execution_tracking"
+            ],
+            "integrations": [
+                "socketio_events",
+                "async_execution",
+                "error_handling",
+                "progress_tracking"
+            ]
+        }
+        
+        return jsonify({
+            "success": True,
+            "capabilities": capabilities,
+            "adk_available": adk_mama_bear is not None
+        })
+        
+    except Exception as e:
+        logger.error(f"Error getting ADK capabilities: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+# ==================== ADK WORKFLOW SOCKET.IO HANDLERS ====================
+
+@socketio.on('join_workflow_room')
+def handle_join_workflow_room(data):
+    """Join a workflow execution room for real-time updates"""
+    execution_id = data.get('execution_id')
+    if execution_id:
+        join_room(f"workflow_{execution_id}")
+        emit('joined_workflow_room', {
+            'execution_id': execution_id,
+            'message': 'Joined workflow room for real-time updates'
+        })
+
+@socketio.on('leave_workflow_room')
+def handle_leave_workflow_room(data):
+    """Leave a workflow execution room"""
+    execution_id = data.get('execution_id')
+    if execution_id:
+        leave_room(f"workflow_{execution_id}")
+        emit('left_workflow_room', {
+            'execution_id': execution_id,
+            'message': 'Left workflow room'
+        })
 
 # Start the Flask application
 if __name__ == '__main__':

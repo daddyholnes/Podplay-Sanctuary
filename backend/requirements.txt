@@ -11,6 +11,14 @@ typing-extensions==4.8.0
 mem0ai==0.1.101
 together==0.2.7
 
+# Google ADK and MCP Integration
+google-adk==1.1.1
+fastmcp==2.5.2
+mcp==1.9.2
+anthropic==0.40.0
+openai==1.54.4
+docker==7.1.0
+
 # DevSandbox Dependencies
 psutil==5.9.6
 python-socketio==5.9.0

@@ -52,15 +52,21 @@ export const API_ENDPOINTS = {
     SESSIONS: '/api/chat/sessions',
     MODELS: '/api/chat/models',
   },
-  
-  // MCP endpoints (Updated for modular backend)
+    // MCP endpoints (Updated for modular backend)
   MCP: {
     SEARCH: '/api/mcp/search',
+    DISCOVER: '/api/mcp/discover',
+    MANAGE: '/api/mcp/manage',
     INSTALL: '/api/mcp/install',
     CATEGORIES: '/api/mcp/categories',
     TRENDING: '/api/mcp/trending',
     SERVER: '/api/mcp/server',
     RECOMMENDATIONS: '/api/mcp/recommendations',
+    STATUS: '/api/mcp/status',
+    UNINSTALL: '/api/mcp/uninstall',
+    CONFIG: '/api/mcp/config',
+    LIST: '/api/mcp/list',
+    RESTART: '/api/mcp/restart',
   },
   
   // Control Center endpoints (New modular backend)
@@ -190,9 +196,7 @@ export const API_ENDPOINTS = {
     GET_REPORTS: '/api/scout/projects/:id/reports',
     GET_HISTORY: '/api/scout/projects/:id/history',
     EXPORT_DATA: '/api/scout/projects/:id/export',
-  },
-
-  // System Management endpoints
+  },  // System Management endpoints
   SYSTEM: {
     HEALTH: '/api/system/health',
     STATUS: '/api/system/status',
