@@ -55,11 +55,11 @@ class MCPDockerOrchestrator:
         # Initialize Docker
         self._initialize_docker()
         
-        # Load default MCP server specs
-        self._load_default_servers()
+        # Load default MCP server specs        self._load_default_servers()
         
         logger.info("🔌 MCP Docker Orchestrator initialized")
-      def _initialize_docker(self):
+    
+    def _initialize_docker(self):
         """Initialize Docker client"""
         try:
             import docker

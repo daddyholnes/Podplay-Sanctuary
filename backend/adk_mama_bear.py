@@ -347,8 +347,7 @@ class ADKMamaBearAgent:
                     logger.warning("Anthropic API key not found")
             except Exception as e:
                 logger.error(f"Failed to initialize Anthropic client: {e}")
-        
-        # Initialize Vertex AI
+          # Initialize Vertex AI
         if VERTEX_AVAILABLE:
             try:
                 project_id = os.getenv('GOOGLE_CLOUD_PROJECT')
@@ -357,7 +356,8 @@ class ADKMamaBearAgent:
                     self.model_clients['vertex'] = True  # Mark as available
                     logger.info("🔑 Vertex AI client initialized")
                 else:
-                    logger.warning("Google Cloud project not configured")        except Exception as e:
+                    logger.warning("Google Cloud project not configured")
+            except Exception as e:
                 logger.error(f"Failed to initialize Vertex AI: {e}")
     
     def _initialize_docker(self):
@@ -365,8 +365,7 @@ class ADKMamaBearAgent:
         try:
             if DOCKER_AVAILABLE:
                 import docker
-                self.docker_client = docker.DockerClient.from_env()
-                # Test connection
+                self.docker_client = docker.DockerClient.from_env()                # Test connection
                 self.docker_client.ping()
                 logger.info("🐳 Docker client initialized successfully")
             else:
@@ -379,7 +378,8 @@ class ADKMamaBearAgent:
             self.docker_client = None
     
     def _initialize_memory(self):
-        """Initialize Mem0 for persistent memory"""        try:
+        """Initialize Mem0 for persistent memory"""
+        try:
             # Import mem0 if available
             try:
                 from mem0 import MemoryClient
