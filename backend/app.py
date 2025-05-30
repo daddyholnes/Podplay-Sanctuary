@@ -431,11 +431,15 @@ except ImportError as e:
     agentic_dev_assistant = None
     logger.warning(f"Agentic DevSandbox not available: {e}")
 
-app = Flask(__name__)
-# CORS configuration moved to later in the file
-
+# Flask app is already created earlier in the file at line 174
 # Register test API endpoints for connectivity debugging
 test_api.register_test_endpoints(app)
+
+# Debug: Print all registered routes
+print("🔍 DEBUG: Registered Flask routes:")
+for rule in app.url_map.iter_rules():
+    print(f"  - {rule.rule} [{', '.join(rule.methods)}]")
+print("🔍 DEBUG: Route registration complete")
 
 # ==================== MCP MARKETPLACE DATA MODELS ====================
 
@@ -1895,12 +1899,6 @@ def mama_bear_chat():
             "vertex_ai": False,
             "memories_used": [],
             "metadata": {}
-        })
-        
-    except Exception as e:
-        logger.error(f"Error in Mama Bear chat: {e}")
-        return jsonify({
-            "success": False, 
             "error": str(e),
             "response": "🐻 I'm having a moment of technical difficulty. Let me try again in a moment."
         }), 500
