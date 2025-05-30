@@ -3,14 +3,17 @@ import { useEffect, useState } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useAppStore } from '../store/useAppStore';
 import { ChatMessage, Environment, ScoutStatus, Task, TimelineEvent } from '../types';
-import { SOCKET_URL } from '../utils/constants';
+// import { SOCKET_URL } from '../utils/constants'; // No longer directly used for 'io' constructor
 
 export const useSocket = () => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const { addMessage, updateMessage, updateEnvironment, setScoutStatus, setCurrentScoutTask, updateScoutTaskProgress } = useAppStore();
 
   useEffect(() => {
-    const newSocket = io(SOCKET_URL, {
+    // Connect to the same host/port as the frontend, and specify the '/socket.io' path.
+    // Vite's proxy will then redirect this to the backend.
+    const newSocket = io(window.location.origin, {
+      path: '/socket.io', // Important: this matches the proxy path in vite.config.ts
       transports: ['websocket'], // Prefer WebSocket
     });
     setSocket(newSocket);

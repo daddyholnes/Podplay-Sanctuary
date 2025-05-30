@@ -29,9 +29,15 @@ class DevSandboxManager:
     def __init__(self):
         # ...existing initialization...
         try:
-            self.docker_client = docker.from_env()
+            import docker
+            self.docker_client = docker.DockerClient.from_env()
             self.docker_available = True
             print("✅ Docker client initialized successfully")
+        except ImportError:
+            print("⚠️  Docker package not available")
+            print("📝 DevSandbox will run in simulation mode")
+            self.docker_client = None
+            self.docker_available = False
         except Exception as e:
             print(f"⚠️  Docker not available: {e}")
             print("📝 DevSandbox will run in simulation mode")

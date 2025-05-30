@@ -357,31 +357,33 @@ class ADKMamaBearAgent:
                     self.model_clients['vertex'] = True  # Mark as available
                     logger.info("🔑 Vertex AI client initialized")
                 else:
-                    logger.warning("Google Cloud project not configured")
-            except Exception as e:
+                    logger.warning("Google Cloud project not configured")        except Exception as e:
                 logger.error(f"Failed to initialize Vertex AI: {e}")
     
     def _initialize_docker(self):
         """Initialize Docker client for VM management"""
         try:
             if DOCKER_AVAILABLE:
-                self.docker_client = docker.from_env()
+                import docker
+                self.docker_client = docker.DockerClient.from_env()
                 # Test connection
                 self.docker_client.ping()
                 logger.info("🐳 Docker client initialized successfully")
             else:
                 logger.warning("Docker not available - VM management disabled")
+        except ImportError:
+            logger.warning("🐳 Docker package not available - running in mock mode")
+            self.docker_client = None
         except Exception as e:
             logger.error(f"Failed to initialize Docker: {e}")
             self.docker_client = None
     
     def _initialize_memory(self):
-        """Initialize Mem0 for persistent memory"""
-        try:
+        """Initialize Mem0 for persistent memory"""        try:
             # Import mem0 if available
             try:
-                from mem0 import Memory
-                self.memory_client = Memory()
+                from mem0 import MemoryClient
+                self.memory_client = MemoryClient()
                 logger.info("🧠 Mem0 memory client initialized")
             except ImportError:
                 logger.warning("Mem0 not available - proceeding without persistent memory")

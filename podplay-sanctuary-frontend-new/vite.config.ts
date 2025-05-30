@@ -13,7 +13,7 @@ export default defineConfig({
         changeOrigin: true,
       },
       '/socket.io': {
-        target: 'ws://localhost:5000', // Ensure 'ws' for WebSocket
+        target: 'http://localhost:5000', // Use http, not ws for target
         ws: true,
         changeOrigin: true,
       }
