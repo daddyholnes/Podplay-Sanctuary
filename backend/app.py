@@ -176,7 +176,7 @@ app = Flask(__name__)
 # Enable CORS for all routes with proper preflight handling
 cors = CORS(app, resources={
     r"/*": {
-        "origins": ["http://localhost:5173", "http://127.0.0.1:5173"],
+        "origins": "*",  # Allow all origins for development
         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         "allow_headers": ["Content-Type", "Authorization", "X-Requested-With", "Accept", "Origin"],
         "expose_headers": ["Content-Type", "X-Total-Count"],
@@ -200,7 +200,8 @@ socketio = SocketIO(
     logger=True,
     ping_timeout=60,
     ping_interval=25,
-    manage_session=False
+    manage_session=False,
+    path='/socket.io/'
 )
 
 # ==================== SOCKET.IO EVENT HANDLERS ====================
@@ -432,6 +433,9 @@ except ImportError as e:
 
 app = Flask(__name__)
 # CORS configuration moved to later in the file
+
+# Register test API endpoints for connectivity debugging
+test_api.register_test_endpoints(app)
 
 # ==================== MCP MARKETPLACE DATA MODELS ====================
 
