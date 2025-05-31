@@ -1,11 +1,11 @@
 {
   "name": "podplay-build-backend",
   "version": "1.0.0",
-  "description": "Podplay Build Sanctuary - Backend API for Mama Bear Gem Lead Developer Agent",
-  "main": "app.py",
+  "description": "Podplay Build Sanctuary - Backend API for Mama Bear Gem Lead Developer Agent",  "main": "app_new.py",
   "scripts": {
-    "start": "python app.py",
-    "dev": "python app.py",
+    "start": "python app_new.py",
+    "dev": "python app_new.py",
+    "legacy": "python app.py",
     "install-deps": "pip install -r requirements.txt"
   },
   "keywords": [

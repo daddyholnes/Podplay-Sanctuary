@@ -1970,28 +1970,37 @@ def get_mcp_servers():
         servers = {
             "servers": [
                 {
-                    "id": "filesystem",
-                    "name": "File System Access",
-                    "description": "Secure file system operations",
-                    "status": "available",
-                    "category": "utility",
-                    "capabilities": ["read", "write", "list"]
+                    "id": "github-mcp",
+                    "name": "GitHub MCP Server",
+                    "description": "Official GitHub integration for repository management",
+                    "category": "development_tools",
+                    "author": "Anthropic",
+                    "version": "1.0.0",
+                    "is_official": True,
+                    "popularity_score": 92,
+                    "capabilities": ["repo_management", "issue_tracking", "pr_management"]
                 },
                 {
-                    "id": "database",
-                    "name": "Database Interface",
-                    "description": "SQL database connectivity",
-                    "status": "available", 
-                    "category": "database",
-                    "capabilities": ["query", "insert", "update"]
+                    "id": "aws-mcp",
+                    "name": "AWS MCP Server",
+                    "description": "Official AWS integration for cloud services",
+                    "category": "cloud_services",
+                    "author": "Anthropic",
+                    "version": "1.0.0",
+                    "is_official": True,
+                    "popularity_score": 95,
+                    "capabilities": ["ec2_management", "s3_operations", "lambda_functions"]
                 },
                 {
-                    "id": "web-scraper",
-                    "name": "Web Scraper",
-                    "description": "Extract data from websites",
-                    "status": "available",
-                    "category": "web",
-                    "capabilities": ["scrape", "parse", "extract"]
+                    "id": "notion-mcp",
+                    "name": "Notion MCP",
+                    "description": "Notion workspace integration for content management",
+                    "category": "productivity",
+                    "author": "ai-ng",
+                    "version": "0.5.0",
+                    "is_official": False,
+                    "popularity_score": 75,
+                    "capabilities": ["page_management", "database_operations", "content_sync"]
                 }
             ],
             "total": 3,
@@ -2047,70 +2056,275 @@ def manage_mcp_server():
             "error": str(e)
         }), 500
 
-# ==================== SOCKET.IO EVENT HANDLERS ====================
+@app.route('/api/mcp/install', methods=['POST'])
+def install_mcp_server():
+    """Install an MCP server"""
+    try:
+        data = request.get_json()
+        if not data or 'serverId' not in data:
+            return jsonify({"error": "Invalid request payload"}), 400
 
-@socketio.on('connect')
-def handle_connect():
-    """Handle client connection"""
-    logger.info(f"🔌 Client connected: {request.sid}")
-    socketio.emit('connected', {
-        'status': 'success', 
-        'message': 'Connected to Podplay Sanctuary Backend',
-        'service': 'podplay-sanctuary',
-        'version': '2.0.0',
-        'features': ['mcp-marketplace', 'mama-bear-chat', 'vertex-ai', 'adk-workflows']
-    })
+        server_id = data['serverId']
+        
+        # Mock installation process
+        return jsonify({
+            "success": True,
+            "serverId": server_id,
+            "status": "installed",
+            "message": f"MCP server {server_id} installed successfully"
+        }), 200
+    except Exception as e:
+        logger.error(f"Error installing MCP server: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
-@socketio.on('disconnect')
-def handle_disconnect():
-    """Handle client disconnection"""
-    logger.info(f"🔌 Client disconnected: {request.sid}")
+@app.route('/api/mcp/search', methods=['GET'])
+def search_mcp_servers():
+    """Search MCP servers in the marketplace"""
+    try:
+        query = request.args.get('query', '')
+        category = request.args.get('category', '')
+        official_only = request.args.get('official_only', 'false').lower() == 'true'
+        
+        # Mock search results since MCP service may not be fully initialized
+        mock_servers = [
+            {
+                "id": "github-mcp",
+                "name": "GitHub MCP Server",
+                "description": "Official GitHub integration for repository management",
+                "category": "development_tools",
+                "author": "Anthropic",
+                "version": "1.0.0",
+                "is_official": True,
+                "popularity_score": 92,
+                "capabilities": ["repo_management", "issue_tracking", "pr_management"]
+            },
+            {
+                "id": "aws-mcp",
+                "name": "AWS MCP Server",
+                "description": "Official AWS integration for cloud services",
+                "category": "cloud_services",
+                "author": "Anthropic",
+                "version": "1.0.0",
+                "is_official": True,
+                "popularity_score": 95,
+                "capabilities": ["ec2_management", "s3_operations", "lambda_functions"]
+            },
+            {
+                "id": "notion-mcp",
+                "name": "Notion MCP",
+                "description": "Notion workspace integration for content management",
+                "category": "productivity",
+                "author": "ai-ng",
+                "version": "0.5.0",
+                "is_official": False,
+                "popularity_score": 75,
+                "capabilities": ["page_management", "database_operations", "content_sync"]
+            }
+        ]
+        
+        # Filter by query
+        if query:
+            filtered_servers = [s for s in mock_servers if query.lower() in s['name'].lower() or query.lower() in s['description'].lower()]
+        else:
+            filtered_servers = mock_servers
+        
+        # Filter by category
+        if category:
+            filtered_servers = [s for s in filtered_servers if s['category'] == category]
+        
+        # Filter by official status
+        if official_only:
+            filtered_servers = [s for s in filtered_servers if s['is_official']]
+        
+        return jsonify({
+            "success": True,
+            "servers": filtered_servers,
+            "total": len(filtered_servers),
+            "query": query,
+            "category": category
+        }), 200
+    except Exception as e:
+        logger.error(f"Error searching MCP servers: {e}")
+        return jsonify({"error": "Internal server error"}), 500
 
-@socketio.on('ping')
-def handle_ping(data):
-    """Handle ping/pong for connection testing"""
-    logger.debug(f"🏓 Ping received from {request.sid}: {data}")
-    socketio.emit('pong', {'message': 'Backend alive', 'timestamp': datetime.now().isoformat()})
+@app.route('/api/mcp/categories', methods=['GET'])
+def get_mcp_categories():
+    """Get all available MCP server categories"""
+    try:
+        categories = [
+            {"id": "database", "label": "Database", "description": "Database connectivity and operations"},
+            {"id": "cloud_services", "label": "Cloud Services", "description": "Cloud platform integrations"},
+            {"id": "development_tools", "label": "Development Tools", "description": "Code and development utilities"},
+            {"id": "communication", "label": "Communication", "description": "Messaging and collaboration tools"},
+            {"id": "ai_ml", "label": "AI & Machine Learning", "description": "AI model and ML service integrations"},
+            {"id": "productivity", "label": "Productivity", "description": "Workflow and productivity enhancement"},
+            {"id": "search_data", "label": "Search & Data", "description": "Search engines and data processing"},
+            {"id": "file_system", "label": "File System", "description": "File operations and management"},
+            {"id": "web_apis", "label": "Web APIs", "description": "Web service and API integrations"},
+            {"id": "security", "label": "Security", "description": "Security and authentication tools"},
+            {"id": "monitoring", "label": "Monitoring", "description": "System monitoring and logging"},
+            {"id": "content_management", "label": "Content Management", "description": "Content creation and management"}
+        ]
+        
+        return jsonify({
+            "success": True,
+            "categories": categories,
+            "total": len(categories)
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting MCP categories: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "categories": []
+        }), 500
 
-# ==================== ADK WORKFLOW SOCKET.IO HANDLERS ====================
+@app.route('/api/dev-sandbox/<sandbox_id>/preview/start', methods=['POST'])
+def start_dev_sandbox_preview(sandbox_id):
+    """Start live preview for a specific sandbox environment"""
+    if not DEV_SANDBOX_AVAILABLE:
+        return jsonify({"error": "DevSandbox service is not available"}), 503
 
-@socketio.on('join_workflow_room')
-def handle_join_workflow_room(data):
-    """Join a workflow execution room for real-time updates"""
-    execution_id = data.get('execution_id')
-    if execution_id:
-        join_room(f"workflow_{execution_id}")
-        emit('joined_workflow_room', {
-            'execution_id': execution_id,
-            'message': 'Joined workflow room for real-time updates'
-        })
+    try:
+        dev_sandbox_manager = DevSandboxManager()
+        preview_info = dev_sandbox_manager.start_live_preview(sandbox_id)
 
-@socketio.on('leave_workflow_room')
-def handle_leave_workflow_room(data):
-    """Leave a workflow execution room"""
-    execution_id = data.get('execution_id')
-    if execution_id:
-        leave_room(f"workflow_{execution_id}")
-        emit('left_workflow_room', {
-            'execution_id': execution_id,
-            'message': 'Left workflow room'
-        })
+        if not preview_info:
+            return jsonify({"error": "Failed to start live preview"}), 500
 
-# Start the Flask application with Socket.IO
-if __name__ == '__main__':
-    print("\n🚀 Starting Podplay Backend Server with Socket.IO...")
-    print(f"🌐 Server will be available at: http://localhost:5000")
-    print("📊 API endpoints ready for DevSandbox, Mama Bear, and Vertex Garden")
-    print("🔌 Socket.IO enabled for real-time communication")
-    print("🔧 Press Ctrl+C to stop the server\n")
+        return jsonify({
+            "success": True,
+            "sandboxId": sandbox_id,
+            "previewUrl": preview_info.get('preview_url')
+        }), 200
+    except Exception as e:
+        logger.error(f"Error starting live preview for sandbox {sandbox_id}: {e}")
+        return jsonify({"error": "Internal server error"}), 500
+
+@app.route('/api/mcp/trending', methods=['GET'])
+def get_trending_mcp_servers():
+    """Get trending MCP servers"""
+    try:
+        limit = int(request.args.get('limit', 10))
+        
+        # Initialize marketplace manager
+        db = SanctuaryDB()
+        marketplace = MCPMarketplaceManager(db)
+        
+        # Get trending servers
+        trending_servers = marketplace.get_trending_servers(limit)
+        
+        return jsonify({
+            "success": True,
+            "servers": trending_servers,
+            "total": len(trending_servers),
+            "limit": limit
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error getting trending MCP servers: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "servers": []
+        }), 500
+
+@app.route('/api/nixos/workspaces', methods=['GET', 'POST'])
+def nixos_workspaces():
+    """Handle NixOS workspace operations"""
+    if not NIXOS_INFRASTRUCTURE_AVAILABLE:
+        return jsonify({"error": "NixOS infrastructure is not available"}), 503
     
-    # CRITICAL: Use socketio.run() instead of app.run() for Socket.IO support
-    socketio.run(
-        app,
-        host='0.0.0.0',
-        port=5000,
-        debug=True,
-        use_reloader=False,
-        allow_unsafe_werkzeug=True,
-        log_output=True
-    )
+    try:
+        if request.method == 'GET':
+            # List all workspaces
+            orchestrator = NixOSSandboxOrchestrator()
+            workspaces = orchestrator.list_workspaces()
+            
+            return jsonify({
+                "success": True,
+                "workspaces": workspaces,
+                "total": len(workspaces)
+            }), 200
+            
+        elif request.method == 'POST':
+            # Create new workspace
+            data = request.get_json()
+            if not data or 'name' not in data:
+                return jsonify({"error": "Invalid request payload"}), 400
+            
+            workspace_name = data['name']
+            workspace_config = data.get('config', {})
+            
+            orchestrator = NixOSSandboxOrchestrator()
+            workspace_info = orchestrator.create_workspace(workspace_name, workspace_config)
+            
+            if not workspace_info:
+                return jsonify({"error": "Failed to create workspace"}), 500
+            
+            return jsonify({
+                "success": True,
+                "workspace": workspace_info
+            }), 201
+            
+    except Exception as e:
+        logger.error(f"Error in NixOS workspaces endpoint: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>/start', methods=['POST'])
+def start_nixos_workspace(workspace_id):
+    """Start a specific NixOS workspace"""
+    if not NIXOS_INFRASTRUCTURE_AVAILABLE:
+        return jsonify({"error": "NixOS infrastructure is not available"}), 503
+    
+    try:
+        orchestrator = NixOSSandboxOrchestrator()
+        result = orchestrator.start_workspace(workspace_id)
+        
+        if not result:
+            return jsonify({"error": "Failed to start workspace"}), 500
+        
+        return jsonify({
+            "success": True,
+            "workspaceId": workspace_id,
+            "status": "starting",
+            "message": "Workspace is starting up"
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error starting NixOS workspace {workspace_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/api/nixos/workspaces/<workspace_id>/stop', methods=['POST'])
+def stop_nixos_workspace(workspace_id):
+    """Stop a specific NixOS workspace"""
+    if not NIXOS_INFRASTRUCTURE_AVAILABLE:
+        return jsonify({"error": "NixOS infrastructure is not available"}), 503
+    
+    try:
+        orchestrator = NixOSSandboxOrchestrator()
+        result = orchestrator.stop_workspace(workspace_id)
+        
+        if not result:
+            return jsonify({"error": "Failed to stop workspace"}), 500
+        
+        return jsonify({
+            "success": True,
+            "workspaceId": workspace_id,
+            "status": "stopped",
+            "message": "Workspace has been stopped"
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Error stopping NixOS workspace {workspace_id}: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e)
+        }), 500

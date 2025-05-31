@@ -55,31 +55,38 @@ def create_app(config_name='default'):
         marketplace_service=marketplace
     )
     app.config['MAMA_BEAR_INSTANCE'] = mama_bear_service
-    
-    # Initialize Proactive Discovery Agent
+      # Initialize Proactive Discovery Agent
     from .services.proactive_discovery_agent import ProactiveDiscoveryAgent
+    
     discovery_agent = ProactiveDiscoveryAgent(
         marketplace_service=marketplace,
         mama_bear_service=mama_bear_service
     )
-    app.config['DISCOVERY_AGENT_INSTANCE'] = discovery_agent    # Register blueprints
+    app.config['DISCOVERY_AGENT_INSTANCE'] = discovery_agent
+    
+    # Register blueprints
     from .api.blueprints.health import health_bp
     from .api.blueprints.mcp_api import mcp_bp
     from .api.blueprints.chat_api import chat_bp, init_chat_services
     from .api.blueprints.control_center_api import control_center_bp
     from .api.blueprints.scout_api import scout_bp
     from .api.blueprints.nixos_api import nixos_bp
+    from .api.blueprints.devsandbox_api import devsandbox_bp
     from .api.blueprints.adk_workflow_api import adk_workflow_bp, init_adk_workflow_services
     
-    app.register_blueprint(health_bp)
+    app.register_blueprint(health_bp, url_prefix='/api')  # Register with /api prefix
     app.register_blueprint(mcp_bp)
     app.register_blueprint(chat_bp)
     app.register_blueprint(control_center_bp)
     app.register_blueprint(scout_bp)
     app.register_blueprint(nixos_bp)
-    app.register_blueprint(adk_workflow_bp)      # Initialize chat services
+    app.register_blueprint(devsandbox_bp)
+    app.register_blueprint(adk_workflow_bp)
+
+    # Initialize chat services
     init_chat_services(mama_bear_service, vertex_ai_service)
-      # Initialize ADK workflow services
+    
+    # Initialize ADK workflow services
     init_adk_workflow_services(None, mama_bear_service)  # ADK agent will be set externally
     
     # Add middleware to inject services into request context
@@ -112,6 +119,7 @@ def create_app(config_name='default'):
                 "instances": "/api/mama-bear/code-server/instances",
                 "agent_commands": "/api/mama-bear/agent/commands",
                 "system_metrics": "/api/mama-bear/system/metrics",
+                "devsandbox": "/api/devsandbox/status",
                 "adk_workflows": "/api/adk/workflows",
                 "adk_execute": "/api/adk/workflows/execute",
                 "adk_models": "/api/adk/models/status",
