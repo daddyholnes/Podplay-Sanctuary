@@ -1,9 +1,10 @@
 
 import React, { useState } from 'react';
-import Sidebar from './components/Sidebar';
-import UnifiedDevelopmentHub from './components/UnifiedDevelopmentHub';
-import { ViewType } from './types';
-import { APP_TITLE } from './constants'; 
+import './src/index.css';
+import Sidebar from './src/components/Sidebar';
+import UnifiedDevelopmentHub from './src/components/UnifiedDevelopmentHub';
+import { ViewType } from './src/types';
+import { APP_TITLE } from './src/constants'; 
 
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<ViewType>(ViewType.MamaBearChat);
