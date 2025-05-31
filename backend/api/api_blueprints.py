@@ -38,6 +38,10 @@ def register_blueprints(app: Flask):
         from .blueprints.scout_agent_blueprint import scout_bp
         app.register_blueprint(scout_bp)
         
+        # NixOS Workspaces API endpoints
+        from .blueprints.nixos_workspaces_blueprint import nixos_bp
+        app.register_blueprint(nixos_bp)
+        
         logger.info("All API blueprints registered successfully")
         
         # Log registered routes for debugging

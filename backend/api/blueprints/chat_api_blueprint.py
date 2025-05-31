@@ -17,7 +17,7 @@ from utils.validators import validate_chat_input
 logger = get_logger(__name__)
 
 # Create blueprint for chat and AI interaction operations
-chat_bp = Blueprint('chat', __name__, url_prefix='/api/mama-bear')
+chat_bp = Blueprint('chat', __name__, url_prefix='/api/chat')
 
 # Agent instance will be injected by service initialization
 mama_bear_agent: MamaBearAgent = None
@@ -33,7 +33,7 @@ def init_chat_api(agent: MamaBearAgent):
     mama_bear_agent = agent
     logger.info("Chat API blueprint initialized with Mama Bear agent")
 
-@chat_bp.route('/chat', methods=['POST'])
+@chat_bp.route('/mama-bear', methods=['POST'])
 def process_chat_message():
     """
     Process chat interaction with Mama Bear AI agent including context management

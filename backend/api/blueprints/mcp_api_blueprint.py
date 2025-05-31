@@ -359,3 +359,51 @@ def get_recommendations():
             "error": "Failed to generate recommendations",
             "recommendations": []
         }), 500
+
+@mcp_bp.route('/manage', methods=['GET'])
+def manage_installed_servers():
+    """
+    Get list of installed MCP servers for management interface
+    
+    Returns:
+        JSON response with installed servers and management options
+    """
+    try:
+        if not marketplace_manager:
+            return jsonify({
+                "success": False,
+                "error": "Marketplace service not available",
+                "installed_servers": []
+            }), 503
+        
+        # Get installed servers (same as /installed but formatted for management UI)
+        installed_servers = marketplace_manager.get_installed_servers()
+        
+        # Format for management interface
+        management_data = []
+        for server in installed_servers:
+            management_data.append({
+                "name": server.get("name", "Unknown"),
+                "status": server.get("status", "unknown"),
+                "description": server.get("description", ""),
+                "version": server.get("version", "latest"),
+                "last_updated": server.get("last_updated", ""),
+                "actions": ["restart", "update", "uninstall", "configure"]
+            })
+        
+        logger.debug(f"Management interface serving {len(management_data)} installed servers")
+        
+        return jsonify({
+            "success": True,
+            "installed_servers": management_data,
+            "total_count": len(management_data),
+            "management_actions": ["install_new", "update_all", "restart_all"]
+        })
+        
+    except Exception as e:
+        logger.error(f"MCP management endpoint error: {e}")
+        return jsonify({
+            "success": False,
+            "error": "Failed to retrieve management data",
+            "installed_servers": []
+        }), 500
