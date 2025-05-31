@@ -70,21 +70,21 @@ def create_app(config_name='development'):
         manage_session=False,
         path='/socket.io/'
     )
-    
-    # Initialize database
+      # Initialize database
     from models.database import init_database
     init_database(app)
     
-    # Register API blueprints
-    from api import register_blueprints
-    register_blueprints(app)
-      # Register Socket.IO handlers
-    from api.blueprints.socket_handlers import register_socket_handlers
-    register_socket_handlers(socketio)
-    
-    # Initialize services and inject dependencies
+    # Initialize services FIRST - before registering blueprints
     from services import initialize_services
     initialize_services(app)
+    
+    # Register API blueprints AFTER services are initialized
+    from api import register_blueprints
+    register_blueprints(app)
+    
+    # Register Socket.IO handlers
+    from api.blueprints.socket_handlers import register_socket_handlers
+    register_socket_handlers(socketio)
     
     # Register global error handlers
     from utils.error_handlers import register_error_handlers

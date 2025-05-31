@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Socket.IO Connection Test</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.js"></script>
+</head>
+<body>
+    <h1>Socket.IO Connection Test</h1>
+    <div id="status">Connecting...</div>
+    <div id="messages"></div>
+
+    <script>
+        const socket = io('http://127.0.0.1:5000', {
+            transports: ['websocket', 'polling'],
+            timeout: 5000,
+            forceNew: true
+        });
+
+        const statusDiv = document.getElementById('status');
+        const messagesDiv = document.getElementById('messages');
+
+        function addMessage(message) {
+            const p = document.createElement('p');
+            p.textContent = `${new Date().toLocaleTimeString()}: ${message}`;
+            messagesDiv.appendChild(p);
+        }
+
+        socket.on('connect', () => {
+            statusDiv.textContent = '✅ Connected to Socket.IO server!';
+            statusDiv.style.color = 'green';
+            addMessage('Connected successfully');
+        });
+
+        socket.on('disconnect', () => {
+            statusDiv.textContent = '❌ Disconnected from server';
+            statusDiv.style.color = 'red';
+            addMessage('Disconnected');
+        });
+
+        socket.on('connect_error', (error) => {
+            statusDiv.textContent = '❌ Connection failed';
+            statusDiv.style.color = 'red';
+            addMessage(`Connection error: ${error.message}`);
+        });
+
+        // Test chat connection
+        setTimeout(() => {
+            socket.emit('join_chat', { user_id: 'test_user' });
+            addMessage('Sent join_chat event');
+        }, 1000);
+    </script>
+</body>
+</html>
