@@ -49,6 +49,67 @@ Podplay Build is a revolutionary **desktop AI assistant** that combines the powe
 - **System Tray Integration**: Quick access from anywhere
 - **Cross-Platform**: Works on Windows, macOS, and Linux
 
+---
+
+## 📦 Professional Repo Structure
+
+- All documentation is in the [`docs/`](./docs) folder
+- All test scripts and files are in the [`test/`](./test) folder
+- All install/setup scripts are consolidated (see below)
+
+## 🚀 Quick Start (Windows)
+
+1. **Clone the repo:**
+   ```pwsh
+   git clone <repo-url>
+   cd Podplay-Sanctuary
+   ```
+2. **Install all dependencies:**
+   ```pwsh
+   ./install.ps1
+   ```
+3. **Run the app:**
+   - See `docs/USER_GUIDE.md` for run instructions for backend, frontend, and electron.
+
+## 🚀 Quick Start (Linux/Mac)
+
+1. **Clone the repo:**
+   ```bash
+   git clone <repo-url>
+   cd Podplay-Sanctuary
+   ```
+2. **Install all dependencies:**
+   ```bash
+   ./install.sh
+   ```
+3. **Run the app:**
+   - See `docs/USER_GUIDE.md` for run instructions for backend, frontend, and electron.
+
+## 🧹 Cleanup
+
+To remove all build artifacts, caches, and temp files:
+- On Windows:
+  ```pwsh
+  ./cleanup.ps1
+  ```
+- On Linux/Mac:
+  ```bash
+  ./cleanup.sh
+  ```
+
+---
+
+## 🗂️ Folders
+- `docs/` — All documentation
+- `test/` — All test scripts and files
+- `backend/` — Python backend
+- `frontend/` — React frontend
+- `electron/` — Electron desktop app
+
+---
+
+## 📝 For more details, see the documentation in the `docs/` folder.
+
 ## 🚀 Quick Start
 
 ### One-Click Installation
