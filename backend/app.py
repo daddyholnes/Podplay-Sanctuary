@@ -78,13 +78,13 @@ def create_app(config_name='development'):
     # Register API blueprints
     from api import register_blueprints
     register_blueprints(app)
-    
-    # Register Socket.IO handlers
+      # Register Socket.IO handlers
     from api.blueprints.socket_handlers import register_socket_handlers
     register_socket_handlers(socketio)
-      # Initialize services - temporarily disabled
-    # from services import initialize_services
-    # initialize_services(app)
+    
+    # Initialize services and inject dependencies
+    from services import initialize_services
+    initialize_services(app)
     
     # Register global error handlers
     from utils.error_handlers import register_error_handlers
