@@ -18,35 +18,40 @@ const ChatInput: React.FC<ChatInputProps> = ({ onSendMessage, isLoading }) => {
     }
   };
 
-  const iconButtonClasses = "p-2 text-gray-400 hover:text-purple-400 transition-colors rounded-full hover:bg-slate-700/50";
+  const iconButtonClasses = "p-2 text-gray-400 hover:text-purple-400 transition-all duration-200 rounded-lg hover:bg-slate-700/30";
 
   return (
-    <form onSubmit={handleSubmit} className="flex items-center p-3 bg-slate-800 space-x-2 w-full">
-      <button type="button" className={iconButtonClasses} title="Attach file">
-        <PlusCircleIcon className="w-6 h-6" />
-      </button>
-      <button type="button" className={iconButtonClasses} title="Upload image (Not implemented)">
-        <DocumentIcon className="w-6 h-6" />
-      </button>
-       <button type="button" className={iconButtonClasses} title="Use microphone (Not implemented)">
-        <MicrophoneIcon className="w-6 h-6" />
-      </button>
+    <form onSubmit={handleSubmit} className="flex items-center p-4 space-x-3 w-full">
+      <div className="flex items-center space-x-2">
+        <button type="button" className={iconButtonClasses} title="Attach file">
+          <PlusCircleIcon className="w-5 h-5" />
+        </button>
+        <button type="button" className={iconButtonClasses} title="Upload document">
+          <DocumentIcon className="w-5 h-5" />
+        </button>
+        <button type="button" className={iconButtonClasses} title="Voice input">
+          <MicrophoneIcon className="w-5 h-5" />
+        </button>
+      </div>
 
-      <input
-        type="text"
-        value={inputValue}
-        onChange={(e) => setInputValue(e.target.value)}
-        placeholder="Ask Mama Bear anything..."
-        className="flex-1 p-3 bg-slate-700/50 border border-slate-600 rounded-lg text-gray-200 placeholder-gray-500 focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all"
-        disabled={isLoading}
-      />
-       <button type="button" className={iconButtonClasses} title="Emoji (Not implemented)">
-        <FaceSmileIcon className="w-6 h-6" />
-      </button>
+      <div className="flex-1 relative">
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          placeholder="Ask Mama Bear anything..."
+          className="w-full p-3 pr-12 bg-slate-700/50 backdrop-blur-sm border border-slate-600/50 rounded-xl text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-purple-500/50 focus:border-purple-500/50 focus:bg-slate-700/70 outline-none transition-all duration-200"
+          disabled={isLoading}
+        />
+        <button type="button" className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-purple-400 transition-colors" title="Add emoji">
+          <FaceSmileIcon className="w-5 h-5" />
+        </button>
+      </div>
+
       <button
         type="submit"
         disabled={isLoading || !inputValue.trim()}
-        className="p-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-slate-600 disabled:cursor-not-allowed transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-slate-800"
+        className="p-3 scout-gradient text-white rounded-xl hover:shadow-lg disabled:bg-slate-600 disabled:cursor-not-allowed transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-purple-500/50 focus:ring-offset-2 focus:ring-offset-slate-800 glow-purple disabled:shadow-none"
         title="Send message"
       >
         <PaperAirplaneIcon className="w-6 h-6" />
