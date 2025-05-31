@@ -3,13 +3,13 @@ Flask-CORS==4.0.0
 Flask-SocketIO==5.3.6
 Werkzeug==2.3.7
 requests==2.31.0
-python-dotenv==1.0.0
+python-dotenv>=1.1.0
 schedule==1.2.0
-typing-extensions==4.8.0
+typing-extensions>=4.11,<5
 
 # Enhanced Mama Bear Capabilities
 mem0ai==0.1.101
-together==0.2.7
+# together==0.2.7
 
 # Google ADK and MCP Integration
 google-adk==1.1.1
@@ -27,11 +27,11 @@ scp==0.14.5
 # libvirt-python==9.8.0  # Commented out for Cloud Run deployment - not available in Cloud Run environment
 
 # Google Cloud and Vertex AI integration
-google-cloud-aiplatform==1.38.1
+google-cloud-aiplatform>=1.87.0
 google-auth==2.23.3
 google-auth-oauthlib==1.1.0
-google-auth-httplib2==0.1.1
-google-api-python-client==2.103.0
+google-auth-httplib2>=0.2.0,<1.0.0
+google-api-python-client>=2.157.0
 google-cloud-core==2.3.3
 
 # Production server

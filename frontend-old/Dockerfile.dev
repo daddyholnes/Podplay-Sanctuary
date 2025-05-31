@@ -1,0 +1,23 @@
+# Development Dockerfile for frontend
+FROM node:18-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+
+# Install dependencies without running postinstall scripts
+RUN npm ci --ignore-scripts
+
+# Copy source code
+COPY . .
+
+# Run TypeScript check now that source files are available
+RUN npm run postinstall
+
+# Expose port
+EXPOSE 5173
+
+# Start the development server
+CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0", "--port", "5173"]
