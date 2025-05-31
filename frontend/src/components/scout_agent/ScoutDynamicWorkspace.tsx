@@ -175,7 +175,6 @@ const ScoutDynamicWorkspace: React.FC = () => {
     if (currentAction?.id === id) {
       setCurrentAction(prev => prev ? { ...prev, ...updates } : null);
     }  };
-
   // ==================== MESSAGE HANDLING ====================
   
   const sendMessage = async () => {
@@ -191,6 +190,102 @@ const ScoutDynamicWorkspace: React.FC = () => {
     setAttachments([]);
     setIsLoading(true);
     setIsTyping(true);
+
+    // Add action for MCP/RAG processing
+    const actionId = addAgentAction({
+      type: 'thinking',
+      name: 'Processing Request',
+      description: 'Mama Bear is analyzing your message with MCP tools and RAG knowledge...',
+      status: 'running'
+    });
+
+    try {
+      // Enhanced backend call with MCP/RAG/web search support
+      const formData = new FormData();
+      formData.append('message', message);
+      formData.append('project_id', projectContext?.id || 'scout-session');
+      formData.append('workspace_mode', workspaceState.mode);
+      formData.append('context', JSON.stringify({
+        workspace_active: workspaceState.mode !== 'chat',
+        current_files: fileTree.map(f => f.name),
+        project_context: projectContext,
+        agent_actions: agentActions.slice(-5) // Last 5 actions for context
+      }));
+      
+      // Add file attachments
+      files.forEach((file, index) => {
+        if (file.file) {
+          formData.append(`file_${index}`, file.file);
+        }
+      });
+
+      // Use dynamic API URL resolution
+      const getBackendUrl = () => {
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          return 'http://localhost:5000';
+        }
+        
+        if (window.location.hostname.includes('app.github.dev')) {
+          const backendUrl = window.location.hostname.replace('-5173.', '-5000.');
+          return `https://${backendUrl}`;
+        }
+        
+        return window.location.origin.replace(':5173', ':5000');
+      };
+      
+      const backendUrl = getBackendUrl();
+      console.log('🚀 Scout Agent connecting to:', backendUrl);
+
+      const response = await fetch(`${backendUrl}/api/scout-agent/chat`, {
+        method: 'POST',
+        body: formData,
+        mode: 'cors',
+        headers: {
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const data = await response.json();
+      
+      // Update action as completed
+      updateAgentAction(actionId, {
+        status: 'completed',
+        output: data.tools_used || [],
+        progress: 100
+      });
+
+      // Add Mama Bear's response
+      addMessage('assistant', data.response || 'I received your message and processed it with my available tools!');
+
+      // Handle any actions or workspace transitions from the response
+      if (data.workspace_transition) {
+        handleWorkspaceTransition(data.workspace_transition);
+      }
+
+      if (data.file_operations) {
+        handleFileOperations(data.file_operations);
+      }
+
+      if (data.orchestration_data) {
+        handleOrchestrationData(data.orchestration_data);
+      }
+
+    } catch (error) {
+      console.error('Scout Agent error:', error);
+        updateAgentAction(actionId, {
+        status: 'failed',
+        output: error instanceof Error ? error.message : String(error)
+      });
+
+      addMessage('system', `⚠️ Connection error: ${error instanceof Error ? error.message : String(error)}. Please check that the backend server is running.`);
+    } finally {
+      setIsLoading(false);
+      setIsTyping(false);
+    }
 
     // Check if this looks like a project request
     const isProjectRequest = message.toLowerCase().includes('build') || 
@@ -271,11 +366,112 @@ const ScoutDynamicWorkspace: React.FC = () => {
       setIsLoading(false);
     }
   };
-
   const handleSubmit = async (message: string, files?: MediaAttachment[]) => {
     setCurrentInput(message);
     if (files) setAttachments(files);
     await sendMessage();
+  };
+
+  // ==================== MCP/RAG/WEB SEARCH HANDLERS ====================
+
+  const handleWorkspaceTransition = async (transitionData: any) => {
+    console.log('🔄 Handling workspace transition:', transitionData);
+    
+    if (transitionData.mode) {
+      setWorkspaceState(prev => ({
+        ...prev,
+        mode: transitionData.mode,
+        isTransitioning: true
+      }));
+
+      // Add action for transition
+      const actionId = addAgentAction({
+        type: 'system',
+        name: 'Workspace Transition',
+        description: `Switching to ${transitionData.mode} mode...`,
+        status: 'running'
+      });
+
+      setTimeout(() => {
+        setWorkspaceState(prev => ({
+          ...prev,
+          isTransitioning: false
+        }));
+        
+        updateAgentAction(actionId, {
+          status: 'completed',
+          progress: 100
+        });
+      }, 2000);
+    }
+  };
+
+  const handleFileOperations = async (fileOps: any[]) => {
+    console.log('📁 Handling file operations:', fileOps);
+    
+    for (const op of fileOps) {
+      const actionId = addAgentAction({
+        type: 'file_operation',
+        name: `File ${op.action}`,
+        description: `${op.action} ${op.path}`,
+        status: 'running'
+      });
+
+      try {
+        // Simulate file operation
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        if (op.action === 'create' || op.action === 'update') {
+          const newFile: FileNode = {
+            id: `file-${Date.now()}`,
+            name: op.path.split('/').pop() || 'unknown',
+            type: 'file',
+            path: op.path,
+            content: op.content || '',
+            language: op.language || 'text',
+            modified: false
+          };
+          
+          setFileTree(prev => [...prev, newFile]);
+        }
+
+        updateAgentAction(actionId, {
+          status: 'completed',
+          output: `Successfully ${op.action}d ${op.path}`,
+          progress: 100
+        });
+
+      } catch (error) {
+        updateAgentAction(actionId, {
+          status: 'failed',
+          output: `Failed to ${op.action} ${op.path}: ${error}`
+        });
+      }
+    }
+  };
+
+  const handleOrchestrationData = async (orchData: OrchestrationData) => {
+    console.log('🎯 Handling orchestration data:', orchData);
+    
+    if (orchData.workspace_created) {
+      setProjectContext(prev => prev ? {
+        ...prev,
+        workspaceId: orchData.workspace_id,
+        vmId: orchData.vm_id,
+        status: 'workspace_ready'
+      } : null);
+
+      addMessage('system', `✅ Workspace created! ID: ${orchData.workspace_id}`);
+      
+      if (orchData.preview_url) {
+        setLivePreview({
+          type: 'web',
+          url: orchData.preview_url,
+          title: 'Live Preview',
+          isLoading: false
+        });
+      }
+    }
   };
 
   // ==================== WORKSPACE MANAGEMENT ====================
@@ -1970,34 +2166,49 @@ if __name__ == "__main__":
           </div>
         )}
         <div ref={chatEndRef} />
-      </div>
-
-      <div className="scout-chat-input-section">
+      </div>      <div className="scout-chat-input-section">
         <div className="scout-chat-input-wrapper">
-          <div className="scout-quick-start-buttons">
+          {/* Enhanced Scout Agent Action Bar - Full Width with Small Icon Buttons */}
+          <div className="scout-action-bar">
             <button 
-              className="scout-quick-btn"
-              onClick={() => handleSubmit("Build me a beautiful website")}
+              className="scout-action-icon-btn research"
+              onClick={() => handleSubmit("Research this topic comprehensively with web search, analysis, and documentation")}
+              title="Research - Web search, analysis, documentation"
             >
-              🌐 Website
+              <span className="scout-action-icon">🔍</span>
+              <span className="scout-action-label">Research</span>
             </button>
             <button 
-              className="scout-quick-btn"
-              onClick={() => handleSubmit("Create a Python API")}
+              className="scout-action-icon-btn create"
+              onClick={() => handleSubmit("Create a new project, application, or solution from scratch")}
+              title="Create - Build new projects, apps, solutions"
             >
-              🐍 API
+              <span className="scout-action-icon">✨</span>
+              <span className="scout-action-label">Create</span>
             </button>
             <button 
-              className="scout-quick-btn"
-              onClick={() => handleSubmit("Build a React app")}
+              className="scout-action-icon-btn plan"
+              onClick={() => handleSubmit("Plan and architect a comprehensive development strategy and roadmap")}
+              title="Plan - Architecture, strategy, roadmap"
             >
-              ⚛️ React App
+              <span className="scout-action-icon">📋</span>
+              <span className="scout-action-label">Plan</span>
             </button>
             <button 
-              className="scout-quick-btn"
-              onClick={() => handleSubmit("Make a Discord bot")}
+              className="scout-action-icon-btn analyze"
+              onClick={() => handleSubmit("Analyze code, data, patterns, performance, and provide insights")}
+              title="Analyze - Code review, data analysis, insights"
             >
-              🤖 Bot
+              <span className="scout-action-icon">📊</span>
+              <span className="scout-action-label">Analyze</span>
+            </button>
+            <button 
+              className="scout-action-icon-btn debug"
+              onClick={() => handleSubmit("Debug issues, troubleshoot problems, and fix errors systematically")}
+              title="Debug - Troubleshoot, fix errors, solve problems"
+            >
+              <span className="scout-action-icon">🔧</span>
+              <span className="scout-action-label">Debug</span>
             </button>
           </div>
           
@@ -2039,7 +2250,7 @@ if __name__ == "__main__":
                 ...attachment,
                 preview: attachment.type === 'image' ? attachment.url : undefined
               }))}
-              placeholder="🐻 Tell Mama Bear what amazing thing you want to build..."
+              placeholder="🐻 Tell Scout what amazing thing you want to build..."
               disabled={isLoading}
               theme="sanctuary"
               allowFileUpload={true}
@@ -2047,6 +2258,7 @@ if __name__ == "__main__":
               allowAudioRecording={true}
               allowVideoRecording={true}
               allowScreenCapture={true}
+              showQuickActions={true}
               className="scout-chat-input-enhanced"
             />
           </div>
@@ -2227,10 +2439,27 @@ if __name__ == "__main__":
               {fileTree.reduce((count, file) => count + (file.children?.length || 0) + 1, 0)} files
             </span>
           </div>
-        </div>
-        <div className="scout-explorer-controls">
-          <button className="scout-file-btn" title="New file">📄</button>
-          <button className="scout-file-btn" title="New folder">📁</button>
+        </div>        <div className="scout-explorer-controls">
+          <button 
+            className="scout-file-btn" 
+            title="New file"
+            onClick={() => {
+              const fileName = prompt('Enter file name:');
+              if (fileName) createNewFile(fileName, 'file');
+            }}
+          >
+            📄
+          </button>
+          <button 
+            className="scout-file-btn" 
+            title="New folder"
+            onClick={() => {
+              const folderName = prompt('Enter folder name:');
+              if (folderName) createNewFile(folderName, 'folder');
+            }}
+          >
+            📁
+          </button>
           <button className="scout-file-btn" title="Refresh">🔄</button>
         </div>
       </div>
@@ -2516,17 +2745,42 @@ if __name__ == "__main__":
       </div>
     </div>
   );
-
   const renderCodeEditor = () => (
     <div className="scout-code-editor">
       <div className="scout-editor-header">
         <span>📝 {activeFile?.name || 'Editor'}</span>
         {activeFile?.modified && <span className="scout-modified-indicator">●</span>}
+        {activeFile && (
+          <button 
+            className="scout-save-btn"
+            onClick={() => handleFileSave(editorContent)}
+            title="Save file (Ctrl+S)"
+          >
+            💾 Save
+          </button>
+        )}
       </div>
       <div className="scout-editor-content" ref={editorRef}>
         <textarea
           value={editorContent}
-          onChange={(e) => setEditorContent(e.target.value)}
+          onChange={(e) => {
+            setEditorContent(e.target.value);
+            // Mark file as modified
+            if (activeFile) {
+              setFileTree(prev => prev.map(file => 
+                file.id === activeFile.id ? { ...file, modified: true } : file
+              ));
+            }
+          }}
+          onKeyDown={(e) => {
+            // Handle Ctrl+S to save
+            if (e.ctrlKey && e.key === 's') {
+              e.preventDefault();
+              if (activeFile) {
+                handleFileSave(editorContent);
+              }
+            }
+          }}
           placeholder="// Code will appear here as Mama Bear generates it..."
           className="scout-code-textarea"
         />
