@@ -300,17 +300,20 @@ What would you like to explore first? I'm here to make your development journey 
       console.error('Failed to load MCP servers:', error);
     }
   };
-
   const sendMessage = async () => {
     if (!chatState.currentInput.trim() && chatState.attachments.length === 0) return;
 
+    // Store the input before clearing it
+    const messageContent = chatState.currentInput;
+    const messageAttachments = [...chatState.attachments];
+
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
-      content: chatState.currentInput,
+      content: messageContent,
       sender: 'user',
       timestamp: new Date(),
       type: 'text',
-      attachments: chatState.attachments.length > 0 ? [...chatState.attachments] : undefined
+      attachments: messageAttachments.length > 0 ? messageAttachments : undefined
     };
 
     setChatState(prev => ({
@@ -328,9 +331,9 @@ What would you like to explore first? I'm here to make your development journey 
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          message: chatState.currentInput,
+          message: messageContent,
           user_id: 'nathan',
-          attachments: chatState.attachments.map(att => ({
+          attachments: messageAttachments.map(att => ({
             type: att.type,
             name: att.name,
             size: att.size,

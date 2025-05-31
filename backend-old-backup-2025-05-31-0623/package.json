@@ -1,0 +1,27 @@
+{
+  "name": "podplay-build-backend",
+  "version": "1.0.0",
+  "description": "Podplay Build Sanctuary - Backend API for Mama Bear Gem Lead Developer Agent",  "main": "app_new.py",
+  "scripts": {
+    "start": "python app_new.py",
+    "dev": "python app_new.py",
+    "legacy": "python app.py",
+    "install-deps": "pip install -r requirements.txt"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "ai-agent",
+    "sanctuary",
+    "podplay",
+    "developer-tools"
+  ],
+  "author": "Nathan - Podplay Build Sanctuary",
+  "license": "MIT",
+  "dependencies": {
+    "flask": "^2.3.0",
+    "flask-cors": "^4.0.0",
+    "requests": "^2.31.0",
+    "sqlite3": "built-in"
+  }
+}
