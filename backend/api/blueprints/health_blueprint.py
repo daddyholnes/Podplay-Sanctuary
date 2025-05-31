@@ -16,6 +16,58 @@ logger = get_logger(__name__)
 # Create blueprint for health check operations
 health_bp = Blueprint('health', __name__)
 
+@health_bp.route('/api/test-connection', methods=['GET'])
+def test_connection():
+    """
+    Test connection endpoint specifically expected by frontend
+    Used by frontend components for backend connectivity verification
+    
+    Returns:
+        JSON response confirming backend connection is successful
+    """
+    try:
+        return jsonify({
+            "status": "connected",
+            "message": "Backend connection successful",
+            "service": "podplay-sanctuary",
+            "backend_running": True,
+            "version": "2.0.0",
+            "features": [
+                "mcp-marketplace",
+                "mama-bear-chat", 
+                "vertex-garden",
+                "scout-agent",
+                "socket-io"
+            ],
+            "timestamp": datetime.now().isoformat()
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Test connection failed: {e}")
+        return jsonify({
+            "status": "error",
+            "message": f"Connection test failed: {str(e)}",
+            "backend_running": False,
+            "timestamp": datetime.now().isoformat()
+        }), 500
+
+@health_bp.route('/', methods=['GET'])
+def root():
+    """
+    Root endpoint returning basic service information
+    
+    Returns:
+        JSON response with welcome message and basic service status
+    """
+    return jsonify({
+        "message": "Welcome to Podplay Sanctuary Backend",
+        "service": "podplay-sanctuary", 
+        "status": "running",
+        "version": "2.0.0",
+        "description": "The Sanctuary for Calm, Empowered Creation",
+        "timestamp": datetime.now().isoformat()
+    })
+
 @health_bp.route('/health', methods=['GET'])
 def health_check():
     """
