@@ -140,3 +140,28 @@ class MCPMarketplaceManager:
             recommendations.extend(servers[:3])  # Top 3 from each category
         
         return recommendations[:10]  # Limit to 10 recommendations
+
+    def get_installed_servers(self) -> List[Dict[str, Any]]:
+        """Get list of installed MCP servers"""
+        try:
+            with self.db.get_connection() as conn:
+                cursor = conn.execute('''
+                    SELECT * FROM mcp_servers 
+                    WHERE is_installed = 1 
+                    ORDER BY name ASC
+                ''')
+                servers = []
+                
+                for row in cursor.fetchall():
+                    server_dict = dict(row)
+                    # Parse JSON fields
+                    server_dict['capabilities'] = json.loads(server_dict['capabilities'])
+                    server_dict['dependencies'] = json.loads(server_dict['dependencies'])
+                    server_dict['configuration_schema'] = json.loads(server_dict['configuration_schema'])
+                    server_dict['tags'] = json.loads(server_dict['tags'])
+                    servers.append(server_dict)
+                
+                return servers
+        except Exception as e:
+            logger.error(f"Error getting installed servers: {e}")
+            return []

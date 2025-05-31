@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Podplay Sanctuary - Socket.IO Integration Test</title>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .connected { background: rgba(46, 204, 113, 0.3); }
+        .disconnected { background: rgba(231, 76, 60, 0.3); }
+        .error { background: rgba(241, 196, 15, 0.3); }
+        .test-section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        button {
+            background: linear-gradient(45deg, #ff6b6b, #feca57);
+            border: none;
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: bold;
+            margin: 5px;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+        }
+        #logs {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 8px;
+            padding: 15px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+        }
+        .log-entry {
+            margin: 5px 0;
+            padding: 5px;
+        }
+        .timestamp {
+            color: #bdc3c7;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐻 Podplay Sanctuary - Socket.IO Integration Test</h1>
+        
+        <div id="connectionStatus" class="status disconnected">
+            🔴 Disconnected
+        </div>
+        
+        <div class="test-section">
+            <h2>🧪 Socket.IO Event Tests</h2>
+            <button onclick="testChatEvent()">Test Chat Event</button>
+            <button onclick="testMCPEvent()">Test MCP Event</button>
+            <button onclick="testNixOSEvent()">Test NixOS Event</button>
+            <button onclick="testDevSandboxEvent()">Test DevSandbox Event</button>
+            <button onclick="testHealthEvent()">Test Health Event</button>
+            <button onclick="clearLogs()">Clear Logs</button>
+        </div>
+        
+        <div class="test-section">
+            <h2>📊 Real-time System Monitoring</h2>
+            <button onclick="subscribeToSystemMetrics()">Subscribe to System Metrics</button>
+            <button onclick="subscribeToHealthUpdates()">Subscribe to Health Updates</button>
+            <button onclick="unsubscribeAll()">Unsubscribe All</button>
+        </div>
+        
+        <div class="test-section">
+            <h2>📝 Event Logs</h2>
+            <div id="logs"></div>
+        </div>
+    </div>
+
+    <script>
+        // Initialize Socket.IO connection
+        const socket = io('http://localhost:5000', {
+            transports: ['polling', 'websocket']
+        });
+
+        const statusDiv = document.getElementById('connectionStatus');
+        const logsDiv = document.getElementById('logs');
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            logEntry.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
+            logsDiv.appendChild(logEntry);
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+
+        // Connection events
+        socket.on('connect', () => {
+            statusDiv.className = 'status connected';
+            statusDiv.innerHTML = '🟢 Connected - Session ID: ' + socket.id;
+            log('✅ Socket.IO connected successfully', 'success');
+        });
+
+        socket.on('disconnect', (reason) => {
+            statusDiv.className = 'status disconnected';
+            statusDiv.innerHTML = '🔴 Disconnected';
+            log(`❌ Socket.IO disconnected: ${reason}`, 'error');
+        });
+
+        socket.on('connect_error', (error) => {
+            statusDiv.className = 'status error';
+            statusDiv.innerHTML = '⚠️ Connection Error';
+            log(`🚨 Connection error: ${error.message}`, 'error');
+        });
+
+        // Chat events
+        socket.on('chat_response', (data) => {
+            log(`💬 Chat Response: ${JSON.stringify(data)}`, 'chat');
+        });
+
+        socket.on('chat_typing', (data) => {
+            log(`⌨️ Chat Typing: ${JSON.stringify(data)}`, 'chat');
+        });
+
+        // MCP events
+        socket.on('mcp_server_installed', (data) => {
+            log(`📦 MCP Server Installed: ${JSON.stringify(data)}`, 'mcp');
+        });
+
+        socket.on('mcp_discovery_update', (data) => {
+            log(`🔍 MCP Discovery Update: ${JSON.stringify(data)}`, 'mcp');
+        });
+
+        // NixOS events
+        socket.on('nixos_workspace_created', (data) => {
+            log(`🐧 NixOS Workspace Created: ${JSON.stringify(data)}`, 'nixos');
+        });
+
+        socket.on('nixos_build_progress', (data) => {
+            log(`🔨 NixOS Build Progress: ${JSON.stringify(data)}`, 'nixos');
+        });
+
+        // DevSandbox events
+        socket.on('devsandbox_environment_ready', (data) => {
+            log(`🛠️ DevSandbox Environment Ready: ${JSON.stringify(data)}`, 'devsandbox');
+        });
+
+        socket.on('devsandbox_preview_update', (data) => {
+            log(`👀 DevSandbox Preview Update: ${JSON.stringify(data)}`, 'devsandbox');
+        });
+
+        // System health events
+        socket.on('system_metrics_update', (data) => {
+            log(`📊 System Metrics: ${JSON.stringify(data)}`, 'system');
+        });
+
+        socket.on('health_status_change', (data) => {
+            log(`🏥 Health Status Change: ${JSON.stringify(data)}`, 'health');
+        });
+
+        // Test functions
+        function testChatEvent() {
+            log('🧪 Testing chat event...', 'test');
+            socket.emit('chat_message', {
+                message: 'Hello from Socket.IO test!',
+                session_id: 'test-session-' + Date.now(),
+                model: 'mama-bear'
+            });
+        }
+
+        function testMCPEvent() {
+            log('🧪 Testing MCP event...', 'test');
+            socket.emit('mcp_search', {
+                query: 'git tools',
+                category: 'development'
+            });
+        }
+
+        function testNixOSEvent() {
+            log('🧪 Testing NixOS event...', 'test');
+            socket.emit('nixos_workspace_status', {
+                workspace_id: 'test-workspace'
+            });
+        }
+
+        function testDevSandboxEvent() {
+            log('🧪 Testing DevSandbox event...', 'test');
+            socket.emit('devsandbox_environment_status', {
+                environment_id: 'env-python-001'
+            });
+        }
+
+        function testHealthEvent() {
+            log('🧪 Testing health event...', 'test');
+            socket.emit('request_health_status');
+        }
+
+        function subscribeToSystemMetrics() {
+            log('📊 Subscribing to system metrics...', 'test');
+            socket.emit('subscribe_system_metrics');
+        }
+
+        function subscribeToHealthUpdates() {
+            log('🏥 Subscribing to health updates...', 'test');
+            socket.emit('subscribe_health_updates');
+        }
+
+        function unsubscribeAll() {
+            log('🔕 Unsubscribing from all events...', 'test');
+            socket.emit('unsubscribe_all');
+        }
+
+        function clearLogs() {
+            logsDiv.innerHTML = '';
+            log('🧹 Logs cleared', 'info');
+        }
+
+        // Auto-connect message
+        log('🚀 Attempting to connect to Podplay Sanctuary Socket.IO server...', 'info');
+    </script>
+</body>
+</html>
