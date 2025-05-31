@@ -257,22 +257,11 @@ interface MCPServer {
   tags: string[];
 }
 
-interface DailyBriefing {
-  date: string;
-  new_mcp_tools: MCPServer[];
-  updated_models: Array<{name: string; update: string}>;
-  project_priorities: string[];
-  recommendations: string[];
-  system_status: {
-    installed_mcp_servers: number;
-    available_mcp_servers: number;
-    sanctuary_health: string;
-  };
-}
+
 
 // ==================== MAMA BEAR GREETING COMPONENT ====================
 
-const MamaBearGreeting: React.FC<{briefing: DailyBriefing | null}> = ({ briefing }) => {
+const MamaBearGreeting: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
@@ -292,51 +281,8 @@ const MamaBearGreeting: React.FC<{briefing: DailyBriefing | null}> = ({ briefing
       <div className="greeting-header">
         <h1>🐻 {getGreeting()}, Nathan</h1>
         <p className="sanctuary-subtitle">Welcome to your sanctuary for calm, empowered creation</p>
+        <p className="chat-invite">Ready to chat with Mama Bear? I can help you spin up VMs, manage your tools, and guide your development journey!</p>
       </div>
-      
-      {briefing && (
-        <div className="daily-briefing">
-          <div className="briefing-section">
-            <h3>☕ Today's Coffee Break Update</h3>
-            <div className="briefing-grid">
-              <div className="briefing-card">
-                <h4>🆕 New MCP Tools</h4>
-                <p>{briefing.new_mcp_tools.length} new tools discovered</p>
-                {briefing.new_mcp_tools.slice(0, 2).map(tool => (
-                  <div key={tool.name} className="tool-preview">
-                    <span className="tool-name">{tool.name}</span>
-                    <span className="tool-category">{tool.category}</span>
-                  </div>
-                ))}
-              </div>
-              
-              <div className="briefing-card">
-                <h4>🎯 Today's Priorities</h4>
-                {briefing.project_priorities.length > 0 ? (
-                  briefing.project_priorities.slice(0, 3).map((priority, index) => (
-                    <div key={index} className="priority-item">
-                      <span className="priority-number">{index + 1}</span>
-                      <span className="priority-text">{priority}</span>
-                    </div>
-                  ))
-                ) : (
-                  <p className="no-priorities">No active priorities - perfect time to explore!</p>
-                )}
-              </div>
-              
-              <div className="briefing-card">
-                <h4>💡 Mama Bear's Recommendations</h4>
-                {briefing.recommendations.slice(0, 2).map((rec, index) => (
-                  <div key={index} className="recommendation">
-                    <span className="rec-icon">💡</span>
-                    <span className="rec-text">{rec}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
@@ -621,9 +567,7 @@ type ActiveView =
   | 'MiniAppLauncher' // Cherry Studio inspired mini apps
   | 'MamaBearControlCenter'; // Mama Bear Control Center
 
-const App: React.FC = () => {
-  const [briefing, setBriefing] = useState<DailyBriefing | null>(null);
-  const [activeView, setActiveView] = useState<ActiveView>('Sanctuary'); 
+const App: React.FC = () => {  const [activeView, setActiveView] = useState<ActiveView>('Sanctuary'); 
   const [isLoading, setIsLoading] = useState(true);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [backendOnline, setBackendOnline] = useState(false);
@@ -631,52 +575,19 @@ const App: React.FC = () => {
   // For ScoutAgentProject view, we'll need a project ID.
   // For now, hardcode one for testing. In a real app, this would come from a list/selection.
   const [currentScoutProjectId] = useState<string>("test-project-alpha");
-
   const handleBackendStatus = useCallback((isRunning: boolean) => {
     setBackendOnline(isRunning);
-    // Potentially fetch briefing only if backend is online
-    if (isRunning && !briefing) {
-      fetchBriefing();
-    }
-  }, [briefing]); // Dependency on briefing to avoid re-fetching if already loaded
-
-  const fetchBriefing = async () => {
-    console.log("Attempting to fetch briefing from:", buildApiUrl(API_ENDPOINTS.MAMA_BEAR.BRIEFING));
-    try {
-      const response = await fetch(buildApiUrl(API_ENDPOINTS.MAMA_BEAR.BRIEFING));
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      const data = await response.json();
-      if (data.success && data.briefing) {
-        setBriefing(data.briefing);
-      } else {
-        console.warn("Failed to parse briefing data:", data.error || "Unknown error");
-        setBriefing(null); // Set to null or an empty state on failure
-      }
-    } catch (error) {
-      console.error('Error loading briefing:', error);
-      setBriefing(null); // Set to null or an empty state on error
-    } finally {
-      setIsLoading(false); // Initial loading complete even if briefing fails
-    }
-  };
+    setIsLoading(false); // Set loading to false when backend status is determined
+  }, []);
   
   useEffect(() => {
-    // BackendConnectionManager will call handleBackendStatus, which then calls fetchBriefing
-    // So, direct call to fetchBriefing here might be redundant if BackendConnectionManager is quick.
-    // However, keeping it for initial load if BackendConnectionManager takes time or is bypassed.
-    if (backendOnline && !briefing) { // Only fetch if online and no briefing yet
-        fetchBriefing();
-    } else if (!backendOnline) {
-        setIsLoading(false); // If backend is offline, don't hang on loading
-    }
-  }, [backendOnline, briefing]);
-
+    // Set loading to false if backend comes online or goes offline
+    setIsLoading(false);
+  }, [backendOnline]);
   const renderActiveView = () => {
     switch (activeView) {
             case 'Sanctuary':
-        return <MamaBearGreeting briefing={briefing} />;
+        return <MamaBearGreeting />;
       case 'Marketplace':
         return <MCPMarketplace />;
       case 'Discovery':
@@ -695,13 +606,12 @@ const App: React.FC = () => {
       case 'MiniAppLauncher': // Cherry Studio inspired mini apps
         return <MiniAppLauncher />;
       case 'MamaBearControlCenter': // Mama Bear Control Center
-        return <MamaBearControlCenter />;
-      default:
-        return <MamaBearGreeting briefing={briefing} />; // Fallback view
+        return <MamaBearControlCenter />;      default:
+        return <MamaBearGreeting />; // Fallback view
     }
   };
 
-  if (isLoading && !briefing && backendOnline) { // Refined loading condition
+  if (isLoading && backendOnline) { // Refined loading condition
     return (
       <div className="loading-sanctuary">
         <div className="loading-content">
@@ -832,32 +742,29 @@ const App: React.FC = () => {
       </div>
 
       {/* Main Content Area */}
-      <main className={`sanctuary-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-        {activeView === 'Sanctuary' && (
+      <main className={`sanctuary-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>        {activeView === 'Sanctuary' && (
           <div className="sanctuary-view">
-            <MamaBearGreeting briefing={briefing} />
+            <MamaBearGreeting />
             
             <div className="sanctuary-status">
               <h2>🏠 Sanctuary Status</h2>
-              {briefing && (
-                <div className="status-grid">
-                  <div className="status-card">
-                    <h3>🛠️ MCP Tools</h3>
-                    <p className="status-number">{briefing.system_status.installed_mcp_servers}</p>
-                    <p className="status-label">Active Tools</p>
-                  </div>
-                  <div className="status-card">
-                    <h3>🔍 Available</h3>
-                    <p className="status-number">{briefing.system_status.available_mcp_servers}</p>
-                    <p className="status-label">Tools to Explore</p>
-                  </div>
-                  <div className="status-card">
-                    <h3>💚 Health</h3>
-                    <p className="status-number">{briefing.system_status.sanctuary_health}</p>
-                    <p className="status-label">System Status</p>
-                  </div>
+              <div className="status-grid">
+                <div className="status-card">
+                  <h3>🛠️ MCP Tools</h3>
+                  <p className="status-number">Ready</p>
+                  <p className="status-label">System Status</p>
                 </div>
-              )}
+                <div className="status-card">
+                  <h3>🤖 Mama Bear</h3>
+                  <p className="status-number">Online</p>
+                  <p className="status-label">Chat Available</p>
+                </div>
+                <div className="status-card">
+                  <h3>💚 Health</h3>
+                  <p className="status-number">Excellent</p>
+                  <p className="status-label">All Systems</p>
+                </div>
+              </div>
             </div>
           </div>
         )}

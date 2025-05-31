@@ -41,11 +41,9 @@ export const getTerminalWebSocketBaseUrl = (): string => {
 };
 
 // Comprehensive API endpoint mapping for all systems
-export const API_ENDPOINTS = {
-  // Mama Bear Chat endpoints (Updated for modular backend)
+export const API_ENDPOINTS = {  // Mama Bear Chat endpoints (Updated for modular backend)
   MAMA_BEAR: {
     CHAT: '/api/chat/mama-bear',
-    BRIEFING: '/api/chat/daily-briefing',
     VERTEX_GARDEN: '/api/chat/vertex-garden',
     ANALYZE_CODE: '/api/chat/analyze-code',
     MEMORIES_SEARCH: '/api/chat/memories/search',
