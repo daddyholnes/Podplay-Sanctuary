@@ -1643,3 +1643,129 @@ select:focus {
   0% { left: -100%; }
   100% { left: 100%; }
 }
+
+/* ==================== UNIFIED WORKSPACE STYLES ==================== */
+
+.unified-workspace-app {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--sanctuary-background);
+  font-family: var(--font-primary);
+}
+
+.legacy-fallback-control {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1000;
+  opacity: 0.7;
+  transition: opacity 0.3s ease;
+}
+
+.legacy-fallback-control:hover {
+  opacity: 1;
+}
+
+.legacy-fallback-btn {
+  background: rgba(var(--sanctuary-surface), 0.8);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--sanctuary-border);
+  color: var(--sanctuary-text-secondary);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.legacy-fallback-btn:hover {
+  background: rgba(var(--sanctuary-surface-hover), 0.9);
+  color: var(--sanctuary-text);
+  transform: translateY(-1px);
+}
+
+.legacy-mode-indicator {
+  position: fixed;
+  top: 1rem;
+  left: 1rem;
+  z-index: 1000;
+  opacity: 0.8;
+}
+
+.legacy-mode-indicator button {
+  background: linear-gradient(135deg, var(--sanctuary-accent), var(--sanctuary-secondary));
+  border: none;
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: var(--radius-lg);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: var(--shadow-md);
+}
+
+.legacy-mode-indicator button:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+.app-status-bar {
+  position: fixed;
+  bottom: 1rem;
+  right: 1rem;
+  z-index: 999;
+  display: flex;
+  gap: 0.5rem;
+  opacity: 0.8;
+  transition: opacity 0.3s ease;
+}
+
+.app-status-bar:hover {
+  opacity: 1;
+}
+
+.app-status-bar .backend-status,
+.app-status-bar .electron-status {
+  background: rgba(var(--sanctuary-surface), 0.9);
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--sanctuary-border);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+}
+
+/* Enhanced existing styles for better integration */
+.app.sanctuary-theme {
+  transition: all 0.3s ease;
+}
+
+.app.sanctuary-theme.legacy-mode {
+  filter: sepia(0.1) saturate(0.9);
+}
+
+/* ==================== LOADING ENHANCEMENTS ==================== */
+
+.loading-sanctuary {
+  background: linear-gradient(135deg, var(--sanctuary-background), var(--sanctuary-primary));
+  position: relative;
+  overflow: hidden;
+}
+
+.loading-sanctuary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="20" r="2" fill="%238fb996" opacity="0.3"><animateTransform attributeName="transform" type="translate" values="0 0;0 80;0 0" dur="2s" repeatCount="indefinite"/></circle><circle cx="20" cy="50" r="2" fill="%235a7c65" opacity="0.4"><animateTransform attributeName="transform" type="translate" values="0 0;80 0;0 0" dur="2.5s" repeatCount="indefinite"/></circle><circle cx="80" cy="50" r="2" fill="%23d4af37" opacity="0.2"><animateTransform attributeName="transform" type="translate" values="0 0;-80 0;0 0" dur="3s" repeatCount="indefinite"/></circle></svg>') no-repeat center;
+  background-size: 200px 200px;
+  animation: float 4s ease-in-out infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
