@@ -2,7 +2,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './App.css';
 import './EnhancedChat.css'; // For enhanced chat features
-// Core Components
+
+// New Unified Workspace Components
+import { DesignSystemProvider } from './contexts/DesignSystemContext';
+import UnifiedDynamicWorkspace from './components/UnifiedDynamicWorkspace';
+
+// Legacy Components (for fallback support)
 import ScoutDynamicWorkspace from './components/scout_agent/ScoutDynamicWorkspace';
 import MiniAppLauncher from './components/MiniAppLauncher';
 import MamaBearControlCenter from './components/MamaBearControlCenter';
@@ -232,43 +237,41 @@ const BackendConnectionManager: React.FC<{
 
 // ==================== MAIN APP COMPONENT ====================
 
-// Define the possible views for type safety
-type ActiveView = 
-  | 'MamaBearControlCenter' // Primary AI Hub
-  | 'UnifiedDevelopmentHub' // Consolidated Dev Environments + Workspaces  
-  | 'ScoutDynamicWorkspace' // Scout Agent Workspace
-  | 'MiniAppLauncher'; // Mini Apps Launcher
-
 const App: React.FC = () => {  
-  const [activeView, setActiveView] = useState<ActiveView>('MamaBearControlCenter'); 
   const [isLoading, setIsLoading] = useState(true);
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [backendOnline, setBackendOnline] = useState(false);
+  const [useLegacyMode, setUseLegacyMode] = useState(false);
+
+  // Legacy navigation state for fallback mode
+  const [activeView, setActiveView] = useState<'MamaBearControlCenter' | 'UnifiedDevelopmentHub' | 'ScoutDynamicWorkspace' | 'MiniAppLauncher'>('MamaBearControlCenter');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
 
   const handleBackendStatus = useCallback((isRunning: boolean) => {
     setBackendOnline(isRunning);
-    setIsLoading(false); // Set loading to false when backend status is determined
+    setIsLoading(false);
   }, []);
   
   useEffect(() => {
-    // Set loading to false if backend comes online or goes offline
     setIsLoading(false);
-  }, [backendOnline]);  const renderActiveView = () => {
+  }, [backendOnline]);
+
+  // Legacy view renderer for fallback mode
+  const renderLegacyView = () => {
     switch (activeView) {
-      case 'MamaBearControlCenter': // Primary AI Hub
+      case 'MamaBearControlCenter':
         return <MamaBearControlCenter />;
-      case 'UnifiedDevelopmentHub': // Consolidated Dev Environments + Workspaces
+      case 'UnifiedDevelopmentHub':
         return <UnifiedDevelopmentHub />;
-      case 'ScoutDynamicWorkspace': // Scout Agent Workspace
+      case 'ScoutDynamicWorkspace':
         return <ScoutDynamicWorkspace />;
-      case 'MiniAppLauncher': // Mini Apps Launcher
+      case 'MiniAppLauncher':
         return <MiniAppLauncher />;
       default:
-        return <MamaBearControlCenter />; // Default to Mama Bear Control Center
+        return <MamaBearControlCenter />;
     }
   };
 
-  if (isLoading && backendOnline) { // Refined loading condition
+  if (isLoading && backendOnline) {
     return (
       <div className="loading-sanctuary">
         <div className="loading-content">
@@ -279,79 +282,111 @@ const App: React.FC = () => {
     );
   }
 
-  return (
-    <div className="app sanctuary-theme">
-      {/* Left Sidebar */}
-      <div className={`sanctuary-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
-        <div className="sidebar-header">
-          <div className="nav-brand">
-            <h1>🏠 Podplay Build</h1>
-            <p>Mama Bear Gem</p>
-          </div>
-          <button 
-            className="sidebar-toggle"
-            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          >
-            {sidebarCollapsed ? '→' : '←'}
+  // Use new unified workspace by default, with legacy fallback
+  if (useLegacyMode) {
+    return (
+      <div className="app sanctuary-theme">
+        <div className="legacy-mode-indicator">
+          <button onClick={() => setUseLegacyMode(false)}>
+            🚀 Switch to Unified Workspace
           </button>
         </div>
         
-        <nav className="sidebar-nav">          {/* MAMA BEAR CONTROL CENTER - Primary AI Hub */}
-          <button
-            className={`nav-tab ${activeView === 'MamaBearControlCenter' ? 'active' : ''}`}
-            onClick={() => setActiveView('MamaBearControlCenter')}
-            title="Mama Bear Control Center - Your AI Development Partner"
-          >
-            <span className="nav-icon">🐻</span>
-            {!sidebarCollapsed && <span className="nav-label">Mama Bear Control Center</span>}
-          </button>
-
-          {/* UNIFIED DEVELOPMENT HUB - Consolidated Workspaces */}
-          <button
-            className={`nav-tab ${activeView === 'UnifiedDevelopmentHub' ? 'active' : ''}`}
-            onClick={() => setActiveView('UnifiedDevelopmentHub')}
-            title="Unified Development Hub - All Environment Types"
-          >
-            <span className="nav-icon">🏗️</span>
-            {!sidebarCollapsed && <span className="nav-label">Unified Development Hub</span>}
-          </button>
-
-          {/* SCOUT AGENT WORKSPACE - Dynamic Experience */}
-          <button
-            className={`nav-tab ${activeView === 'ScoutDynamicWorkspace' ? 'active' : ''}`}
-            onClick={() => setActiveView('ScoutDynamicWorkspace')}
-            title="Scout Agent Workspace - Rocket Launch Experience"
-          >
-            <span className="nav-icon">🚀</span>
-            {!sidebarCollapsed && <span className="nav-label">Scout Agent Workspace</span>}
-          </button>
-
-          {/* MINI APPS LAUNCHER - Tool Hub */}
-          <button
-            className={`nav-tab ${activeView === 'MiniAppLauncher' ? 'active' : ''}`}
-            onClick={() => setActiveView('MiniAppLauncher')}
-            title="Mini Apps Launcher - Professional Tool Suite"
-          >
-            <span className="nav-icon">⚡</span>
-            {!sidebarCollapsed && <span className="nav-label">Mini Apps Launcher</span>}
-          </button>
-        </nav>
-        
-        {!sidebarCollapsed && (
-          <div className="sidebar-footer">
-            <ElectronStatus />
-            <BackendConnectionManager onBackendStatus={handleBackendStatus} />
-            <div className="sidebar-motto">
-              <p>🐻 Your creative sanctuary</p>
+        {/* Legacy Sidebar */}
+        <div className={`sanctuary-sidebar ${sidebarCollapsed ? 'collapsed' : ''}`}>
+          <div className="sidebar-header">
+            <div className="nav-brand">
+              <h1>🏠 Podplay Build</h1>
+              <p>Mama Bear Gem</p>
             </div>
+            <button 
+              className="sidebar-toggle"
+              onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            >
+              {sidebarCollapsed ? '→' : '←'}
+            </button>
           </div>
-        )}
-      </div>      {/* Main Content Area */}
-      <main className={`sanctuary-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
-        {/* Render the active view directly */}
-        {renderActiveView()}
-      </main>
-    </div>
+          
+          <nav className="sidebar-nav">
+            <button
+              className={`nav-tab ${activeView === 'MamaBearControlCenter' ? 'active' : ''}`}
+              onClick={() => setActiveView('MamaBearControlCenter')}
+              title="Mama Bear Control Center - Your AI Development Partner"
+            >
+              <span className="nav-icon">🐻</span>
+              {!sidebarCollapsed && <span className="nav-label">Mama Bear Control Center</span>}
+            </button>
+
+            <button
+              className={`nav-tab ${activeView === 'UnifiedDevelopmentHub' ? 'active' : ''}`}
+              onClick={() => setActiveView('UnifiedDevelopmentHub')}
+              title="Unified Development Hub - All Environment Types"
+            >
+              <span className="nav-icon">🏗️</span>
+              {!sidebarCollapsed && <span className="nav-label">Unified Development Hub</span>}
+            </button>
+
+            <button
+              className={`nav-tab ${activeView === 'ScoutDynamicWorkspace' ? 'active' : ''}`}
+              onClick={() => setActiveView('ScoutDynamicWorkspace')}
+              title="Scout Agent Workspace - Rocket Launch Experience"
+            >
+              <span className="nav-icon">🚀</span>
+              {!sidebarCollapsed && <span className="nav-label">Scout Agent Workspace</span>}
+            </button>
+
+            <button
+              className={`nav-tab ${activeView === 'MiniAppLauncher' ? 'active' : ''}`}
+              onClick={() => setActiveView('MiniAppLauncher')}
+              title="Mini Apps Launcher - Professional Tool Suite"
+            >
+              <span className="nav-icon">⚡</span>
+              {!sidebarCollapsed && <span className="nav-label">Mini Apps Launcher</span>}
+            </button>
+          </nav>
+          
+          {!sidebarCollapsed && (
+            <div className="sidebar-footer">
+              <ElectronStatus />
+              <BackendConnectionManager onBackendStatus={handleBackendStatus} />
+              <div className="sidebar-motto">
+                <p>🐻 Your creative sanctuary</p>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <main className={`sanctuary-main ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
+          {renderLegacyView()}
+        </main>
+      </div>
+    );
+  }
+
+  // New Unified Workspace Experience
+  return (
+    <DesignSystemProvider>
+      <div className="app unified-workspace-app">
+        <div className="legacy-fallback-control">
+          <button 
+            onClick={() => setUseLegacyMode(true)}
+            className="legacy-fallback-btn"
+            title="Switch to legacy navigation mode"
+          >
+            📄 Legacy Mode
+          </button>
+        </div>
+        
+        {/* Status Components */}
+        <div className="app-status-bar">
+          <ElectronStatus />
+          <BackendConnectionManager onBackendStatus={handleBackendStatus} />
+        </div>
+        
+        {/* Main Unified Workspace */}
+        <UnifiedDynamicWorkspace />
+      </div>
+    </DesignSystemProvider>
   );
 };
 
