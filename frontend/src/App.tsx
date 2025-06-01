@@ -9,6 +9,7 @@ import UnifiedDynamicWorkspace from './components/UnifiedDynamicWorkspace';
 
 // Legacy Components (for fallback support)
 import ScoutDynamicWorkspace from './components/scout_agent/ScoutDynamicWorkspace';
+import ScoutIntegratedWorkflow from './components/scout/ScoutIntegratedWorkflow';
 import MiniAppLauncher from './components/MiniAppLauncher';
 import MamaBearControlCenter from './components/MamaBearControlCenter';
 import UnifiedDevelopmentHub from './components/UnifiedDevelopmentHub';

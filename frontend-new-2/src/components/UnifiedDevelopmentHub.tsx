@@ -3,7 +3,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { ViewType, ChatMessage, PanelType as PanelTypeEnum, AgentStep, MiniApp } from '../types';
 import ChatView from './ChatView';
 import GeminiService from '../services/GeminiService';
-import { INITIAL_GREETING_TEXT, APP_TITLE } from '../constants'; // Assuming APP_TITLE is for the Scout Alpha badge
+import { INITIAL_GREETING_TEXT } from '../constants';
 import CodeEditorPanel from './panels/CodeEditorPanel';
 import FileExplorerPanel from './panels/FileExplorerPanel';
 import TerminalPanel from './panels/TerminalPanel';
@@ -11,6 +11,15 @@ import PreviewPanel from './panels/PreviewPanel';
 import AgentTimelinePanel from './panels/AgentTimelinePanel';
 import ControlCenterPanel from './panels/ControlCenterPanel';
 import MiniAppLauncher from './MiniAppLauncher'; // Import MiniAppLauncher
+
+// Utility function to generate unique IDs
+const generateUniqueId = (): string => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  // Fallback for environments that don't support crypto.randomUUID
+  return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+};
 
 interface UnifiedDevelopmentHubProps {
   currentView: ViewType;
@@ -26,11 +35,11 @@ const UnifiedDevelopmentHub: React.FC<UnifiedDevelopmentHubProps> = ({ currentVi
   const [previewTargetUrl, setPreviewTargetUrl] = useState<string>('about:blank'); // For controlling PreviewPanel
 
   const addMessageToTimeline = useCallback((action: string, details?: string, status: 'running' | 'completed' | 'error' = 'completed', tool?: string) => {
-    setAgentTimeline(prev => [...prev, { id: Date.now().toString(), timestamp: new Date(), action, details, status, tool }]);
+    setAgentTimeline(prev => [...prev, { id: generateUniqueId(), timestamp: new Date(), action, details, status, tool }]);
   }, []);
 
   useEffect(() => {
-    const initialGreetingId = `mama-bear-greeting-${Date.now()}`;
+    const initialGreetingId = `mama-bear-greeting-${generateUniqueId()}`;
     setChatMessages([
       { id: initialGreetingId, text: INITIAL_GREETING_TEXT, sender: 'agent', timestamp: new Date() },
     ]);
@@ -39,7 +48,7 @@ const UnifiedDevelopmentHub: React.FC<UnifiedDevelopmentHubProps> = ({ currentVi
 
   const handleSendMessage = async (text: string) => {
     const newMessage: ChatMessage = {
-      id: `user-${Date.now()}`, text, sender: 'user', timestamp: new Date(),
+      id: `user-${generateUniqueId()}`, text, sender: 'user', timestamp: new Date(),
     };
     setChatMessages(prev => [...prev, newMessage]);
     setIsLoading(true);
@@ -48,7 +57,7 @@ const UnifiedDevelopmentHub: React.FC<UnifiedDevelopmentHubProps> = ({ currentVi
     try {
       const responseText = await GeminiService.sendMessage(text, chatMessages);
       const agentMessage: ChatMessage = {
-        id: `agent-${Date.now()}`, text: responseText, sender: 'agent', timestamp: new Date(),
+        id: `agent-${generateUniqueId()}`, text: responseText, sender: 'agent', timestamp: new Date(),
       };
       setChatMessages(prev => [...prev, agentMessage]);
       addMessageToTimeline(`Mama Bear responded`, responseText.substring(0, 100)+ "...", "completed", "Gemini AI");
@@ -72,7 +81,7 @@ const UnifiedDevelopmentHub: React.FC<UnifiedDevelopmentHubProps> = ({ currentVi
     } catch (error) {
       console.error("Error processing message:", error);
       const errorMessage: ChatMessage = {
-        id: `error-${Date.now()}`, text: "Sorry, I encountered an issue. Please try again.", sender: 'agent', timestamp: new Date(),
+        id: `error-${generateUniqueId()}`, text: "Sorry, I encountered an issue. Please try again.", sender: 'agent', timestamp: new Date(),
       };
       setChatMessages(prev => [...prev, errorMessage]);
       addMessageToTimeline("Error processing user request", (error as Error).message, "error", "System");
@@ -181,8 +190,6 @@ const UnifiedDevelopmentHub: React.FC<UnifiedDevelopmentHubProps> = ({ currentVi
     ? 'flex-1' // Chat takes full height initially or when focused without plan
     : 'h-1/3 md:h-2/5 xl:h-1/3'; // Smaller chat when workspace panels are active or in MiniAppLauncher
 
-  const showMainGreeting = currentView === ViewType.MamaBearChat && !planAgreed;
-  
   return (
     <div className="h-full flex flex-col overflow-hidden">
       {/* Main Content Area: Panels or MiniAppLauncher or Initial Greeting */}

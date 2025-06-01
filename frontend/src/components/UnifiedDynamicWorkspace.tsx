@@ -8,6 +8,7 @@ import { useDesignSystem } from '../contexts/DesignSystemContext';
 // Import existing components to unify them
 import CentralizedChatInterface from './shared/CentralizedChatInterface';
 import ScoutDynamicWorkspace from './scout_agent/ScoutDynamicWorkspace';
+import ScoutIntegratedWorkflow from './scout/ScoutIntegratedWorkflow';
 import MamaBearControlCenter from './MamaBearControlCenter';
 import UnifiedDevelopmentHub from './UnifiedDevelopmentHub';
 import MiniAppLauncher from './MiniAppLauncher';
@@ -51,7 +52,7 @@ const UnifiedDynamicWorkspace: React.FC = () => {
   
   // ==================== LOCAL STATE ====================
   
-  const [currentView, setCurrentView] = useState<string>('hub');
+  const [currentView, setCurrentView] = useState<string>('scout-new');
   const [transition, setTransition] = useState<WorkspaceTransition>({
     isActive: false,
     fromView: '',
@@ -65,8 +66,7 @@ const UnifiedDynamicWorkspace: React.FC = () => {
   const [workspaceMode, setWorkspaceMode] = useState<'unified' | 'split' | 'immersive'>('unified');
 
   // ==================== WORKSPACE VIEWS CONFIGURATION ====================
-  
-  const workspaceViews: WorkspaceView[] = useMemo(() => [
+    const workspaceViews: WorkspaceView[] = useMemo(() => [
     {
       id: 'hub',
       name: 'Development Hub',
@@ -76,6 +76,16 @@ const UnifiedDynamicWorkspace: React.FC = () => {
       category: 'primary',
       gradient: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
       accentColor: '#667eea'
+    },
+    {
+      id: 'scout-new',
+      name: 'Scout Workflow',
+      icon: '✨',
+      component: ScoutIntegratedWorkflow,
+      description: 'Scout.new inspired autonomous development workflow',
+      category: 'primary',
+      gradient: 'linear-gradient(135deg, #a78bfa 0%, #ec4899 100%)',
+      accentColor: '#a78bfa'
     },
     {
       id: 'scout',

@@ -1,0 +1,267 @@
+name: Nightly Regression Tests
+
+on:
+  schedule:
+    # Run nightly at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_suite:
+        description: 'Test suite to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - regression
+          - performance
+          - accessibility
+          - security
+
+jobs:
+  regression-tests:
+    name: Comprehensive Regression Tests
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'regression' || github.event_name == 'schedule' }}
+    
+    strategy:
+      matrix:
+        browser: [chromium, firefox, webkit]
+        viewport: [desktop, tablet, mobile]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+      
+      - name: Run regression tests
+        working-directory: ./frontend
+        run: |
+          npm run test:e2e -- \
+            --browser=${{ matrix.browser }} \
+            --viewport=${{ matrix.viewport }} \
+            --testNamePattern="regression|smoke" \
+            --coverage
+      
+      - name: Upload regression results
+        uses: actions/upload-artifact@v3
+        with:
+          name: regression-results-${{ matrix.browser }}-${{ matrix.viewport }}
+          path: frontend/test-results/
+
+  performance-monitoring:
+    name: Performance Monitoring
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'performance' || github.event_name == 'schedule' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+      
+      - name: Build application
+        working-directory: ./frontend
+        run: npm run build
+      
+      - name: Run performance tests
+        working-directory: ./frontend
+        run: npm run test:performance -- --outputFile=performance-report.json
+      
+      - name: Performance baseline comparison
+        working-directory: ./frontend
+        run: |
+          # Compare with baseline performance metrics
+          node scripts/compare-performance.js performance-report.json
+      
+      - name: Upload performance report
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-monitoring
+          path: |
+            frontend/performance-report.json
+            frontend/performance-comparison.html
+
+  accessibility-monitoring:
+    name: Accessibility Monitoring
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'accessibility' || github.event_name == 'schedule' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+      
+      - name: Run accessibility tests
+        working-directory: ./frontend
+        run: npm run test:accessibility -- --outputFormat=json --outputFile=a11y-report.json
+      
+      - name: Generate accessibility report
+        working-directory: ./frontend
+        run: |
+          # Generate HTML report from JSON results
+          node scripts/generate-a11y-report.js a11y-report.json
+      
+      - name: Upload accessibility report
+        uses: actions/upload-artifact@v3
+        with:
+          name: accessibility-monitoring
+          path: |
+            frontend/a11y-report.json
+            frontend/a11y-report.html
+
+  security-monitoring:
+    name: Security Monitoring
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.test_suite == 'all' || github.event.inputs.test_suite == 'security' || github.event_name == 'schedule' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+      
+      - name: Security audit
+        working-directory: ./frontend
+        run: |
+          npm audit --json > security-audit.json || true
+      
+      - name: OWASP ZAP Security Scan
+        uses: zaproxy/action-full-scan@v0.7.0
+        with:
+          target: 'http://localhost:3000'
+          rules_file_name: '.zap/rules.tsv'
+          cmd_options: '-a'
+      
+      - name: Upload security results
+        uses: actions/upload-artifact@v3
+        with:
+          name: security-monitoring
+          path: |
+            frontend/security-audit.json
+            report_html.html
+            report_json.json
+
+  visual-regression:
+    name: Visual Regression Tests
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'schedule' || github.event.inputs.test_suite == 'all' }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+      
+      - name: Run visual regression tests
+        working-directory: ./frontend
+        run: |
+          npm run test -- --testNamePattern="visual regression" --updateSnapshot=false
+      
+      - name: Upload visual regression results
+        uses: actions/upload-artifact@v3
+        with:
+          name: visual-regression-results
+          path: |
+            frontend/__tests__/__image_snapshots__/
+            frontend/visual-regression-report.html
+
+  nightly-summary:
+    name: Nightly Test Summary
+    runs-on: ubuntu-latest
+    needs: [regression-tests, performance-monitoring, accessibility-monitoring, security-monitoring, visual-regression]
+    if: always()
+    
+    steps:
+      - name: Create test summary
+        run: |
+          echo "# 🌙 Nightly Test Summary - $(date +'%Y-%m-%d')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Test Suite | Status | Details |" >> $GITHUB_STEP_SUMMARY
+          echo "|------------|--------|---------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Regression Tests | ${{ needs.regression-tests.result }} | Cross-browser compatibility |" >> $GITHUB_STEP_SUMMARY
+          echo "| Performance Monitoring | ${{ needs.performance-monitoring.result }} | Core Web Vitals & Benchmarks |" >> $GITHUB_STEP_SUMMARY
+          echo "| Accessibility Monitoring | ${{ needs.accessibility-monitoring.result }} | WCAG 2.1 AA Compliance |" >> $GITHUB_STEP_SUMMARY
+          echo "| Security Monitoring | ${{ needs.security-monitoring.result }} | Vulnerability & OWASP Scans |" >> $GITHUB_STEP_SUMMARY
+          echo "| Visual Regression | ${{ needs.visual-regression.result }} | UI Component Screenshots |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## 📊 Artifacts Generated" >> $GITHUB_STEP_SUMMARY
+          echo "- Regression test results for multiple browsers/viewports" >> $GITHUB_STEP_SUMMARY
+          echo "- Performance monitoring reports with baseline comparisons" >> $GITHUB_STEP_SUMMARY
+          echo "- Accessibility compliance reports" >> $GITHUB_STEP_SUMMARY
+          echo "- Security audit and vulnerability scan results" >> $GITHUB_STEP_SUMMARY
+          echo "- Visual regression test snapshots" >> $GITHUB_STEP_SUMMARY
+
+  notify-slack:
+    name: Notify Slack
+    runs-on: ubuntu-latest
+    needs: [nightly-summary]
+    if: always() && github.event_name == 'schedule'
+    
+    steps:
+      - name: Send Slack notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#podplay-sanctuary-tests'
+          text: |
+            🌙 Nightly regression tests completed
+            
+            📊 Results:
+            • Regression: ${{ needs.regression-tests.result }}
+            • Performance: ${{ needs.performance-monitoring.result }}
+            • Accessibility: ${{ needs.accessibility-monitoring.result }}
+            • Security: ${{ needs.security-monitoring.result }}
+            • Visual: ${{ needs.visual-regression.result }}
+            
+            View details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

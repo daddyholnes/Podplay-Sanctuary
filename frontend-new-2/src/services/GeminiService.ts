@@ -4,8 +4,8 @@ import { ChatMessage as UIChatMessage, GeminiServiceError } from '../types';
 
 // This should be set by the build environment or a global script.
 // For Vite, you'd use import.meta.env.VITE_API_KEY and set it in a .env file.
-// As per instructions, assuming process.env.API_KEY is available.
-const API_KEY = process.env.API_KEY;
+// Using Vite environment variable
+const API_KEY = import.meta.env.VITE_GEMINI_API_KEY || import.meta.env.VITE_API_KEY || "";
 
 type Role = 'user' | 'model';
 
@@ -119,7 +119,7 @@ class GeminiService {
             }
             
             const result: GenerateContentResponse = await chat.sendMessage({ message });
-            return result.text;
+            return result.text || "No response received from AI service.";
 
         } catch (error: any) {
             console.error("Error sending message to Gemini:", error);

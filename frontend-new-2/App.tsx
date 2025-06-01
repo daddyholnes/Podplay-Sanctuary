@@ -1,6 +1,5 @@
 
 import React, { useState } from 'react';
-import './src/index.css';
 import Sidebar from './src/components/Sidebar';
 import UnifiedDevelopmentHub from './src/components/UnifiedDevelopmentHub';
 import { ViewType } from './src/types';

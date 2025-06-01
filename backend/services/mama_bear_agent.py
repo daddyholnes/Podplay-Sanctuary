@@ -11,6 +11,7 @@ from typing import Dict, Any, Optional, List
 from models.database import get_db_connection
 from services.enhanced_mama_service import EnhancedMamaBear
 from services.discovery_agent_service import ProactiveDiscoveryAgent
+from services.mama_bear_capability_system import mama_bear_capabilities
 from utils.logging_setup import get_logger
 
 logger = get_logger(__name__)
@@ -36,8 +37,9 @@ class MamaBearAgent:
         self.marketplace = marketplace_manager
         self.enhanced_mama = EnhancedMamaBear()
         self.discovery_agent = ProactiveDiscoveryAgent(marketplace_manager, self.enhanced_mama)
+        self.capability_system = mama_bear_capabilities  # Full feature awareness
         
-        logger.info("Mama Bear Agent initialized successfully")
+        logger.info("🐻 Mama Bear Agent initialized with comprehensive capability awareness")
     
     def chat(self, message: str, user_id: str = "nathan", session_id: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -120,31 +122,162 @@ class MamaBearAgent:
     
     def _handle_mcp_query(self, message: str, user_id: str) -> str:
         """Handle MCP-related queries with marketplace integration"""
+        # Check MCP server management capability
+        mcp_capability = self.check_capability("mcp_server_management")
+        if not mcp_capability["available"]:
+            return "🐻 MCP server management capabilities are currently being prepared. I'll be able to help you discover, install, and manage MCP servers soon!"
+        
         if 'search' in message.lower() or 'find' in message.lower():
             trending_servers = self.marketplace.get_trending_servers(5)
             server_names = [server['name'] for server in trending_servers]
-            return f"I found these popular MCP servers for you: {', '.join(server_names)}. Would you like details about any of these or help with installation?"
+            return f"""🔍 **I found these popular MCP servers for you:**
+
+{chr(10).join(f'• **{server}**' for server in server_names)}
+
+**My MCP capabilities include:**
+• Discovering new servers from GitHub and marketplace
+• Installing and configuring servers automatically  
+• Managing server lifecycles and updates
+• Providing personalized recommendations
+
+Would you like details about any of these servers, or shall I help you search for something specific? 🛠️"""
         
         if 'install' in message.lower():
-            return "I can help you install MCP servers. Which specific server would you like to install? I have access to database tools, cloud services, development utilities, and AI integrations."
+            return """🛠️ **I can help you install MCP servers!** 
+
+I have access to servers for:
+• **Database tools** (PostgreSQL, MongoDB, Redis)
+• **Cloud services** (AWS, Google Cloud, Azure)  
+• **Development utilities** (Git, Docker, CI/CD)
+• **AI integrations** (OpenAI, Anthropic, local models)
+
+Which specific server would you like to install? I'll handle the entire setup process including configuration and testing! 🚀"""
         
-        return "I can help you discover, search, and manage MCP servers in our marketplace. We have servers for databases, cloud services, AI tools, and development utilities. What specific functionality are you looking for?"
+        return f"""🏪 **I can help you with our comprehensive MCP marketplace!**
+
+**Available capabilities:**
+• **Discover** new servers from 500+ repositories
+• **Search** by functionality, language, or provider
+• **Install** with automatic dependency management
+• **Configure** optimal settings for your environment
+• **Monitor** server health and performance
+
+We have servers for databases, cloud services, AI tools, development utilities, and much more. What specific functionality are you looking for? 
+
+💡 *I can also proactively suggest servers based on your current projects!*"""
     
 
     
     def _handle_code_query(self, message: str, user_id: str) -> str:
         """Handle code-related queries with sandbox integration"""
-        if self.enhanced_mama.together_client:
-            return "I can execute and analyze code safely in our sandbox environment. Please share the code you'd like me to review or run, and I'll provide analysis and results."
-        return "Code execution capabilities are currently being prepared. I can still provide code guidance and suggestions. What programming challenge can I help you with?"
+        # Check code execution and analysis capabilities
+        code_exec_capability = self.check_capability("sandbox_execution")
+        code_analysis_capability = self.check_capability("code_analysis")
+        
+        response = "🧠 **I can help with comprehensive code assistance!**\n\n"
+        
+        if code_exec_capability["available"] and self.enhanced_mama.together_client:
+            response += """**🔒 Secure Code Execution:**
+• Run Python, JavaScript, and other languages safely
+• Execute in isolated NixOS sandbox environment
+• Real-time output and error handling
+• Memory and resource protection
+
+"""
+        
+        if code_analysis_capability["available"]:
+            response += """**🔍 Advanced Code Analysis:**
+• Security vulnerability scanning
+• Performance bottleneck identification  
+• Code quality and maintainability assessment
+• Best practices recommendations
+• Refactoring suggestions
+
+"""
+        
+        response += """**📚 Additional Code Assistance:**
+• Code generation and boilerplate creation
+• Debugging help and error resolution
+• Architecture guidance and design patterns
+• Testing strategy and implementation
+• Documentation generation
+
+"""
+        
+        if 'execute' in message.lower() or 'run' in message.lower():
+            if code_exec_capability["available"] and self.enhanced_mama.together_client:
+                response += "**Ready to execute!** Please share the code you'd like me to run, and I'll execute it safely in our sandbox environment. 🚀"
+            else:
+                response += "Code execution capabilities are currently being prepared. I can still provide code analysis and guidance! 🛠️"
+        elif 'analyze' in message.lower() or 'review' in message.lower():
+            response += "**Ready to analyze!** Share your code and I'll provide comprehensive analysis including security, performance, and quality insights. 📊"
+        else:
+            response += "What specific programming challenge can I help you with? I'm ready to execute, analyze, or guide you through any coding task! 💻"
+        
+        return response
     
     def _generate_general_response(self, message: str, user_id: str, context_insights: Dict) -> str:
         """Generate contextual response for general queries"""
+        message_lower = message.lower()
+        
+        # Check if user is asking about Mama Bear's capabilities
+        if any(phrase in message_lower for phrase in [
+            "what can you do", "your capabilities", "your features", 
+            "help me understand", "what are you", "tell me about yourself",
+            "how can you help", "what do you offer"
+        ]):
+            return self.capability_system.get_feature_awareness_response()
+        
+        # Check for autonomous action requests
+        if any(phrase in message_lower for phrase in [
+            "can you automatically", "set up project", "create environment",
+            "autonomous", "do this for me", "automate"
+        ]):
+            actions_summary = self.capability_system.get_capability_summary()
+            action_list = "\n".join([f"• {action.name}: {action.description}" 
+                                   for action in self.capability_system.autonomous_actions.values()])
+            
+            return f"""🐻 **Yes! I can autonomously handle complex workflows.** Here are my **{actions_summary['autonomous_actions']} autonomous capabilities**:
+
+{action_list}
+
+Just describe what you'd like to accomplish, and I'll break it down into steps and execute it autonomously. What project or task would you like me to help with? 🚀"""
+        
+        # Model selection guidance
+        if any(phrase in message_lower for phrase in [
+            "which model", "ai model", "model selection", "optimal model"
+        ]):
+            return """🧠 **I intelligently select the optimal AI model for each task:**
+
+• **Flash 8B** - Quick summaries, simple questions, fast responses
+• **Flash 002** - Standard development work, code review, planning  
+• **Pro 002** - Complex reasoning, architecture design, difficult problems
+• **Vision Models** - Image analysis, file parsing, visual content
+
+I automatically choose based on task complexity, cost efficiency, and speed requirements. You don't need to worry about model selection - I handle it intelligently! 
+
+What task can I help optimize for you? 🎯"""
+        
+        # Memory-aware default response
         memory_context = ""
         if context_insights.get("relevant_memories"):
             memory_context = f" I remember our previous discussions about {len(context_insights['relevant_memories'])} related topics."
         
-        return f"Hello {user_id}! I'm Mama Bear, your development environment assistant.{memory_context} I can help with MCP server management, code analysis, and development guidance. How can I assist you with your Podplay Sanctuary today?"
+        # Default helpful response with capability hints
+        return f"""🐻 I understand you need help with: "{message}"{memory_context}
+
+I'm here to assist with comprehensive development support! I can:
+
+• **Chat intelligently** with full memory of our conversations
+• **Execute code safely** in secure NixOS sandboxes  
+• **Manage your workspace** and development environments
+• **Discover tools** and recommend MCP servers
+• **Analyze and optimize** your codebase
+• **Plan and execute** complex projects autonomously
+
+Would you like me to elaborate on any of these capabilities, or shall we dive into your specific request? 
+
+💡 *Tip: Ask "What can you do?" for my complete feature overview!*"""
     
 
     
@@ -220,3 +353,58 @@ class MamaBearAgent:
             Memory insights dictionary
         """
         return self.enhanced_mama.get_contextual_insights(query)
+    
+    def check_capability(self, capability_name: str) -> Dict[str, Any]:
+        """
+        Check if a specific capability is available
+        
+        Args:
+            capability_name: Name of the capability to check
+            
+        Returns:
+            Capability status and details
+        """
+        if capability_name in self.capability_system.capabilities:
+            capability = self.capability_system.capabilities[capability_name]
+            return {
+                "available": capability.is_available,
+                "name": capability.name,
+                "description": capability.description,
+                "category": capability.category.value,
+                "complexity": capability.complexity_level.value,
+                "examples": capability.examples
+            }
+        return {"available": False, "error": f"Capability '{capability_name}' not found"}
+    
+    def can_execute_autonomous_action(self, action_id: str) -> Dict[str, Any]:
+        """
+        Check if Mama Bear can execute a specific autonomous action
+        
+        Args:
+            action_id: ID of the autonomous action
+            
+        Returns:
+            Action feasibility assessment
+        """
+        return self.capability_system.can_execute_action(action_id)
+    
+    def suggest_optimal_model(self, task_description: str) -> Dict[str, Any]:
+        """
+        Suggest optimal AI model for a given task
+        
+        Args:
+            task_description: Description of the task
+            
+        Returns:
+            Model recommendation with reasoning
+        """
+        return self.capability_system.suggest_optimal_model(task_description)
+    
+    def get_full_capability_overview(self) -> str:
+        """
+        Get comprehensive overview of all capabilities
+        
+        Returns:
+            Detailed capability overview response
+        """
+        return self.capability_system.get_feature_awareness_response()
