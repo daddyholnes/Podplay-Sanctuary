@@ -1,36 +1,54 @@
-## Resource Monitor Panel
+# React + TypeScript + Vite
 
-The `ResourceMonitorPanel` component provides a real-time view of system metrics (CPU, Memory, Disk, Network) and displays alerts for the current workspace.
+This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
-### Features
-- Live animated metrics for CPU, memory, disk, and network usage
-- Alert system for warnings and critical events
-- Smooth panel transitions and styled with Emotion and Framer Motion
-- Type-safe and fully tested with Vitest + React Testing Library
+Currently, two official plugins are available:
 
-### Usage
+- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) for Fast Refresh
+- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
 
-```tsx
-import { ResourceMonitorPanel } from './components/workspace/ResourceMonitorPanel';
+## Expanding the ESLint configuration
 
-<ResourceMonitorPanel workspaceId="your-workspace-id" />
+If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+
+```js
+export default tseslint.config({
+  extends: [
+    // Remove ...tseslint.configs.recommended and replace with this
+    ...tseslint.configs.recommendedTypeChecked,
+    // Alternatively, use this for stricter rules
+    ...tseslint.configs.strictTypeChecked,
+    // Optionally, add this for stylistic rules
+    ...tseslint.configs.stylisticTypeChecked,
+  ],
+  languageOptions: {
+    // other options...
+    parserOptions: {
+      project: ['./tsconfig.node.json', './tsconfig.app.json'],
+      tsconfigRootDir: import.meta.dirname,
+    },
+  },
+})
 ```
 
-**Props:**
-- `workspaceId` (string): Unique identifier for the workspace to monitor.
+You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
 
-### Testing
+```js
+// eslint.config.js
+import reactX from 'eslint-plugin-react-x'
+import reactDom from 'eslint-plugin-react-dom'
 
-- Run all frontend tests with:
-  ```bash
-  npm run test
-  ```
-- Tests are located in `src/components/workspace/ResourceMonitorPanel.test.tsx`
-- Uses Vitest, jsdom, and React Testing Library.
-
-### Extending
-
-- To add new metrics or alert types, update the `Metrics` and `Alert` interfaces in `ResourceMonitorPanel.tsx`.
-- For custom icons, use Lucide or add your own SVGs.
-
----
+export default tseslint.config({
+  plugins: {
+    // Add the react-x and react-dom plugins
+    'react-x': reactX,
+    'react-dom': reactDom,
+  },
+  rules: {
+    // other rules...
+    // Enable its recommended typescript rules
+    ...reactX.configs['recommended-typescript'].rules,
+    ...reactDom.configs.recommended.rules,
+  },
+})
+```
