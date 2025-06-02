@@ -75,12 +75,22 @@ def create_app(config_name='development'):
     init_database(app)
     
     # Initialize services FIRST - before registering blueprints
-    from services import initialize_services
-    initialize_services(app)
-    
+    # from services import initialize_services
+    # initialize_services(app)
+    from api.blueprints.integration_api import integration_bp, init_integration_workbench
+    from services.service_intergration_enhanced import initialize_services_with_agents
+    services = initialize_services_with_agents(app)
+    # Add integration workbench
+    enhanced_mama = services.get('enhanced_mama') if hasattr(services, 'get') else None
+    marketplace = services.get('marketplace_manager') if hasattr(services, 'get') else None
+    if enhanced_mama and marketplace:
+        init_integration_workbench(enhanced_mama, marketplace)
+        logger.info("🔧 Integration Workbench initialized successfully")
+
     # Register API blueprints AFTER services are initialized
     from api import register_blueprints
     register_blueprints(app)
+    app.register_blueprint(integration_bp)
     
     # Register Socket.IO handlers
     from api.blueprints.socket_handlers import register_socket_handlers

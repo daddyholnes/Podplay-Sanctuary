@@ -176,6 +176,9 @@ mama_bear.log*
 ehthumbs.db
 Thumbs.db
 
+# Credentials files 
+ creds.txt
+*creds.txt
 # Temporary files
 tmp/
 temp/

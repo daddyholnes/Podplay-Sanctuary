@@ -203,30 +203,29 @@ def register_socket_handlers(socketio):
                 })
                 return
             
-            join_room(f"workspace_{workspace_id}")
+            join_room(workspace_id)
             client_id = request.sid
-            
             logger.info(f"Client {client_id} subscribed to workspace {workspace_id}")
             
             emit('workspace_subscribed', {
                 'workspace_id': workspace_id,
                 'status': 'success',
-                'message': f'Subscribed to workspace {workspace_id} updates',
+                'message': f'Subscribed to workspace {workspace_id}',
                 'timestamp': datetime.now().isoformat()
             })
             
         except Exception as e:
             logger.error(f"Workspace subscription error: {e}")
             emit('error', {
-                'message': 'Workspace subscription failed',
+                'message': 'Failed to subscribe to workspace updates',
                 'error': str(e),
                 'timestamp': datetime.now().isoformat()
             })
-    
+
     @socketio.on('workspace_unsubscribe')
     def handle_workspace_unsubscription(data):
         """
-        Unsubscribe from workspace updates with session cleanup
+        Unsubscribe from workspace updates
         
         Args:
             data: Dictionary containing workspace_id for unsubscription
@@ -240,9 +239,8 @@ def register_socket_handlers(socketio):
                 })
                 return
             
-            leave_room(f"workspace_{workspace_id}")
+            leave_room(workspace_id)
             client_id = request.sid
-            
             logger.info(f"Client {client_id} unsubscribed from workspace {workspace_id}")
             
             emit('workspace_unsubscribed', {
@@ -255,144 +253,142 @@ def register_socket_handlers(socketio):
         except Exception as e:
             logger.error(f"Workspace unsubscription error: {e}")
             emit('error', {
-                'message': 'Workspace unsubscription failed',
+                'message': 'Failed to unsubscribe from workspace updates',
                 'error': str(e),
                 'timestamp': datetime.now().isoformat()
             })
-    
-    @socketio.on('mama_bear_chat')
-    def handle_real_time_chat(data):
+
+    # Mama Bear Chat Handlers
+    @socketio.on('join_chat_conversation')
+    def handle_join_chat_conversation(data):
         """
-        Process real-time Mama Bear chat interaction with immediate response
-        
+        Join a specific chat conversation room.
         Args:
-            data: Dictionary containing message and session context for chat processing
+            data: Dictionary containing conversation_id.
         """
         try:
-            message = data.get('message', '')
-            session_id = data.get('session_id', request.sid)
-            user_id = data.get('user_id', 'nathan')
-            
-            if not message.strip():
-                emit('error', {
-                    'message': 'Message content required for chat interaction',
-                    'timestamp': datetime.now().isoformat()
-                })
+            conversation_id = data.get('conversation_id')
+            if not conversation_id:
+                emit('error', {'message': 'Conversation ID is required to join chat.'})
+                return
+
+            join_room(conversation_id)
+            client_id = request.sid
+            logger.info(f"Client {client_id} joined chat conversation {conversation_id}")
+            emit('chat_conversation_joined', {
+                'conversation_id': conversation_id,
+                'status': 'success',
+                'message': f'Successfully joined conversation {conversation_id}.'
+            })
+        except Exception as e:
+            logger.error(f"Error joining chat conversation {data.get('conversation_id')}: {e}")
+            emit('error', {'message': f'Failed to join chat conversation: {str(e)}'})
+
+    @socketio.on('leave_chat_conversation')
+    def handle_leave_chat_conversation(data):
+        """
+        Leave a specific chat conversation room.
+        Args:
+            data: Dictionary containing conversation_id.
+        """
+        try:
+            conversation_id = data.get('conversation_id')
+            if not conversation_id:
+                emit('error', {'message': 'Conversation ID is required to leave chat.'})
+                return
+
+            leave_room(conversation_id)
+            client_id = request.sid
+            logger.info(f"Client {client_id} left chat conversation {conversation_id}")
+            emit('chat_conversation_left', {
+                'conversation_id': conversation_id,
+                'status': 'success',
+                'message': f'Successfully left conversation {conversation_id}.'
+            })
+        except Exception as e:
+            logger.error(f"Error leaving chat conversation {data.get('conversation_id')}: {e}")
+            emit('error', {'message': f'Failed to leave chat conversation: {str(e)}'})
+
+    @socketio.on('send_chat_message')
+    def handle_send_chat_message(data):
+        """
+        Handle incoming chat messages and broadcast them to the conversation room.
+        Args:
+            data: Dictionary containing conversation_id and message payload.
+                  Message payload should be an object with text, sender, etc.
+        """
+        try:
+            conversation_id = data.get('conversation_id')
+            message_payload = data.get('message')
+
+            if not conversation_id or not message_payload:
+                emit('error', {'message': 'Conversation ID and message payload are required.'})
                 return
             
-            logger.info(f"Real-time Mama Bear chat: {message[:50]}...")
+            # Augment message with server-side info if needed (e.g., timestamp, server-validated sender)
+            message_payload['timestamp'] = datetime.now().isoformat()
+            # For now, we trust the sender from the client, but in a real app, validate/set this server-side
+            # message_payload['sender'] = 'mama-bear' # Or determine based on context
+
+            logger.info(f"Message received for conversation {conversation_id} from {message_payload.get('sender')}: {message_payload.get('text')[:50]}...")
             
-            # Process chat through Mama Bear agent if available
-            if mama_bear_agent:
-                try:
-                    chat_result = mama_bear_agent.chat(message, user_id, session_id)
-                    
-                    emit('mama_bear_response', {
-                        'message': chat_result.get('response', 'Chat processing completed'),
-                        'session_id': session_id,
-                        'user_id': user_id,
-                        'timestamp': datetime.now().isoformat(),
-                        'type': 'mama_bear_response',
-                        'success': chat_result.get('success', True),
-                        'metadata': chat_result.get('metadata', {})
-                    })
-                    
-                except Exception as agent_error:
-                    logger.error(f"Mama Bear agent error: {agent_error}")
-                    emit('mama_bear_response', {
-                        'message': 'I encountered a technical difficulty while processing your message. Please try again.',
-                        'session_id': session_id,
-                        'timestamp': datetime.now().isoformat(),
-                        'type': 'mama_bear_response',
-                        'success': False,
-                        'error': str(agent_error)
-                    })
-            else:
-                # Fallback response when agent is not available
-                emit('mama_bear_response', {
-                    'message': f'Hello! I received your message: "{message}". I am currently initializing my systems. Please try again shortly.',
-                    'session_id': session_id,
-                    'timestamp': datetime.now().isoformat(),
-                    'type': 'mama_bear_response',
-                    'success': True,
-                    'agent_available': False
-                })
+            # Broadcast the message to everyone in the specific conversation room
+            socketio.emit('new_chat_message', {
+                'conversation_id': conversation_id,
+                'message': message_payload
+            }, room=conversation_id)
             
+            # Potentially, if Mama Bear needs to respond, trigger agent logic here
+            # For example:
+            # if message_payload.get('sender') == 'user':
+            #     response = mama_bear_agent.process_message(message_payload.get('text'))
+            #     response_payload = {
+            #         'id': str(uuid.uuid4()), # Generate unique ID for the response
+            #         'text': response,
+            #         'sender': 'mama-bear',
+            #         'timestamp': datetime.now().isoformat(),
+            #         'conversation_id': conversation_id 
+            #     }
+            #     socketio.emit('new_chat_message', {
+            #         'conversation_id': conversation_id,
+            #         'message': response_payload
+            #     }, room=conversation_id)
+            #     logger.info(f"Mama Bear responded in conversation {conversation_id}")
+
         except Exception as e:
-            logger.error(f"Real-time chat processing error: {e}")
-            emit('error', {
-                'message': 'Chat processing failed',
-                'error': str(e),
-                'timestamp': datetime.now().isoformat()
-            })
-    
-    @socketio.on('system_status_request')
-    def handle_system_status_inquiry():
-        """
-        Provide comprehensive system status information for monitoring dashboard
-        """
-        try:
-            status_data = {
-                'timestamp': datetime.now().isoformat(),
-                'services': {
-                    'mama_bear': 'running' if mama_bear_agent else 'initializing',
-                    'marketplace': 'running' if marketplace_manager else 'initializing',
-                    'socket_io': 'running',
-                    'database': 'operational',
-                    'logging_system': 'operational'
-                },
-                'system': {
-                    'cpu_usage': 25.5,
-                    'memory_usage': 60.2,
-                    'active_workspaces': 2,
-                    'active_terminals': 3,
-                    'connected_clients': len(socketio.server.manager.get_namespaces())
-                },
-                'environment': {
-                    'sanctuary_health': 'excellent',
-                    'development_mode': True,
-                    'real_time_features': True
-                }
-            }
+            logger.error(f"Error sending chat message in conversation {data.get('conversation_id')}: {e}")
+            emit('error', {'message': f'Failed to send chat message: {str(e)}'})
             
-            emit('system_status', status_data)
-            logger.debug("System status information provided to client")
-            
-        except Exception as e:
-            logger.error(f"System status inquiry error: {e}")
-            emit('error', {
-                'message': 'System status retrieval failed',
-                'error': str(e),
-                'timestamp': datetime.now().isoformat()
-            })
-    
-    @socketio.on('test_event')
-    def handle_test_communication(data):
+    # MCP Marketplace Handlers (Example Structure)
+    @socketio.on('mcp_marketplace_action')
+    def handle_mcp_marketplace_action(data):
         """
-        Handle test events for connection validation and debugging purposes
+        Handle actions related to the MCP Marketplace (e.g., listing items, creating offers)
         
         Args:
-            data: Test payload for echo response validation
+            data: Dictionary containing action type and payload for marketplace interaction
         """
         try:
-            logger.info(f"Test event received: {data}")
+            action_type = data.get('action_type')
+            payload = data.get('payload', {})
             
-            emit('test_response', {
+            logger.info(f"MCP Marketplace action received: {action_type} with payload {payload}")
+            
+            # Placeholder for marketplace action handling logic
+            result = {
+                'action_type': action_type,
                 'status': 'success',
-                'message': 'Test event processed successfully',
-                'received_data': data,
+                'message': f'Action {action_type} processed successfully',
                 'timestamp': datetime.now().isoformat(),
-                'server_info': {
-                    'service': 'podplay-sanctuary',
-                    'socket_io_version': '5.x',
-                    'connection_type': 'websocket'
-                }
-            })
+                'payload': payload
+            }
+            
+            emit('mcp_marketplace_response', result)
             
         except Exception as e:
-            logger.error(f"Test event processing error: {e}")
+            logger.error(f"MCP Marketplace action handling error: {e}")
             emit('error', {
-                'message': 'Test event processing failed',
+                'message': 'MCP Marketplace action processing failed',
                 'error': str(e),
                 'timestamp': datetime.now().isoformat()
             })
