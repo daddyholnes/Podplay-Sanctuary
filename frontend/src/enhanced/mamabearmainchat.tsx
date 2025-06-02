@@ -25,6 +25,7 @@ import {
   Star,
   ArrowRight,
   AlertCircle,
+  Menu,
 } from 'lucide-react';
 
 import mamaBearChatService from '../services/MamaBearChatService';
@@ -43,9 +44,7 @@ interface ChatMessage {
   content: string;
   role: 'user' | 'assistant' | 'system';
   session_id: string;
-  timestamp: string;
   created_at: string;
-  suggestions?: string[];
 }
 
 // Formatted message with properly typed date fields
@@ -54,9 +53,11 @@ interface FormattedChatMessage {
   content: string;
   role: 'user' | 'assistant' | 'system';
   session_id: string;
-  timestamp: Date;
   created_at: Date;
   suggestions?: string[];
+  actions?: string[];
+  isLoading?: boolean;
+  isError?: boolean;
 }
 
 interface ApiResponse<T> {
@@ -74,6 +75,18 @@ interface ToastProps {
   duration: number;
 }
 
+interface MenuItem {
+  id: string;
+  label: string;
+  icon?: React.ReactNode;
+  type?: 'item' | 'divider';
+  onClick: () => void;
+}
+
+interface MamaBearMainChatProps {
+  className?: string;
+}
+
 // Theme interface for consistent styling
 interface ThemeStyles {
   bg: string;
@@ -87,7 +100,7 @@ interface ThemeStyles {
   accent: string;
 }
 
-// Helper function to get theme styles
+// Helper function to get theme styles based on dark mode
 const getThemeStyles = (isDarkMode: boolean): ThemeStyles => {
   return {
     bg: isDarkMode ? 'bg-gray-900' : 'bg-gray-100',
@@ -103,17 +116,381 @@ const getThemeStyles = (isDarkMode: boolean): ThemeStyles => {
 };
 
 // Chat type icon component
-const ChatTypeIcon: React.FC<{ type: ChatSession['type'] }> = ({ type }) => {
+const ChatTypeIcon: React.FC<{ type: ChatSession['type']; className?: string }> = ({ 
+  type, 
+  className = 'w-4 h-4' 
+}) => {
   switch (type) {
     case 'code':
-      return <Code2 className="w-4 h-4" />;
+      return <Code2 className={className} />;
     case 'web':
-      return <Globe className="w-4 h-4" />;
+      return <Globe className={className} />;
     case 'image':
-      return <Database className="w-4 h-4" />;
+      return <Database className={className} />;
     case 'chat':
     default:
-      return <MessageCircle className="w-4 h-4" />;
+      return <MessageCircle className={className} />;
+  }
+};
+
+// Toast component for notifications
+const Toast: React.FC<{ 
+  message: string; 
+  type?: 'success' | 'error' | 'info';
+  variant?: 'purple' | 'default';
+  onClose: () => void;
+}> = ({ 
+  message, 
+  type = 'info',
+  variant = 'default',
+  onClose 
+}) => {
+  let bgColor = '';
+  let textColor = '';
+  let IconComponent;
+
+  // Set styles based on toast type and variant
+  if (variant === 'purple') {
+    switch (type) {
+      case 'success':
+        bgColor = 'bg-green-600 dark:bg-green-700';
+        textColor = 'text-white';
+        IconComponent = Check;
+        break;
+      case 'error':
+        bgColor = 'bg-red-600 dark:bg-red-700';
+        textColor = 'text-white';
+        IconComponent = XCircle;
+        break;
+      case 'info':
+      default:
+        bgColor = 'bg-purple-600 dark:bg-purple-700';
+        textColor = 'text-white';
+        IconComponent = Info;
+    }
+  } else {
+    switch (type) {
+      case 'success':
+        bgColor = 'bg-green-600';
+        textColor = 'text-white';
+        IconComponent = Check;
+        break;
+      case 'error':
+        bgColor = 'bg-red-600';
+        textColor = 'text-white';
+        IconComponent = XCircle;
+        break;
+      case 'info':
+      default:
+        bgColor = 'bg-blue-600';
+        textColor = 'text-white';
+        IconComponent = Info;
+    }
+  }
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 20, scale: 0.8 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: 20, scale: 0.8 }}
+      className={`rounded-md p-4 ${bgColor} ${textColor} shadow-lg flex items-start gap-3`}
+    >
+      <IconComponent className="w-5 h-5 mt-0.5 flex-shrink-0" />
+      <div className="flex-1">{message}</div>
+      <button onClick={onClose} className="text-white hover:text-gray-200">
+        <X className="w-5 h-5" />
+      </button>
+    </motion.div>
+  );
+};
+
+// Toast container component
+const ToastContainer: React.FC<{
+  toasts: ToastProps[];
+  removeToast: (id: string) => void;
+  position?: string;
+  children?: React.ReactNode;
+}> = ({
+  toasts,
+  removeToast,
+  position = 'top-right',
+  children
+}) => {
+  const positionClasses = {
+    'top-right': 'top-4 right-4',
+    'top-left': 'top-4 left-4',
+    'bottom-right': 'bottom-4 right-4',
+    'bottom-left': 'bottom-4 left-4',
+    'top-center': 'top-4 left-1/2 transform -translate-x-1/2',
+    'bottom-center': 'bottom-4 left-1/2 transform -translate-x-1/2',
+  }[position] || 'top-4 right-4';
+
+  return (
+    <div className={`fixed z-50 flex flex-col gap-2 ${positionClasses}`}>
+      <AnimatePresence>
+        {toasts.map((toast) => (
+          <motion.div
+            key={toast.id}
+            initial={{ opacity: 0, y: 20, scale: 0.8 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.8 }}
+            layout
+          >
+            <Toast
+              message={toast.message}
+              type={toast.type}
+              variant={toast.variant}
+              onClose={() => removeToast(toast.id)}
+            />
+          </motion.div>
+        ))}
+      </AnimatePresence>
+      {children}
+    </div>
+  );
+};
+
+// UI Component placeholders (these would be replaced with your actual UI components)
+const Panel: React.FC<{
+  className?: string;
+  title?: string;
+  children: React.ReactNode;
+  direction?: 'row' | 'column';
+  headerClassName?: string;
+  bodyClassName?: string;
+}> = ({ 
+  className = '', 
+  title, 
+  children, 
+  direction = 'column',
+  headerClassName = '',
+  bodyClassName = ''
+}) => {
+  return (
+    <div className={`border rounded-md overflow-hidden ${className}`}>
+      {title && (
+        <div className={`p-3 font-medium border-b ${headerClassName}`}>{title}</div>
+      )}
+      <div className={`p-4 flex ${direction === 'row' ? 'flex-row' : 'flex-col'} ${bodyClassName}`}>
+        {children}
+      </div>
+    </div>
+  );
+};
+
+const Button: React.FC<{
+  onClick?: () => void;
+  variant?: 'primary' | 'secondary' | 'ghost';
+  className?: string;
+  children: React.ReactNode;
+  disabled?: boolean;
+  type?: 'button' | 'submit';
+  title?: string;
+}> = ({
+  onClick,
+  variant = 'primary',
+  className = '',
+  children,
+  disabled = false,
+  type = 'button',
+  title
+}) => {
+  let variantClasses = '';
+  
+  switch (variant) {
+    case 'primary':
+      variantClasses = 'bg-purple-600 hover:bg-purple-700 text-white';
+      break;
+    case 'secondary':
+      variantClasses = 'bg-gray-200 hover:bg-gray-300 text-gray-800 dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-white';
+      break;
+    case 'ghost':
+      variantClasses = 'bg-transparent hover:bg-gray-100 text-gray-800 dark:hover:bg-gray-800 dark:text-gray-200';
+      break;
+  }
+
+  return (
+    <button
+      onClick={onClick}
+      className={`px-4 py-2 rounded-md transition-colors ${variantClasses} ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
+      disabled={disabled}
+      type={type}
+      title={title}
+    >
+      {children}
+    </button>
+  );
+};
+
+const Input: React.FC<{
+  value: string;
+  onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  onKeyDown?: (e: KeyboardEvent<HTMLInputElement | HTMLTextAreaElement>) => void;
+  placeholder?: string;
+  className?: string;
+  type?: string;
+  multiline?: boolean;
+  rows?: number;
+}> = ({
+  value,
+  onChange,
+  onKeyDown,
+  placeholder,
+  className = '',
+  type = 'text',
+  multiline = false,
+  rows = 3
+}) => {
+  const baseClasses = `w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500 ${className}`;
+  
+  return multiline ? (
+    <textarea
+      value={value}
+      onChange={onChange}
+      onKeyDown={onKeyDown}
+      placeholder={placeholder}
+      className={baseClasses}
+      rows={rows}
+    />
+  ) : (
+    <input
+      type={type}
+      value={value}
+      onChange={onChange}
+      onKeyDown={onKeyDown}
+      placeholder={placeholder}
+      className={baseClasses}
+    />
+  );
+};
+
+const Modal: React.FC<{
+  isOpen: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}> = ({
+  isOpen,
+  onClose,
+  title,
+  children
+}) => {
+  if (!isOpen) return null;
+  
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl w-full max-w-md mx-4 overflow-hidden">
+        <div className="flex items-center justify-between p-4 border-b dark:border-gray-700">
+          <h3 className="text-lg font-medium">{title}</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="p-5">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const Tooltip: React.FC<{
+  content: string;
+  children: React.ReactNode;
+}> = ({
+  content,
+  children
+}) => {
+  const [show, setShow] = useState(false);
+  
+  return (
+    <div className="relative inline-block">
+      <div
+        onMouseEnter={() => setShow(true)}
+        onMouseLeave={() => setShow(false)}
+      >
+        {children}
+      </div>
+      {show && (
+        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-2 py-1 bg-gray-800 text-white text-xs rounded whitespace-nowrap">
+          {content}
+          <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-800"></div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+const Dropdown: React.FC<{
+  trigger: React.ReactNode;
+  items: MenuItem[];
+}> = ({
+  trigger,
+  items
+}) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+  
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <div onClick={() => setIsOpen(!isOpen)}>
+        {trigger}
+      </div>
+      
+      {isOpen && (
+        <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-md shadow-lg z-10 border dark:border-gray-700">
+          <div className="py-1">
+            {items.map((item) => (
+              item.type === 'divider' ? (
+                <hr key={item.id} className="my-1 border-gray-200 dark:border-gray-700" />
+              ) : (
+                <div
+                  key={item.id}
+                  className="flex items-center px-4 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer"
+                  onClick={() => {
+                    item.onClick();
+                    setIsOpen(false);
+                  }}
+                >
+                  {item.icon && <span className="mr-2">{item.icon}</span>}
+                  {item.label}
+                </div>
+              )
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+
+
+// Chat type icon component
+const ChatTypeIcon: React.FC<{ type: ChatSession['type']; className?: string }> = ({ type, className = 'w-4 h-4' }) => {
+  switch (type) {
+    case 'code':
+      return <Code2 className={className} />;
+    case 'web':
+      return <Globe className={className} />;
+    case 'image':
+      return <Database className={className} />;
+    case 'chat':
+    default:
+      return <MessageCircle className={className} />;
   }
 };
 
@@ -458,6 +835,187 @@ const MamaBearMainChat: React.FC = () => {
   useEffect(() => {
     scrollToBottom();
   }, [chatMessages]);
+  
+  // Render the component UI
+  return (
+    <div className={`flex h-full w-full overflow-hidden ${theme.bg}`}>
+      {/* Toast notifications */}
+      <ToastContainer toasts={toasts} removeToast={removeToast} />
+      
+      {/* Sidebar */}
+      {showSidebar && (
+        <div className={`w-64 flex-shrink-0 ${theme.cardBg} ${theme.border} border-r flex flex-col h-full`}>
+          <div className={`p-4 flex justify-between items-center border-b ${theme.border}`}>
+            <h2 className={`font-medium ${theme.text}`}>Chat Sessions</h2>
+            <button 
+              onClick={createNewChat}
+              className={`p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700`}
+              title="New Chat"
+            >
+              <Plus size={18} className={theme.text} />
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto">
+            {isLoading ? (
+              <div className={`p-4 text-center ${theme.textSecondary}`}>
+                Loading sessions...
+              </div>
+            ) : chatSessions.length === 0 ? (
+              <div className={`p-4 text-center ${theme.textSecondary}`}>
+                No chat sessions found.
+              </div>
+            ) : (
+              <ul className={`divide-y ${theme.border}`}>
+                {chatSessions.map(session => (
+                  <li key={session.id}>
+                    <button
+                      onClick={() => selectChat(session.id)}
+                      className={`w-full p-3 text-left flex items-center space-x-3 hover:bg-gray-100 dark:hover:bg-gray-700 ${activeChatSession?.id === session.id ? 'bg-gray-100 dark:bg-gray-700' : ''}`}
+                    >
+                      <ChatTypeIcon type={session.type} />
+                      <div className="flex-1 truncate">
+                        <span className={`block ${theme.text}`}>
+                          {session.name || `Chat ${session.id.substring(0, 8)}`}
+                        </span>
+                        <span className={`block text-xs ${theme.textTertiary}`}>
+                          {new Date(session.updated_at).toLocaleString()}
+                        </span>
+                      </div>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+          
+          <div className={`p-4 border-t ${theme.border} flex justify-between`}>
+            <button
+              onClick={toggleDarkMode}
+              className={`p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700`}
+              title={isDarkMode ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {isDarkMode ? <Sun size={18} className={theme.text} /> : <Moon size={18} className={theme.text} />}
+            </button>
+            
+            <button
+              onClick={() => setShowSettings(true)}
+              className={`p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700`}
+              title="Settings"
+            >
+              <Settings size={18} className={theme.text} />
+            </button>
+          </div>
+        </div>
+      )}
+      
+      {/* Main content */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        {/* Chat header */}
+        <div className={`px-4 py-3 flex items-center justify-between ${theme.cardBg} ${theme.border} border-b`}>
+          <div className="flex items-center">
+            <button 
+              onClick={() => setShowSidebar(prev => !prev)}
+              className={`mr-3 p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700`}
+              title={showSidebar ? 'Hide Sidebar' : 'Show Sidebar'}
+            >
+              <Menu size={18} className={theme.text} />
+            </button>
+            
+            <h2 className={`font-medium ${theme.text} flex items-center`}>
+              {activeChatSession ? (
+                <>
+                  <ChatTypeIcon type={activeChatSession.type} className="mr-2" />
+                  {activeChatSession.name || `Chat ${activeChatSession.id.substring(0, 8)}`}
+                </>
+              ) : 'No Chat Selected'}
+            </h2>
+          </div>
+        </div>
+        
+        {/* Chat messages */}
+        <div 
+          className="flex-1 overflow-y-auto p-4"
+          ref={chatContainerRef}
+        >
+          {isLoadingMessages ? (
+            <div className="flex justify-center items-center h-full">
+              <div className={`${theme.textSecondary}`}>Loading messages...</div>
+            </div>
+          ) : !activeChatSession ? (
+            <div className="flex flex-col justify-center items-center h-full">
+              <div className={`${theme.textSecondary} text-center mb-4`}>
+                Select a chat or create a new one to start a conversation
+              </div>
+              <button
+                onClick={createNewChat}
+                className={`px-4 py-2 rounded-md ${theme.button} text-white`}
+              >
+                New Chat
+              </button>
+            </div>
+          ) : chatMessages.length === 0 ? (
+            <div className="flex justify-center items-center h-full">
+              <div className={`${theme.textSecondary}`}>No messages yet. Start a conversation!</div>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {chatMessages.map(msg => (
+                <div key={msg.id} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                  <div 
+                    className={`max-w-[75%] rounded-lg p-3 ${msg.role === 'user' 
+                      ? `${theme.button} text-white` 
+                      : `${theme.cardBg} ${theme.border} border`
+                    }`}
+                  >
+                    <div className={msg.role === 'user' ? 'text-white' : theme.text}>
+                      {msg.content}
+                    </div>
+                    <div className={`text-xs mt-1 ${msg.role === 'user' ? 'text-white opacity-70' : theme.textTertiary}`}>
+                      {msg.timestamp.toLocaleTimeString()}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
+          )}
+        </div>
+        
+        {/* Chat input */}
+        {activeChatSession && (
+          <div className={`p-4 ${theme.cardBg} ${theme.border} border-t`}>
+            <div className="flex">
+              <textarea
+                className={`flex-1 p-3 rounded-md resize-none ${theme.input} ${theme.border} ${theme.text} focus:outline-none focus:ring-2 focus:ring-purple-500`}
+                placeholder="Type your message..."
+                rows={3}
+                value={inputMessage}
+                onChange={handleInputChange}
+                onKeyDown={handleKeyPress}
+                disabled={isSending}
+              />
+            </div>
+            
+            <div className="flex justify-between mt-2">
+              <div className="text-xs ${theme.textSecondary}">
+                Press Enter to send, Shift+Enter for new line
+              </div>
+              
+              <button
+                onClick={sendMessage}
+                disabled={!inputMessage.trim() || isSending}
+                className={`px-4 py-2 rounded-md ${theme.button} text-white disabled:opacity-50`}
+              >
+                {isSending ? 'Sending...' : 'Send'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
 
 // Chat component props
 interface ChatProps {
