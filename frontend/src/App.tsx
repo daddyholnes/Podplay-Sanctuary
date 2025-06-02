@@ -1,19 +1,31 @@
 // filepath: /home/woody/Desktop/podplay-build-beta/frontend/src/App.tsx
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import './App.css';
 import './EnhancedChat.css'; // For enhanced chat features
 
-// New Unified Workspace Components
-import { DesignSystemProvider } from './contexts/DesignSystemContext';
-import UnifiedDynamicWorkspace from './components/UnifiedDynamicWorkspace';
+import MamaBearMainChat from './enhanced/mamabearmainchat';
+import McpMarketplace from './enhanced/scout-mcp-marketplace';
+import ScoutMultiModalChat from './enhanced/scout-multimodal-chat';
+import WorkspaceLayout from './enhanced/scout-workspace-layout';
+import DevWorkspaces from './enhanced/scoutdevworkspaces';
 
-// Legacy Components (for fallback support)
-import ScoutDynamicWorkspace from './components/scout_agent/ScoutDynamicWorkspace';
-import MiniAppLauncher from './components/MiniAppLauncher';
-import MamaBearControlCenter from './components/MamaBearControlCenter';
-import UnifiedDevelopmentHub from './components/UnifiedDevelopmentHub';
-
-import { API_BASE_URL } from './config/api';
+const RightPanelTabs = () => {
+  const [activeTab, setActiveTab] = useState<'marketplace' | 'multimodal' | 'dev'>('marketplace');
+  return (
+    <div className="flex flex-col h-full w-[420px] bg-slate-900/90 border-l border-purple-700/30">
+      <div className="flex border-b border-purple-700/30">
+        <button onClick={() => setActiveTab('marketplace')} className={`flex-1 py-2 ${activeTab==='marketplace' ? 'bg-purple-800/60 text-white' : 'bg-transparent text-purple-300'}`}>Marketplace</button>
+        <button onClick={() => setActiveTab('multimodal')} className={`flex-1 py-2 ${activeTab==='multimodal' ? 'bg-purple-800/60 text-white' : 'bg-transparent text-purple-300'}`}>Multimodal Chat</button>
+        <button onClick={() => setActiveTab('dev')} className={`flex-1 py-2 ${activeTab==='dev' ? 'bg-purple-800/60 text-white' : 'bg-transparent text-purple-300'}`}>Dev Workspaces</button>
+      </div>
+      <div className="flex-1 overflow-auto">
+        {activeTab==='marketplace' && <McpMarketplace />}
+        {activeTab==='multimodal' && <ScoutMultiModalChat />}
+        {activeTab==='dev' && <DevWorkspaces />}
+      </div>
+    </div>
+  );
+};
 
 // ==================== ELECTRON INTEGRATION ====================
 
@@ -363,31 +375,48 @@ const App: React.FC = () => {
     );
   }
 
-  // New Unified Workspace Experience
+  // Always render the new Unified Workspace Experience
   return (
     <DesignSystemProvider>
-      <div className="app unified-workspace-app">
-        <div className="legacy-fallback-control">
-          <button 
-            onClick={() => setUseLegacyMode(true)}
-            className="legacy-fallback-btn"
-            title="Switch to legacy navigation mode"
-          >
-            📄 Legacy Mode
-          </button>
+      <div className="flex h-screen w-screen bg-gradient-to-br from-purple-900 via-slate-900 to-blue-900">
+        {/* Left: MamaBear persistent chat */}
+        <div className="w-[360px] h-full border-r border-purple-700/30 bg-slate-900/80">
+          <MamaBearMainChat />
         </div>
-        
-        {/* Status Components */}
-        <div className="app-status-bar">
-          <ElectronStatus />
-          <BackendConnectionManager onBackendStatus={handleBackendStatus} />
+        {/* Center: Main Workspace */}
+        <div className="flex-1 h-full overflow-auto">
+          <WorkspaceLayout />
         </div>
-        
-        {/* Main Unified Workspace */}
-        <UnifiedDynamicWorkspace />
+        {/* Right: Tabs for Marketplace, Multimodal Chat, Dev Workspaces */}
+        <RightPanelTabs />
       </div>
     </DesignSystemProvider>
+        <button onClick={() => setActiveTab('marketplace')} className={`flex-1 py-2 ${activeTab==='marketplace' ? 'bg-purple-800/60 text-white' : 'bg-transparent text-purple-300'}`}>Marketplace</button>
+        <button onClick={() => setActiveTab('multimodal')} className={`flex-1 py-2 ${activeTab==='multimodal' ? 'bg-purple-800/60 text-white' : 'bg-transparent text-purple-300'}`}>Multimodal Chat</button>
+        <button onClick={() => setActiveTab('dev')} className={`flex-1 py-2 ${activeTab==='dev' ? 'bg-purple-800/60 text-white' : 'bg-transparent text-purple-300'}`}>Dev Workspaces</button>
+      </div>
+      <div className="flex-1 overflow-auto">
+        {activeTab==='marketplace' && <McpMarketplace />}
+        {activeTab==='multimodal' && <ScoutMultiModalChat />}
+        {activeTab==='dev' && <DevWorkspaces />}
+      </div>
+    </div>
   );
 };
 
-export default App;
+export default function App() {
+  return (
+    <div className="flex h-screen w-screen bg-gradient-to-br from-purple-900 via-slate-900 to-blue-900">
+      {/* Left: MamaBear persistent chat */}
+      <div className="w-[360px] h-full border-r border-purple-700/30 bg-slate-900/80">
+        <MamaBearMainChat />
+      </div>
+      {/* Center: Main Workspace */}
+      <div className="flex-1 h-full overflow-auto">
+        <WorkspaceLayout />
+      </div>
+      {/* Right: Tabs for Marketplace, Multimodal Chat, Dev Workspaces */}
+      <RightPanelTabs />
+    </div>
+  );
+}
