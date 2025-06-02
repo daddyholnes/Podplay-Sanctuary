@@ -18,11 +18,26 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    host: '0.0.0.0',
+    cors: true,
+    strictPort: false,
+    hmr: {
+      host: 'localhost',
+      protocol: 'ws',
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:5000',
         changeOrigin: true,
+        secure: false,
+        ws: true,
         rewrite: (path) => path.replace(/^\/api/, '')
+      },
+      '/socket.io': {
+        target: 'http://localhost:5000',
+        changeOrigin: true,
+        secure: false,
+        ws: true
       }
     }
   },
