@@ -39,6 +39,7 @@
     "../frontend-new",
     "../**/__tests__/**",
     "../**/test/**",
-    "dist"
+    "dist",
+    "vite.config.ts"
   ]
 }
