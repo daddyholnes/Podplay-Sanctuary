@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
-import { MessageCircle, Code, Package, Grid, Layers } from 'lucide-react';
+import { MessageCircle, Code, Package, Grid, Layers, Zap } from 'lucide-react';
 
 const SideNavigation = () => {
   const location = useLocation();
@@ -24,6 +24,12 @@ const SideNavigation = () => {
       path: '/workspaces',
       icon: <Code size={24} />,
       description: 'Dev workspaces for projects'
+    },
+    {
+      name: 'Integration',
+      path: '/integration',
+      icon: <Zap size={24} />,
+      description: 'MamaBear Integration Workbench'
     },
     {
       name: 'MCP Marketplace',

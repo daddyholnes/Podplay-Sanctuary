@@ -1,0 +1,479 @@
+/* Scout Workflow Engine Styles */
+:root {
+  --podplay-purple-light: #8e44ad;
+  --podplay-purple: #7d3c98;
+  --podplay-purple-dark: #6c3483;
+  --podplay-purple-darker: #5b2c6f;
+  --podplay-purple-bg-light: rgba(142, 68, 173, 0.05);
+  --podplay-purple-bg: rgba(142, 68, 173, 0.1);
+  --podplay-purple-highlight: rgba(142, 68, 173, 0.2);
+  --podplay-text-light: #f5f5f5;
+  --podplay-text-dark: #333;
+  --podplay-border-light: rgba(142, 68, 173, 0.3);
+  --podplay-border: rgba(142, 68, 173, 0.5);
+  --podplay-gradient: linear-gradient(135deg, #8e44ad, #6c3483);
+  --podplay-gradient-light: linear-gradient(135deg, #9b59b6, #8e44ad);
+  --panel-bg: #ffffff;
+  --panel-border: #e0e0e0;
+  --task-pending: #f5f5f5;
+  --task-in-progress: #e3f2fd;
+  --task-completed: #e8f5e9;
+  --task-failed: #ffebee;
+}
+
+/* Dark theme variables */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --podplay-purple-light: #9b59b6;
+    --podplay-purple: #8e44ad;
+    --podplay-purple-dark: #7d3c98;
+    --podplay-purple-darker: #6c3483;
+    --podplay-purple-bg-light: rgba(142, 68, 173, 0.1);
+    --podplay-purple-bg: rgba(142, 68, 173, 0.15);
+    --podplay-purple-highlight: rgba(142, 68, 173, 0.25);
+    --podplay-text-light: #f5f5f5;
+    --podplay-text-dark: #f5f5f5;
+    --podplay-border-light: rgba(142, 68, 173, 0.4);
+    --podplay-border: rgba(142, 68, 173, 0.6);
+    --panel-bg: #222;
+    --panel-border: #333;
+    --task-pending: #333;
+    --task-in-progress: #1a3c5a;
+    --task-completed: #1b4d1b;
+    --task-failed: #5a1a1a;
+  }
+}
+
+/* Base styling */
+.scout-workflow-engine {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+  color: var(--podplay-text-dark);
+  background-color: var(--panel-bg);
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+/* Header section */
+.scout-workflow-header {
+  background: var(--podplay-gradient);
+  color: var(--podplay-text-light);
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.workflow-title-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.workflow-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.workflow-description {
+  margin: 4px 0 0;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.workflow-progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+}
+
+.progress-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.progress-bar {
+  width: 150px;
+  height: 8px;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background-color: #fff;
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.workflow-stage-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.workflow-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  padding: 0 8px;
+  height: 36px;
+  overflow: hidden;
+}
+
+.search-bar input {
+  background: transparent;
+  border: none;
+  color: var(--podplay-text-light);
+  padding: 8px;
+  width: 180px;
+  outline: none;
+}
+
+.search-bar input::placeholder {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.search-button {
+  background: transparent;
+  border: none;
+  color: var(--podplay-text-light);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+}
+
+.view-toggle {
+  display: flex;
+  align-items: center;
+  background-color: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.view-toggle-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--podplay-text-light);
+  padding: 8px 12px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+}
+
+.view-toggle-button:hover {
+  background-color: rgba(255, 255, 255, 0.1);
+}
+
+.view-toggle-button.active {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.add-task-button,
+.next-stage-button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background-color: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: var(--podplay-text-light);
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+}
+
+.add-task-button:hover,
+.next-stage-button:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+.next-stage-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Main content area */
+.scout-workflow-content {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+.scout-workflow-main {
+  flex: 1;
+  overflow: auto;
+  transition: width 0.3s ease;
+}
+
+.scout-workflow-main.panel-expanded {
+  width: calc(100% - 300px);
+}
+
+.scout-workflow-panel {
+  width: 300px;
+  background-color: var(--panel-bg);
+  border-left: 1px solid var(--panel-border);
+  overflow: auto;
+  transition: width 0.3s ease, transform 0.3s ease;
+  position: relative;
+}
+
+.scout-workflow-panel.collapsed {
+  width: 30px;
+  overflow: hidden;
+}
+
+.panel-toggle {
+  position: absolute;
+  top: 10px;
+  left: 0;
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--podplay-purple-bg);
+  border-radius: 0 4px 4px 0;
+  cursor: pointer;
+  z-index: 1;
+  color: var(--podplay-purple);
+}
+
+.panel-toggle:hover {
+  background-color: var(--podplay-purple-bg-light);
+}
+
+/* Loading, error, and empty states */
+.scout-workflow-loading,
+.scout-workflow-error,
+.scout-workflow-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+  padding: 20px;
+  text-align: center;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--podplay-purple-bg);
+  border-top: 3px solid var(--podplay-purple);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.workflow-actions button {
+  background-color: var(--podplay-purple);
+  color: var(--podplay-text-light);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.workflow-actions button:hover {
+  background-color: var(--podplay-purple-dark);
+}
+
+.workflow-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.workflow-select-button {
+  background-color: var(--podplay-purple-bg) !important;
+  color: var(--podplay-purple) !important;
+  border: 1px solid var(--podplay-border-light) !important;
+}
+
+.workflow-select-button:hover {
+  background-color: var(--podplay-purple-bg-light) !important;
+}
+
+/* Create task modal */
+.create-task-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: var(--panel-bg);
+  border-radius: 8px;
+  padding: 24px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.modal-content h3 {
+  margin-top: 0;
+  color: var(--podplay-purple);
+  font-size: 18px;
+}
+
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.form-group input,
+.form-group textarea,
+.form-group select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid var(--panel-border);
+  border-radius: 4px;
+  background-color: var(--panel-bg);
+  color: var(--podplay-text-dark);
+  font-size: 14px;
+}
+
+.form-group input:focus,
+.form-group textarea:focus,
+.form-group select:focus {
+  outline: none;
+  border-color: var(--podplay-purple);
+  box-shadow: 0 0 0 2px var(--podplay-purple-bg);
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.cancel-button {
+  background-color: transparent;
+  border: 1px solid var(--panel-border);
+  color: var(--podplay-text-dark);
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+}
+
+.cancel-button:hover {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
+.submit-button {
+  background-color: var(--podplay-purple);
+  color: var(--podplay-text-light);
+  border: none;
+  padding: 8px 16px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s ease;
+}
+
+.submit-button:hover {
+  background-color: var(--podplay-purple-dark);
+}
+
+/* Animation keyframes */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* Animations for task elements */
+.task-item {
+  animation: fadeIn 0.3s ease forwards;
+}
+
+.stage-column {
+  animation: slideIn 0.3s ease forwards;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .workflow-progress {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  
+  .workflow-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .scout-workflow-main.panel-expanded {
+    width: 100%;
+  }
+  
+  .scout-workflow-panel {
+    position: fixed;
+    right: 0;
+    top: 0;
+    height: 100%;
+    z-index: 100;
+    transform: translateX(0);
+  }
+  
+  .scout-workflow-panel.collapsed {
+    transform: translateX(calc(100% - 30px));
+  }
+}
