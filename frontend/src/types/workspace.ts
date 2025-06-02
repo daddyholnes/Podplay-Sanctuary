@@ -1,43 +1,107 @@
-// Shared type definitions for workspace components
+// Workspace types for the Scout Dev Workspaces
 
-export interface TimelineStep {
-  id: string; // We consistently use string IDs throughout the app
-  title: string;
-  description: string;
-  status: 'planning' | 'pending' | 'completed';
-}
-
-export interface GeneratedFile {
+export interface Workspace {
   id: string;
   name: string;
-  type: string;
-  icon?: string;
-  status: string;
-  content?: string;
-  children?: GeneratedFile[];
+  description?: string;
+  type: WorkspaceType;
+  template?: string;
+  createdAt: string;
+  updatedAt: string;
+  lastAccessed?: string;
+  files: WorkspaceFile[];
+  gitRepo?: GitRepository;
+  environment?: DevelopmentEnvironment;
 }
 
-// Agent update types
-export interface BaseUpdate {
+export type WorkspaceType = 'web' | 'python' | 'nodejs' | 'react' | 'custom';
+
+export interface WorkspaceFile {
   id: string;
-  type: string;
-  timestamp: string;
+  name: string;
+  path: string;
+  type: FileType;
+  content?: string;
+  size: number;
+  lastModified: string;
+  language?: string;
 }
 
-export interface PlanUpdate extends BaseUpdate {
-  payload: {
-    id: string;
-    steps: TimelineStep[];
-  }
+export type FileType = 'file' | 'directory';
+
+export interface GitRepository {
+  url: string;
+  branch: string;
+  lastCommit?: string;
+  commitMessage?: string;
+  status?: GitStatus[];
 }
 
-export interface FileUpdate extends BaseUpdate {
-  payload: {
-    id: string;
-    name: string;
-    type: string;
-    status: string;
-    content?: string;
-    children?: any[];
-  }
+export interface GitStatus {
+  file: string;
+  status: 'modified' | 'added' | 'deleted' | 'renamed' | 'untracked';
+}
+
+export interface DevelopmentEnvironment {
+  id: string;
+  type: EnvironmentType;
+  status: EnvironmentStatus;
+  url?: string;
+  resources: ResourceUsage;
+}
+
+export type EnvironmentType = 'container' | 'vm' | 'cloud' | 'local';
+
+export type EnvironmentStatus = 
+  | 'creating' 
+  | 'running' 
+  | 'stopped' 
+  | 'paused' 
+  | 'error' 
+  | 'terminated';
+
+export interface ResourceUsage {
+  cpu: number; // percentage
+  memory: number; // MB
+  disk: number; // MB
+  network: {
+    up: number; // KB/s
+    down: number; // KB/s
+  };
+}
+
+// Workspace panel layout
+export interface PanelLayout {
+  id: string;
+  type: PanelType;
+  position: PanelPosition;
+  size: PanelSize;
+  visible: boolean;
+  minimized: boolean;
+  content?: any;
+}
+
+export type PanelType = 
+  | 'explorer' 
+  | 'editor' 
+  | 'preview' 
+  | 'terminal' 
+  | 'chat' 
+  | 'output'
+  | 'resources'
+  | 'custom';
+
+export interface PanelPosition {
+  x: number;
+  y: number;
+  zIndex: number;
+}
+
+export interface PanelSize {
+  width: number;
+  height: number;
+  minWidth?: number;
+  minHeight?: number;
+  maxWidth?: number;
+  maxHeight?: number;
 }
