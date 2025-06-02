@@ -1,0 +1,106 @@
+/**
+ * AgentWindowBridge.css
+ * Styles for agent-window integration components
+ */
+
+/* Agent state indicators */
+.agent-state-indicator {
+  display: flex;
+  align-items: center;
+  padding: 4px 8px;
+  font-size: 0.85rem;
+  border-radius: 12px;
+  margin-right: 8px;
+}
+
+.agent-state-indicator.busy {
+  background-color: var(--podplay-purple-light);
+  color: var(--podplay-white);
+}
+
+.agent-state-indicator.error {
+  background-color: var(--podplay-error);
+  color: var(--podplay-white);
+}
+
+.agent-state-indicator.active {
+  background-color: var(--podplay-success);
+  color: var(--podplay-white);
+}
+
+/* Model usage indicator */
+.model-usage-indicator {
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  background-color: rgba(var(--podplay-purple-rgb), 0.1);
+  color: var(--podplay-purple);
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.model-usage-indicator svg {
+  margin-right: 4px;
+  width: 14px;
+  height: 14px;
+}
+
+/* Agent typing indicators */
+.agent-typing-indicator {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+}
+
+.agent-typing-indicator span {
+  width: 8px;
+  height: 8px;
+  margin: 0 2px;
+  background-color: var(--podplay-purple);
+  border-radius: 50%;
+  animation: typing-animation 1s infinite ease-in-out;
+}
+
+.agent-typing-indicator span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.agent-typing-indicator span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.agent-typing-indicator span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typing-animation {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-6px);
+    opacity: 1;
+  }
+}
+
+/* Error message styles */
+.agent-error-message {
+  background-color: rgba(var(--podplay-error-rgb), 0.1);
+  border-left: 3px solid var(--podplay-error);
+  padding: 8px 12px;
+  margin: 8px 0;
+  border-radius: 0 4px 4px 0;
+  font-size: 0.9rem;
+}
+
+.agent-error-message h4 {
+  margin: 0 0 4px 0;
+  color: var(--podplay-error);
+}
+
+.agent-error-message p {
+  margin: 0;
+  color: var(--podplay-text);
+}

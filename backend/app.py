@@ -4,6 +4,7 @@ Podplay Build Backend - Clean Application Factory
 The Sanctuary for Calm, Empowered Creation
 
 Mama Bear Gem - Lead Developer Agent with clean modular architecture
+Integration Workbench - Universal Automation Hub
 """
 
 import os
@@ -76,11 +77,25 @@ def create_app(config_name='development'):
     
     # Initialize services FIRST - before registering blueprints
     from services import initialize_services
-    initialize_services(app)
+    services = initialize_services(app)
+    
+    # Initialize integration workbench with required services
+    from api.blueprints.integration_api import integration_bp, init_integration_workbench
+    enhanced_mama = services.get('enhanced_mama')
+    marketplace = services.get('marketplace_manager')
+    
+    if enhanced_mama and marketplace:
+        init_integration_workbench(enhanced_mama, marketplace)
+        logger.info("🔧 Integration Workbench initialized successfully")
+    else:
+        logger.warning("⚠️ Could not initialize Integration Workbench: required services not available")
     
     # Register API blueprints AFTER services are initialized
     from api import register_blueprints
     register_blueprints(app)
+    
+    # Register Integration Workbench blueprint
+    app.register_blueprint(integration_bp)
     
     # Register Socket.IO handlers
     from api.blueprints.socket_handlers import register_socket_handlers
@@ -101,6 +116,7 @@ if __name__ == '__main__':
         
         print("🚀 Starting Podplay Sanctuary Backend Server...")
         print("🐻 Mama Bear Control Center is ready!")
+        print("🔧 Integration Workbench - Universal Automation Hub initialized!")
         print("🌐 Server will be available at: http://127.0.0.1:5000")
         print("📡 API endpoints ready for frontend connections")
         print("🔌 Socket.IO enabled for real-time communication")

@@ -1,14 +1,61 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ComponentType } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@/contexts/ThemeContext';
+import { SocketProvider } from '@/contexts/SocketContext';
+import { WindowProvider, WindowRegistry } from '@/enhanced/window-management/WindowContext';
 import AppLayout from '@/components/layout/AppLayout';
 
-// Enhanced modules
-import MamaBearMainChat from '@/enhanced/mama-bear-main-chat/MamaBearMainChat';
+// Agent state types from AgentWindowBridge
+interface AgentState {
+  messages: Array<{role: string, content: string}>;
+  isLoading: boolean;
+  error: string | null;
+}
+
+// Wrapper for legacy route components to provide agent props
+interface LegacyAgentWrapperProps {
+  Component: ComponentType<any>;
+  agentType: string;
+}
+
+// LegacyAgentWrapper bridges between route-based components and agent-window system
+const LegacyAgentWrapper = ({ Component, agentType }: LegacyAgentWrapperProps) => {
+  const [agentState, setAgentState] = useState<AgentState>({
+    messages: [],
+    isLoading: false,
+    error: null
+  });
+
+  const updateAgentState = (update: Partial<AgentState>) => {
+    setAgentState(prev => ({ ...prev, ...update }));
+  };
+
+  return (
+    <Component 
+      agentType={agentType}
+      agentState={agentState}
+      updateAgentState={updateAgentState}
+    />
+  );
+};
+
+// Agent Window Bridge for multi-agent coordination
+import AgentWindowBridge from '@/enhanced/agent-integration/AgentWindowBridge';
+
+// MamaBear Agent Components
+import {
+  MamaBearMainChat,
+  MamaBearScout,
+  MamaBearDevWorkspace,
+  MamaBearMCP,
+  MamaBearIntegrationWorkbench
+} from '@/enhanced/mama-bear-agents';
+
+// Legacy Scout Components (will be gradually replaced by MamaBear agents)
 import ScoutMultiModalChat from '@/enhanced/scout-multimodal-chat/ScoutMultiModalChat';
 import ScoutDevWorkspaces from '@/enhanced/scout-dev-workspaces/ScoutDevWorkspaces';
 import ScoutMcpMarketplace from '@/enhanced/scout-mcp-marketplace/ScoutMcpMarketplace';
-import ScoutMiniAppsHub from '@/enhanced/scout-miniapps-hub/ScoutMiniAppsHub';
+import ScoutMiniAppsHub from '@/enhanced/scout-mini-apps/ScoutMiniAppsHub';
 
 function App() {
   const [isLoading, setIsLoading] = useState(true);
@@ -43,20 +90,48 @@ function App() {
     );
   }
 
+  // Register MamaBear components with the window system
+  useEffect(() => {
+    WindowRegistry.registerComponent('MamaBearMainChat', MamaBearMainChat);
+    WindowRegistry.registerComponent('MamaBearScout', MamaBearScout);
+    WindowRegistry.registerComponent('MamaBearDevWorkspace', MamaBearDevWorkspace);
+    WindowRegistry.registerComponent('MamaBearMCP', MamaBearMCP);
+    WindowRegistry.registerComponent('MamaBearIntegrationWorkbench', MamaBearIntegrationWorkbench);
+  }, []);
+
   return (
     <ThemeProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route element={<AppLayout />}>
-            <Route path="/" element={<Navigate to="/mama-bear" replace />} />
-            <Route path="/mama-bear" element={<MamaBearMainChat />} />
-            <Route path="/scout-chat" element={<ScoutMultiModalChat />} />
-            <Route path="/workspaces" element={<ScoutDevWorkspaces />} />
-            <Route path="/mcp-marketplace" element={<ScoutMcpMarketplace />} />
-            <Route path="/mini-apps" element={<ScoutMiniAppsHub />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
+      <SocketProvider>
+        <WindowProvider>
+          <BrowserRouter>
+            {/* Agent Window Bridge provides multi-agent coordination */}
+            <AgentWindowBridge />
+            
+            <Routes>
+              <Route element={<AppLayout />}>
+                <Route path="/" element={<Navigate to="/mama-bear" replace />} />
+                {/* Legacy routes - will eventually use window management exclusively */}
+                <Route path="/mama-bear" element={
+                  <LegacyAgentWrapper
+                    Component={MamaBearMainChat}
+                    agentType="MAIN_CHAT"
+                  />
+                } />
+                <Route path="/scout-chat" element={<ScoutMultiModalChat />} />
+                <Route path="/workspaces" element={<ScoutDevWorkspaces />} />
+                <Route path="/integration" element={
+                  <LegacyAgentWrapper
+                    Component={MamaBearIntegrationWorkbench}
+                    agentType="INTEGRATION_WORKBENCH"
+                  />
+                } />
+                <Route path="/mcp-marketplace" element={<ScoutMcpMarketplace />} />
+                <Route path="/mini-apps" element={<ScoutMiniAppsHub />} />
+              </Route>
+            </Routes>
+          </BrowserRouter>
+        </WindowProvider>
+      </SocketProvider>
     </ThemeProvider>
   );
 }

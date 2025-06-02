@@ -19,17 +19,27 @@ interface ThemeProviderProps {
 }
 
 export const ThemeProvider = ({ children }: ThemeProviderProps) => {
-  // Check local storage or system preference
+  // Check local storage or system preference with fallback
   const getInitialTheme = (): Theme => {
-    const savedTheme = localStorage.getItem('podplay-theme') as Theme;
-    
-    if (savedTheme) {
-      return savedTheme;
+    try {
+      const savedTheme = localStorage.getItem('podplay-theme') as Theme;
+      
+      if (savedTheme) {
+        return savedTheme;
+      }
+      
+      // Check system preference safely
+      try {
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        return prefersDark ? 'dark' : 'light';
+      } catch (error) {
+        console.warn('matchMedia not available, defaulting to dark theme');
+        return 'dark'; // Default to dark theme for Podplay's aesthetic
+      }
+    } catch (error) {
+      console.warn('localStorage not available, defaulting to dark theme');
+      return 'dark';
     }
-    
-    // Check system preference
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    return prefersDark ? 'dark' : 'light';
   };
 
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
@@ -67,16 +77,25 @@ export const ThemeProvider = ({ children }: ThemeProviderProps) => {
 
   // Initialize and listen for system preference changes
   useEffect(() => {
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    
-    const handleChange = () => {
-      if (!localStorage.getItem('podplay-theme')) {
-        setTheme(mediaQuery.matches ? 'dark' : 'light');
-      }
-    };
-    
-    mediaQuery.addEventListener('change', handleChange);
-    return () => mediaQuery.removeEventListener('change', handleChange);
+    try {
+      const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+      
+      const handleChange = () => {
+        try {
+          if (!localStorage.getItem('podplay-theme')) {
+            setTheme(mediaQuery.matches ? 'dark' : 'light');
+          }
+        } catch (error) {
+          console.warn('localStorage access failed in mediaQuery handler');
+        }
+      };
+      
+      mediaQuery.addEventListener('change', handleChange);
+      return () => mediaQuery.removeEventListener('change', handleChange);
+    } catch (error) {
+      console.warn('Could not set up matchMedia listener, theme may not auto-update');
+      return () => {}; // Empty cleanup function
+    }
   }, []);
 
   return (

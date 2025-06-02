@@ -1,0 +1,333 @@
+/* WindowManager Component Styles */
+.window-manager {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  z-index: 1;
+}
+
+/* Window Dock */
+.window-dock {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 40px;
+  background: linear-gradient(to right, var(--podplay-purple-bg-dark), var(--podplay-purple-bg));
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 12px;
+  z-index: 1000;
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Minimized Windows Area */
+.minimized-windows {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  flex: 1;
+  padding-right: 12px;
+}
+
+.minimized-window-button {
+  height: 28px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  background-color: var(--podplay-purple-bg-light);
+  border: 1px solid var(--podplay-purple);
+  border-radius: 14px;
+  color: var(--podplay-text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+}
+
+.minimized-window-button:hover {
+  background-color: var(--podplay-purple-bg);
+  transform: translateY(-2px);
+}
+
+.minimized-window-button:active {
+  transform: translateY(0);
+}
+
+.window-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background-color: var(--podplay-purple);
+  color: white;
+  border-radius: 50%;
+  margin-right: 8px;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.minimized-title {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Control Panel Toggle */
+.control-panel-toggle {
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  background-color: var(--podplay-purple-bg-light);
+  border: 1px solid var(--podplay-purple);
+  color: var(--podplay-purple);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.control-panel-toggle:hover, 
+.control-panel-toggle.active {
+  background-color: var(--podplay-purple);
+  color: white;
+}
+
+.control-panel-toggle:active {
+  transform: scale(0.95);
+}
+
+/* Window Control Panel */
+.window-control-panel {
+  position: absolute;
+  bottom: 45px;
+  right: 12px;
+  width: 300px;
+  background-color: var(--panel-bg);
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  padding: 16px;
+  z-index: 1001;
+  border: 1px solid var(--panel-border);
+  animation: panelSlideUp 0.2s ease forwards;
+}
+
+@keyframes panelSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.panel-section {
+  margin-bottom: 16px;
+}
+
+.panel-section:last-child {
+  margin-bottom: 0;
+}
+
+.panel-section h3 {
+  font-size: 14px;
+  margin-top: 0;
+  margin-bottom: 8px;
+  color: var(--podplay-purple);
+  border-bottom: 1px solid var(--panel-border);
+  padding-bottom: 4px;
+}
+
+/* Window Type Buttons */
+.window-type-buttons {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.window-type-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 6px;
+  background-color: var(--panel-bg-light);
+  border: 1px solid var(--panel-border);
+  color: var(--podplay-text);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.window-type-button:hover {
+  background-color: var(--panel-bg-dark);
+  transform: translateY(-2px);
+}
+
+.window-type-button:active {
+  transform: translateY(0);
+}
+
+/* Different colors for different window types */
+.window-type-button.chat {
+  border-color: var(--podplay-purple);
+  color: var(--podplay-purple);
+}
+.window-type-button.chat:hover {
+  background-color: var(--podplay-purple-bg-light);
+}
+
+.window-type-button.workflow {
+  border-color: var(--podplay-blue);
+  color: var(--podplay-blue);
+}
+.window-type-button.workflow:hover {
+  background-color: var(--podplay-blue-bg-light);
+}
+
+.window-type-button.task {
+  border-color: var(--podplay-green);
+  color: var(--podplay-green);
+}
+.window-type-button.task:hover {
+  background-color: var(--podplay-green-bg-light);
+}
+
+.window-type-button.resource {
+  border-color: var(--podplay-orange);
+  color: var(--podplay-orange);
+}
+.window-type-button.resource:hover {
+  background-color: var(--podplay-orange-bg-light);
+}
+
+.window-type-button.code {
+  border-color: var(--podplay-indigo);
+  color: var(--podplay-indigo);
+}
+.window-type-button.code:hover {
+  background-color: var(--podplay-indigo-bg-light);
+}
+
+.window-type-button.browser {
+  border-color: var(--podplay-teal);
+  color: var(--podplay-teal);
+}
+.window-type-button.browser:hover {
+  background-color: var(--podplay-teal-bg-light);
+}
+
+/* Arrange Buttons */
+.arrange-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.arrange-button {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 6px;
+  background-color: var(--panel-bg-light);
+  border: 1px solid var(--podplay-purple);
+  color: var(--podplay-purple);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.arrange-button:hover {
+  background-color: var(--podplay-purple-bg-light);
+  transform: translateY(-2px);
+}
+
+.arrange-button:active {
+  transform: translateY(0);
+}
+
+/* Save Layout Button */
+.save-layout-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 6px;
+  background-color: var(--podplay-purple-bg-light);
+  border: 1px solid var(--podplay-purple);
+  color: var(--podplay-purple);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.save-layout-button:hover {
+  background-color: var(--podplay-purple);
+  color: white;
+}
+
+.save-layout-button:active {
+  transform: scale(0.98);
+}
+
+/* Window Content Placeholder for demo */
+.window-content-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 24px;
+  text-align: center;
+  color: var(--podplay-text-light);
+}
+
+.window-type-icon {
+  font-size: 32px;
+  margin-bottom: 16px;
+  opacity: 0.7;
+  color: var(--podplay-purple);
+}
+
+.placeholder-text {
+  font-size: 14px;
+  opacity: 0.7;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .window-control-panel {
+    width: 250px;
+  }
+  
+  .window-type-buttons {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .minimized-window-button {
+    padding: 0 8px;
+  }
+  
+  .window-icon {
+    margin-right: 4px;
+  }
+  
+  .minimized-title {
+    max-width: 60px;
+  }
+}
