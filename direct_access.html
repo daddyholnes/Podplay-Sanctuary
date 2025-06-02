@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Podplay Sanctuary Direct Access</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            background-color: #1e1e2e;
+            color: #cdd6f4;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+        .container {
+            max-width: 800px;
+            text-align: center;
+        }
+        h1 {
+            color: #c9a2ff;
+            margin-bottom: 1rem;
+        }
+        .card {
+            background-color: #302d41;
+            border-radius: 8px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .button {
+            display: inline-block;
+            background: linear-gradient(135deg, #c9a2ff 0%, #a374db 100%);
+            color: #1e1e2e;
+            font-weight: bold;
+            padding: 0.75rem 1.5rem;
+            border-radius: 8px;
+            text-decoration: none;
+            margin: 0.5rem;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+        }
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(201, 162, 255, 0.4);
+        }
+        .status {
+            margin-top: 1rem;
+            padding: 1rem;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: rgba(166, 227, 161, 0.2);
+            color: #a6e3a1;
+        }
+        .error {
+            background-color: rgba(243, 139, 168, 0.2);
+            color: #f38ba8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>Podplay Sanctuary</h1>
+            <p>Your AI studio and digital sanctuary</p>
+            
+            <div>
+                <a href="http://localhost:5173" target="_blank" class="button">Open Podplay Frontend</a>
+                <a href="http://localhost:5000/health" target="_blank" class="button">Check Backend Health</a>
+            </div>
+            
+            <div class="status" id="backendStatus"></div>
+            <div class="status" id="frontendStatus"></div>
+        </div>
+    </div>
+
+    <script>
+        // Check backend health
+        async function checkBackendHealth() {
+            const statusDiv = document.getElementById('backendStatus');
+            try {
+                const response = await fetch('http://localhost:5000/health');
+                if (response.ok) {
+                    const data = await response.json();
+                    statusDiv.classList.add('success');
+                    statusDiv.innerHTML = `<strong>Backend:</strong> Running and healthy! (${data.status})`;
+                } else {
+                    statusDiv.classList.add('error');
+                    statusDiv.innerHTML = `<strong>Backend:</strong> Running but returned status ${response.status}`;
+                }
+            } catch (error) {
+                statusDiv.classList.add('error');
+                statusDiv.innerHTML = `<strong>Backend:</strong> Not accessible (${error.message})`;
+            }
+        }
+
+        // Check frontend availability
+        async function checkFrontendHealth() {
+            const statusDiv = document.getElementById('frontendStatus');
+            try {
+                // Using no-cors mode since we can't actually read the response in this mode
+                await fetch('http://localhost:5173', { mode: 'no-cors' });
+                statusDiv.classList.add('success');
+                statusDiv.innerHTML = `<strong>Frontend:</strong> Development server running!`;
+            } catch (error) {
+                statusDiv.classList.add('error');
+                statusDiv.innerHTML = `<strong>Frontend:</strong> Not accessible (${error.message})`;
+            }
+        }
+
+        // Run checks when page loads
+        window.addEventListener('load', () => {
+            checkBackendHealth();
+            checkFrontendHealth();
+        });
+    </script>
+</body>
+</html>
