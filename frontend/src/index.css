@@ -1,0 +1,209 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --purple-50: 245 243 255;
+    --purple-100: 237 233 254;
+    --purple-200: 221 214 254;
+    --purple-300: 196 181 253;
+    --purple-400: 167 139 250;
+    --purple-500: 139 92 246;
+    --purple-600: 124 58 237;
+    --purple-700: 109 40 217;
+    --purple-800: 91 33 182;
+    --purple-900: 76 29 149;
+    --purple-950: 46 16 101;
+  }
+
+  body {
+    @apply bg-sanctuary-light dark:bg-sanctuary-dark text-gray-800 dark:text-gray-200 font-sans;
+    transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-purple-300 dark:bg-purple-600 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-purple-400 dark:bg-purple-500;
+  }
+
+  /* Focus styles for accessibility */
+  :focus-visible {
+    @apply outline-none ring-2 ring-purple-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-900 rounded-md;
+  }
+
+  /* Smooth transitions for theme changes */
+  .theme-transition {
+    @apply transition-all duration-300 ease-in-out;
+  }
+}
+
+@layer components {
+  /* Purple gradient backgrounds */
+  .bg-purple-gradient {
+    @apply bg-gradient-to-br from-purple-400 to-purple-700 text-white;
+  }
+
+  .bg-purple-gradient-light {
+    @apply bg-gradient-to-br from-purple-100 to-purple-300 text-purple-900;
+  }
+
+  .bg-purple-gradient-animated {
+    @apply bg-gradient-to-br from-purple-400 via-purple-600 to-purple-800 text-white animate-gradient-xy;
+    background-size: 200% 200%;
+  }
+
+  /* Glass panels */
+  .glass-panel {
+    @apply bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border border-purple-100 dark:border-purple-900;
+  }
+
+  .glass-panel-purple {
+    @apply bg-purple-50/90 dark:bg-purple-950/90 backdrop-blur-md border border-purple-200 dark:border-purple-800;
+  }
+
+  /* Buttons */
+  .btn {
+    @apply px-4 py-2 rounded-md font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-200 ease-in-out;
+  }
+
+  .btn-primary {
+    @apply btn bg-purple-gradient hover:shadow-sanctuary;
+  }
+
+  .btn-secondary {
+    @apply btn bg-white dark:bg-gray-800 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 hover:bg-purple-50 dark:hover:bg-gray-700;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-gray-800;
+  }
+
+  /* Input fields */
+  .input-field {
+    @apply w-full px-4 py-2 rounded-md border border-gray-300 dark:border-gray-700 
+           bg-white dark:bg-gray-800 
+           focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 
+           dark:focus:ring-purple-400 dark:focus:border-purple-400
+           transition-all duration-200 ease-in-out;
+  }
+
+  /* Cards */
+  .card {
+    @apply rounded-lg shadow-sanctuary p-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700;
+  }
+
+  .card-purple {
+    @apply rounded-lg shadow-sanctuary p-4 bg-purple-50 dark:bg-gray-800 border border-purple-200 dark:border-purple-800;
+  }
+
+  /* Draggable header */
+  .draggable-header {
+    @apply cursor-move bg-purple-gradient rounded-t-lg px-4 py-3 flex items-center justify-between;
+  }
+
+  /* Messages */
+  .message-user {
+    @apply bg-purple-100 dark:bg-purple-900 text-purple-900 dark:text-purple-100 rounded-2xl rounded-tr-sm py-3 px-4 max-w-3xl;
+  }
+
+  .message-assistant {
+    @apply bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl rounded-tl-sm py-3 px-4 max-w-3xl;
+  }
+
+  .message-system {
+    @apply bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-2xl py-2 px-3 text-sm max-w-3xl;
+  }
+
+  /* Typing indicator */
+  .typing-indicator {
+    @apply inline-flex space-x-1;
+  }
+
+  .typing-indicator-dot {
+    @apply w-2 h-2 rounded-full bg-purple-500 dark:bg-purple-400;
+    animation: typing-bounce 1.4s infinite ease-in-out both;
+  }
+
+  .typing-indicator-dot:nth-child(1) {
+    animation-delay: -0.32s;
+  }
+
+  .typing-indicator-dot:nth-child(2) {
+    animation-delay: -0.16s;
+  }
+
+  @keyframes typing-bounce {
+    0%, 80%, 100% { 
+      transform: scale(0);
+    } 
+    40% { 
+      transform: scale(1.0);
+    }
+  }
+
+  /* File previews */
+  .file-preview {
+    @apply p-3 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center gap-3;
+  }
+
+  .image-preview {
+    @apply rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 max-w-sm;
+  }
+
+  /* Tabs */
+  .tab {
+    @apply px-4 py-2 rounded-t-md text-gray-600 dark:text-gray-400 
+           hover:text-purple-700 dark:hover:text-purple-300 cursor-pointer;
+  }
+
+  .tab-active {
+    @apply px-4 py-2 rounded-t-md text-purple-700 dark:text-purple-300 
+           bg-white dark:bg-gray-800 border-t border-l border-r 
+           border-gray-200 dark:border-gray-700;
+  }
+}
+
+/* Animation for gradient backgrounds */
+@keyframes gradient-x {
+  0%, 100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+}
+
+@keyframes gradient-y {
+  0%, 100% {
+    background-position: 50% 0%;
+  }
+  50% {
+    background-position: 50% 100%;
+  }
+}
+
+@keyframes gradient-xy {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}

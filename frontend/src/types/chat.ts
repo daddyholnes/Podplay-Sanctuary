@@ -1,61 +1,78 @@
-/**
- * Chat types for Podplay Sanctuary
- */
-
-export interface ChatSession {
-  id: string;
-  title: string;
-  created_at: string;
-  updated_at: string;
-  model_id: string;
-  message_count: number;
-  type: string;
-}
+// Message types
+export type MessageRole = 'user' | 'assistant' | 'system';
 
 export interface ChatMessage {
   id: string;
-  session_id: string;
-  role: 'user' | 'assistant' | 'system';
+  sessionId: string;
+  role: MessageRole;
   content: string;
-  created_at: string;
+  timestamp: string;
   attachments?: Attachment[];
-  metadata?: Record<string, any>;
-  suggestions?: string[];
-  actions?: string[];
 }
 
 export interface Attachment {
   id: string;
-  type: 'image' | 'audio' | 'video' | 'file' | 'code';
-  url: string;
   filename: string;
-  mime_type: string;
-  size?: number;
-  metadata?: Record<string, any>;
+  contentType: string;
+  size: number;
+  url: string;
+  thumbnailUrl?: string;
 }
 
-export interface NewChatSessionRequest {
-  title: string;
-  model_id?: string;
-  type?: string;
+// Chat session types
+export interface ChatSession {
+  id: string;
+  name: string;
+  model: string;
+  systemInstruction?: string;
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
+  lastMessage?: string;
 }
 
-export interface NewChatMessageRequest {
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-  attachments?: Attachment[];
-  metadata?: Record<string, any>;
-}
-
-export interface ApiError {
-  status: 'error';
-  error: string;
-  code?: string;
-}
-
+// API response types
 export interface ApiResponse<T> {
-  status: 'success' | 'error';
-  data?: T;
-  error?: string;
-  code?: string;
+  data: T;
+  status: number;
+  message?: string;
+}
+
+// Chat input types
+export interface ChatInputState {
+  message: string;
+  attachments: File[];
+  isRecording: boolean;
+  isProcessing: boolean;
+}
+
+// Message status
+export type MessageStatus = 'sending' | 'complete' | 'error';
+
+// Chat UI states
+export interface ChatUIState {
+  inputFocused: boolean;
+  showEmojiPicker: boolean;
+  showAttachmentMenu: boolean;
+  minimized: boolean;
+  fullscreen: boolean;
+}
+
+// Agent types
+export interface AgentState {
+  isThinking: boolean;
+  actionStep?: string;
+  progressPercent?: number;
+  showTypingIndicator: boolean;
+}
+
+// Media recording types
+export interface MediaRecordingState {
+  isRecordingAudio: boolean;
+  isRecordingVideo: boolean;
+  audioBlob?: Blob;
+  videoBlob?: Blob;
+  recordingTime: number;
+  audioUrl?: string;
+  videoUrl?: string;
 }
