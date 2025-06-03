@@ -8,7 +8,7 @@
 .env.test.local
 .env.production.local
 credentials.txt
-
+google-cloud-sdk-*.tar.gz
 # Google Cloud SDK and CLI
 google-cloud-sdk/
 google-cloud-cli-*.tar.gz
