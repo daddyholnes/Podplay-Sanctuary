@@ -1,1 +1,1 @@
-from .factory import create_app
+# Package marker for app

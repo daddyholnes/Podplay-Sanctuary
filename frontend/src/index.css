@@ -1,209 +1,398 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Import Inter font for clean typography */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
 
-@layer base {
-  :root {
-    --purple-50: 245 243 255;
-    --purple-100: 237 233 254;
-    --purple-200: 221 214 254;
-    --purple-300: 196 181 253;
-    --purple-400: 167 139 250;
-    --purple-500: 139 92 246;
-    --purple-600: 124 58 237;
-    --purple-700: 109 40 217;
-    --purple-800: 91 33 182;
-    --purple-900: 76 29 149;
-    --purple-950: 46 16 101;
+/* Podplay Sanctuary Theme Variables */
+@theme {
+  /* Base Colors */
+  --color-white: #ffffff;
+  --color-black: #000000;
+  --color-transparent: transparent;
+  
+  /* Gray Scale */
+  --color-gray-50: #f8fafc;
+  --color-gray-100: #f1f5f9;
+  --color-gray-200: #e2e8f0;
+  --color-gray-300: #cbd5e1;
+  --color-gray-400: #94a3b8;
+  --color-gray-500: #64748b;
+  --color-gray-600: #475569;
+  --color-gray-700: #334155;
+  --color-gray-800: #1e293b;
+  --color-gray-900: #0f172a;
+  --color-gray-950: #020617;
+
+  /* Podplay Purple Theme */
+  --color-purple-50: #faf5ff;
+  --color-purple-100: #f3e8ff;
+  --color-purple-200: #e9d5ff;
+  --color-purple-300: #d8b4fe;
+  --color-purple-400: #c084fc;
+  --color-purple-500: #a855f7;
+  --color-purple-600: #9333ea;
+  --color-purple-700: #7c3aed;
+  --color-purple-800: #6b21a8;
+  --color-purple-900: #581c87;
+  --color-purple-950: #3b0764;
+
+  /* Pink Accents */
+  --color-pink-50: #fdf2f8;
+  --color-pink-100: #fce7f3;
+  --color-pink-200: #fbcfe8;
+  --color-pink-300: #f9a8d4;
+  --color-pink-400: #f472b6;
+  --color-pink-500: #ec4899;
+  --color-pink-600: #db2777;
+  --color-pink-700: #be185d;
+  --color-pink-800: #9d174d;
+  --color-pink-900: #831843;
+  --color-pink-950: #500724;
+
+  /* Blue Accents */
+  --color-blue-50: #eff6ff;
+  --color-blue-100: #dbeafe;
+  --color-blue-200: #bfdbfe;
+  --color-blue-300: #93c5fd;
+  --color-blue-400: #60a5fa;
+  --color-blue-500: #3b82f6;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
+  --color-blue-800: #1e40af;
+  --color-blue-900: #1e3a8a;
+  --color-blue-950: #172554;
+
+  /* Green Status */
+  --color-green-50: #f0fdf4;
+  --color-green-100: #dcfce7;
+  --color-green-200: #bbf7d0;
+  --color-green-300: #86efac;
+  --color-green-400: #4ade80;
+  --color-green-500: #22c55e;
+  --color-green-600: #16a34a;
+  --color-green-700: #15803d;
+  --color-green-800: #166534;
+  --color-green-900: #14532d;
+  --color-green-950: #052e16;
+
+  /* Red Alerts */
+  --color-red-50: #fef2f2;
+  --color-red-100: #fee2e2;
+  --color-red-200: #fecaca;
+  --color-red-300: #fca5a5;
+  --color-red-400: #f87171;
+  --color-red-500: #ef4444;
+  --color-red-600: #dc2626;
+  --color-red-700: #b91c1c;
+  --color-red-800: #991b1b;
+  --color-red-900: #7f1d1d;
+  --color-red-950: #450a0a;
+
+  /* Yellow Warnings */
+  --color-yellow-50: #fefce8;
+  --color-yellow-100: #fef3c7;
+  --color-yellow-200: #fde68a;
+  --color-yellow-300: #fcd34d;
+  --color-yellow-400: #fbbf24;
+  --color-yellow-500: #f59e0b;
+  --color-yellow-600: #d97706;
+  --color-yellow-700: #b45309;
+  --color-yellow-800: #92400e;
+  --color-yellow-900: #78350f;
+  --color-yellow-950: #451a03;
+
+  /* Font Families */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'Fira Code', 'SF Mono', Consolas, monospace;
+
+  /* Spacing */
+  --spacing-px: 1px;
+  --spacing-0: 0;
+  --spacing-0.5: 0.125rem;
+  --spacing-1: 0.25rem;
+  --spacing-1.5: 0.375rem;
+  --spacing-2: 0.5rem;
+  --spacing-2.5: 0.625rem;
+  --spacing-3: 0.75rem;
+  --spacing-3.5: 0.875rem;
+  --spacing-4: 1rem;
+  --spacing-5: 1.25rem;
+  --spacing-6: 1.5rem;
+  --spacing-7: 1.75rem;
+  --spacing-8: 2rem;
+  --spacing-9: 2.25rem;
+  --spacing-10: 2.5rem;
+  --spacing-11: 2.75rem;
+  --spacing-12: 3rem;
+  --spacing-14: 3.5rem;
+  --spacing-16: 4rem;
+  --spacing-20: 5rem;
+  --spacing-24: 6rem;
+  --spacing-28: 7rem;
+  --spacing-32: 8rem;
+  --spacing-36: 9rem;
+  --spacing-40: 10rem;
+  --spacing-44: 11rem;
+  --spacing-48: 12rem;
+  --spacing-52: 13rem;
+  --spacing-56: 14rem;
+  --spacing-60: 15rem;
+  --spacing-64: 16rem;
+  --spacing-72: 18rem;
+  --spacing-80: 20rem;
+  --spacing-96: 24rem;
+
+  /* Border Radius */
+  --radius-none: 0;
+  --radius-sm: 0.125rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-2xl: 1rem;
+  --radius-3xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* Box Shadows */
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+  --shadow-none: 0 0 #0000;
+
+  /* Animation Durations */
+  --animate-duration-75: 75ms;
+  --animate-duration-100: 100ms;
+  --animate-duration-150: 150ms;
+  --animate-duration-200: 200ms;
+  --animate-duration-300: 300ms;
+  --animate-duration-500: 500ms;
+  --animate-duration-700: 700ms;
+  --animate-duration-1000: 1000ms;
+
+  /* Backdrop Blur */
+  --backdrop-blur-sm: blur(4px);
+  --backdrop-blur-md: blur(12px);
+  --backdrop-blur-lg: blur(16px);
+  --backdrop-blur-xl: blur(24px);
+  --backdrop-blur-2xl: blur(40px);
+  --backdrop-blur-3xl: blur(64px);
+}
+
+/* Root styles */
+:root {
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  font-weight: 400;
+  
+  color-scheme: light;
+  color: var(--color-gray-900);
+  background-color: var(--color-white);
+  
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Dark theme */
+.dark {
+  color-scheme: dark;
+  color: var(--color-gray-100);
+  background-color: var(--color-gray-900);
+}
+
+/* Purple Neon theme */
+.purple-neon {
+  color-scheme: dark;
+  color: var(--color-purple-100);
+  background: linear-gradient(135deg, var(--color-purple-900), var(--color-pink-900));
+}
+
+/* Base element styles */
+* {
+  box-sizing: border-box;
+}
+
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+#root {
+  width: 100%;
+  height: 100vh;
+  margin: 0 auto;
+}
+
+/* Scrollbar styles */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-gray-300);
+  border-radius: var(--radius-full);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gray-400);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: var(--color-gray-600);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: var(--color-gray-500);
+}
+
+.purple-neon ::-webkit-scrollbar-thumb {
+  background: var(--color-purple-600);
+}
+
+.purple-neon ::-webkit-scrollbar-thumb:hover {
+  background: var(--color-purple-500);
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
   }
-
-  body {
-    @apply bg-sanctuary-light dark:bg-sanctuary-dark text-gray-800 dark:text-gray-200 font-sans;
-    transition: background-color 0.3s ease-in-out, color 0.3s ease-in-out;
-  }
-
-  /* Scrollbar styling */
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-
-  ::-webkit-scrollbar-track {
-    @apply bg-transparent;
-  }
-
-  ::-webkit-scrollbar-thumb {
-    @apply bg-purple-300 dark:bg-purple-600 rounded-full;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    @apply bg-purple-400 dark:bg-purple-500;
-  }
-
-  /* Focus styles for accessibility */
-  :focus-visible {
-    @apply outline-none ring-2 ring-purple-500 ring-offset-2 ring-offset-white dark:ring-offset-gray-900 rounded-md;
-  }
-
-  /* Smooth transitions for theme changes */
-  .theme-transition {
-    @apply transition-all duration-300 ease-in-out;
+  to {
+    opacity: 1;
   }
 }
 
-@layer components {
-  /* Purple gradient backgrounds */
-  .bg-purple-gradient {
-    @apply bg-gradient-to-br from-purple-400 to-purple-700 text-white;
+@keyframes slideInFromLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
   }
-
-  .bg-purple-gradient-light {
-    @apply bg-gradient-to-br from-purple-100 to-purple-300 text-purple-900;
-  }
-
-  .bg-purple-gradient-animated {
-    @apply bg-gradient-to-br from-purple-400 via-purple-600 to-purple-800 text-white animate-gradient-xy;
-    background-size: 200% 200%;
-  }
-
-  /* Glass panels */
-  .glass-panel {
-    @apply bg-white/80 dark:bg-gray-900/80 backdrop-blur-md border border-purple-100 dark:border-purple-900;
-  }
-
-  .glass-panel-purple {
-    @apply bg-purple-50/90 dark:bg-purple-950/90 backdrop-blur-md border border-purple-200 dark:border-purple-800;
-  }
-
-  /* Buttons */
-  .btn {
-    @apply px-4 py-2 rounded-md font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-all duration-200 ease-in-out;
-  }
-
-  .btn-primary {
-    @apply btn bg-purple-gradient hover:shadow-sanctuary;
-  }
-
-  .btn-secondary {
-    @apply btn bg-white dark:bg-gray-800 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800 hover:bg-purple-50 dark:hover:bg-gray-700;
-  }
-
-  .btn-ghost {
-    @apply btn bg-transparent text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-gray-800;
-  }
-
-  /* Input fields */
-  .input-field {
-    @apply w-full px-4 py-2 rounded-md border border-gray-300 dark:border-gray-700 
-           bg-white dark:bg-gray-800 
-           focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500 
-           dark:focus:ring-purple-400 dark:focus:border-purple-400
-           transition-all duration-200 ease-in-out;
-  }
-
-  /* Cards */
-  .card {
-    @apply rounded-lg shadow-sanctuary p-4 bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700;
-  }
-
-  .card-purple {
-    @apply rounded-lg shadow-sanctuary p-4 bg-purple-50 dark:bg-gray-800 border border-purple-200 dark:border-purple-800;
-  }
-
-  /* Draggable header */
-  .draggable-header {
-    @apply cursor-move bg-purple-gradient rounded-t-lg px-4 py-3 flex items-center justify-between;
-  }
-
-  /* Messages */
-  .message-user {
-    @apply bg-purple-100 dark:bg-purple-900 text-purple-900 dark:text-purple-100 rounded-2xl rounded-tr-sm py-3 px-4 max-w-3xl;
-  }
-
-  .message-assistant {
-    @apply bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-2xl rounded-tl-sm py-3 px-4 max-w-3xl;
-  }
-
-  .message-system {
-    @apply bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-2xl py-2 px-3 text-sm max-w-3xl;
-  }
-
-  /* Typing indicator */
-  .typing-indicator {
-    @apply inline-flex space-x-1;
-  }
-
-  .typing-indicator-dot {
-    @apply w-2 h-2 rounded-full bg-purple-500 dark:bg-purple-400;
-    animation: typing-bounce 1.4s infinite ease-in-out both;
-  }
-
-  .typing-indicator-dot:nth-child(1) {
-    animation-delay: -0.32s;
-  }
-
-  .typing-indicator-dot:nth-child(2) {
-    animation-delay: -0.16s;
-  }
-
-  @keyframes typing-bounce {
-    0%, 80%, 100% { 
-      transform: scale(0);
-    } 
-    40% { 
-      transform: scale(1.0);
-    }
-  }
-
-  /* File previews */
-  .file-preview {
-    @apply p-3 rounded-md border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 flex items-center gap-3;
-  }
-
-  .image-preview {
-    @apply rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 max-w-sm;
-  }
-
-  /* Tabs */
-  .tab {
-    @apply px-4 py-2 rounded-t-md text-gray-600 dark:text-gray-400 
-           hover:text-purple-700 dark:hover:text-purple-300 cursor-pointer;
-  }
-
-  .tab-active {
-    @apply px-4 py-2 rounded-t-md text-purple-700 dark:text-purple-300 
-           bg-white dark:bg-gray-800 border-t border-l border-r 
-           border-gray-200 dark:border-gray-700;
+  to {
+    transform: translateX(0);
+    opacity: 1;
   }
 }
 
-/* Animation for gradient backgrounds */
-@keyframes gradient-x {
+@keyframes slideInFromRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromBottom {
+  from {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse {
   0%, 100% {
-    background-position: 0% 50%;
+    opacity: 1;
   }
   50% {
-    background-position: 100% 50%;
+    opacity: 0.5;
   }
 }
 
-@keyframes gradient-y {
-  0%, 100% {
-    background-position: 50% 0%;
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
   }
-  50% {
-    background-position: 50% 100%;
+  to {
+    transform: rotate(360deg);
   }
 }
 
-@keyframes gradient-xy {
-  0% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
-  100% {
-    background-position: 0% 50%;
+/* Utility classes */
+.animate-fade-in {
+  animation: fadeIn var(--animate-duration-300) ease-out;
+}
+
+.animate-slide-in-left {
+  animation: slideInFromLeft var(--animate-duration-500) ease-out;
+}
+
+.animate-slide-in-right {
+  animation: slideInFromRight var(--animate-duration-500) ease-out;
+}
+
+.animate-slide-in-bottom {
+  animation: slideInFromBottom var(--animate-duration-500) ease-out;
+}
+
+.animate-pulse {
+  animation: pulse var(--animate-duration-1000) infinite;
+}
+
+.animate-spin {
+  animation: spin var(--animate-duration-1000) linear infinite;
+}
+
+/* Glassmorphism effect */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: var(--backdrop-blur-md);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.dark .glass {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.purple-neon .glass {
+  background: rgba(168, 85, 247, 0.1);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+}
+
+/* Focus states for accessibility */
+.focus-visible:focus-visible {
+  outline: 2px solid var(--color-purple-500);
+  outline-offset: 2px;
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

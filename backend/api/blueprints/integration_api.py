@@ -1,3 +1,10 @@
+from flask import Blueprint, jsonify
+
+integration_bp = Blueprint('integration', __name__)
+
+@integration_bp.route('/api/integration/status', methods=['GET'])
+def integration_status():
+    return jsonify({"status": "ok", "service": "Integration Workbench"}), 200
 from flask import Blueprint, request, jsonify
 import logging
 import requests
@@ -20,6 +27,9 @@ def init_integration_workbench(enhanced_mama, marketplace):
     marketplace_service = marketplace
     logger.info("Integration workbench initialized with enhanced MamaBear and marketplace services")
     return True
+
+# Alias for test compatibility
+initialize_integration_api = init_integration_workbench
 
 @integration_bp.route('/scrape', methods=['POST'])
 def scrape_url():

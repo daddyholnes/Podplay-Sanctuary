@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Purple theme sensory-friendly styling */
+@layer base {
+  body {
+    @apply bg-gradient-to-r from-purple-900 to-indigo-900 text-white;
+  }
+  
+  /* Smooth transition for all interactive elements */
+  button, a, input, textarea, select {
+    @apply transition-all duration-200;
+  }
+  
+  /* Sensory-friendly focus states */
+  *:focus-visible {
+    @apply outline-none ring-2 ring-purple-400 ring-opacity-50;
+  }
+}
+
+/* Custom utility classes for the purple gradient UI */
+@layer utilities {
+  .bg-sanctuary {
+    @apply bg-gradient-to-r from-purple-900 to-indigo-900;
+  }
+  
+  .bg-sanctuary-light {
+    @apply bg-gradient-to-r from-purple-800 to-indigo-800;
+  }
+  
+  .bg-sanctuary-button {
+    @apply bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700;
+  }
+}

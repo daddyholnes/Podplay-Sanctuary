@@ -61,6 +61,17 @@ class DatabaseManager:
     def _create_tables(self, conn):
         """Create all application tables with proper schema"""
         
+        # Agent Learning table
+        conn.execute('''
+            CREATE TABLE IF NOT EXISTS agent_learning (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                interaction_type TEXT NOT NULL,
+                context TEXT,
+                insight TEXT,
+                timestamp TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+
         # MCP Servers table
         conn.execute('''
             CREATE TABLE IF NOT EXISTS mcp_servers (

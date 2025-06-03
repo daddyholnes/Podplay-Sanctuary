@@ -22,6 +22,14 @@ chat_bp = Blueprint('chat', __name__, url_prefix='/api/chat')
 # Agent instance will be injected by service initialization
 mama_bear_agent: MamaBearAgent = None
 
+@chat_bp.route('/conversations', methods=['GET'])
+def get_conversations():
+    """
+    Stub endpoint to return recent chat conversations for the UI
+    """
+    # TODO: Replace with real DB query
+    return jsonify({"success": True, "conversations": []}), 200
+
 def init_chat_api(agent: MamaBearAgent):
     """
     Initialize Chat API blueprint with Mama Bear agent dependency

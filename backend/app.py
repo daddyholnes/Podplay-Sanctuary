@@ -47,6 +47,14 @@ def create_app(config_name='development'):
     logger = logging.getLogger(__name__)
     logger.info("🐻 Initializing Podplay Sanctuary Backend")
     
+    # Register Models API Blueprint
+    try:
+        from api.models_api import models_api
+        app.register_blueprint(models_api)
+        logger.info("📝 Registered Models API Blueprint")
+    except Exception as e:
+        logger.error(f"❌ Failed to register Models API Blueprint: {e}")
+    
     # Initialize CORS with proper configuration
     CORS(app, resources={
         r"/*": {
@@ -101,6 +109,16 @@ def create_app(config_name='development'):
     from api.blueprints.socket_handlers import register_socket_handlers
     register_socket_handlers(socketio)
     
+    # Create uploads directory if it doesn't exist
+    uploads_dir = os.path.join(app.root_path, 'uploads')
+    os.makedirs(uploads_dir, exist_ok=True)
+    logger.info(f"📁 Ensured uploads directory exists at {uploads_dir}")
+    
+    # Configure static route for uploads
+    @app.route('/uploads/<path:filename>')
+    def uploaded_file(filename):
+        return send_from_directory(uploads_dir, filename)
+    
     # Register global error handlers
     from utils.error_handlers import register_error_handlers
     register_error_handlers(app)
@@ -108,16 +126,21 @@ def create_app(config_name='development'):
     logger.info("🌟 Podplay Sanctuary Backend initialized successfully")
     logger.info("🐻 Mama Bear Control Center ready")
     
+    # If called by Flask CLI, only return the app instance (not the tuple)
+    if os.environ.get("FLASK_RUN_FROM_CLI") == "1":
+        return app
     return app, socketio
 
 if __name__ == '__main__':
     try:
         app, socketio = create_app()
+        # Use port 5001 since 5000 is in use
+        port = 5000
         
         print("🚀 Starting Podplay Sanctuary Backend Server...")
         print("🐻 Mama Bear Control Center is ready!")
         print("🔧 Integration Workbench - Universal Automation Hub initialized!")
-        print("🌐 Server will be available at: http://127.0.0.1:5000")
+        print("🌐 Server will be available at: http://127.0.0.1:5001")
         print("📡 API endpoints ready for frontend connections")
         print("🔌 Socket.IO enabled for real-time communication")
         print("==================================================")
@@ -125,7 +148,7 @@ if __name__ == '__main__':
         socketio.run(
             app,
             host="0.0.0.0",
-            port=5000,
+            port=port,
             debug=True,
             use_reloader=False,
             allow_unsafe_werkzeug=True,

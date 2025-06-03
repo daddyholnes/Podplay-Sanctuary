@@ -22,11 +22,18 @@
   "author": "Podplay Sanctuary Team",
   "description": "🐻 Podplay Sanctuary - AI Development Workspace",
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^8.2.2",
+    "task-master-ai": "^0.16.1"
   },
   "workspaces": [
     "frontend",
     "frontend-new-2",
     "electron"
-  ]
+  ],
+  "dependencies": {
+    "clsx": "^2.1.1",
+    "framer-motion": "^12.15.0",
+    "lucide-react": "^0.511.0",
+    "tailwind-merge": "^3.3.0"
+  }
 }

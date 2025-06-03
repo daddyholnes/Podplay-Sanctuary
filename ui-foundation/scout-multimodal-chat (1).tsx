@@ -2,25 +2,86 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Send, Mic, MicOff, Paperclip, Image, Video, FileText, Settings, 
   Sun, Moon, ChevronDown, Copy, ThumbsUp, ThumbsDown, RotateCcw,
-  Zap, Eye, Clock, DollarSign, Database, Sparkles, Brain, MessageSquare
+  Zap, Eye, Clock, DollarSign, Database, Sparkles, Brain, MessageSquare, X
 } from 'lucide-react';
+import { sendMessageToModel, uploadFiles, transcribeAudio } from './services/modelService';
+import type { Message as ServiceMessage, UploadedFile as ServiceUploadedFile } from './services/modelService';
 
-const ScoutMultiModalChat = () => {
-  const [isDarkMode, setIsDarkMode] = useState(true);
-  const [selectedModel, setSelectedModel] = useState('gemini-2.5-pro-preview-05-06');
-  const [isRecording, setIsRecording] = useState(false);
-  const [showModelSelector, setShowModelSelector] = useState(false);
-  const [inputText, setInputText] = useState('');
-  const [messages, setMessages] = useState([]);
-  const [uploadedFiles, setUploadedFiles] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
+// Define TypeScript interfaces
+interface UploadedFile {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  url: string;
+  preview?: string;
+  uploadTime: Date;
+}
+
+interface Message {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  content: string;
+  timestamp: Date;
+  model?: string;
+  tokens?: number;
+  fileIds?: string[];
+}
+
+interface CapabilityBadgeProps {
+  capability: string;
+}
+
+interface CapabilityIcon {
+  icon: React.ReactNode;
+  color: string;
+}
+
+interface AIModel {
+  name: string;
+  provider: string;
+  icon: string;
+  color: string;
+  capabilities: string[];
+  contextLength: string;
+  pricing: string;
+  rateLimit: string;
+  knowledgeCutoff: string;
+  specialties: string[];
+  description: string;
+  useCases: string[];
+  badge?: {
+    text: string;
+    color: string;
+  };
+}
+
+interface ThemeClasses {
+  bg: string;
+  cardBg: string;
+  border: string;
+  text: string;
+  textSecondary: string;
+  input: string;
+  button: string;
+}
+
+const ScoutMultiModalChat: React.FC = () => {
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(true);
+  const [selectedModel, setSelectedModel] = useState<string>('gemini-2.5-pro-preview-05-06');
+  const [isRecording, setIsRecording] = useState<boolean>(false);
+  const [showModelSelector, setShowModelSelector] = useState<boolean>(false);
+  const [inputText, setInputText] = useState<string>('');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
   
-  const fileInputRef = useRef(null);
-  const imageInputRef = useRef(null);
-  const videoInputRef = useRef(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
 
   // AI Models configuration (Current Google AI Studio models)
-  const models = {
+  const models: Record<string, AIModel> = {
     // Gemini 2.5 Models
     'gemini-2.5-pro-preview-05-06': {
       name: 'Gemini 2.5 Pro Preview 05-06',
@@ -34,7 +95,11 @@ const ScoutMultiModalChat = () => {
       knowledgeCutoff: 'Jan 2025',
       specialties: ['Coding', 'Reasoning', 'Multimodal understanding'],
       description: 'Reason over complex problems, tackle difficult code, math and STEM problems',
-      useCases: ['Complex problem solving', 'Large dataset analysis', 'Advanced coding tasks']
+      useCases: ['Complex problem solving', 'Large dataset analysis', 'Advanced coding tasks'],
+      badge: {
+        text: 'PRO',
+        color: 'bg-blue-600'
+      }
     },
     'gemini-2.5-flash-preview-04-17': {
       name: 'Gemini 2.5 Flash Preview 04-17',
@@ -47,7 +112,12 @@ const ScoutMultiModalChat = () => {
       rateLimit: '1000 RPM',
       knowledgeCutoff: 'Apr 2024',
       specialties: ['Speed', 'Multimodal', 'Preview features'],
-      description: 'Fast preview model with latest Gemini 2.5 capabilities'
+      description: 'Fast preview model with latest Gemini 2.5 capabilities',
+      useCases: ['Quick responses', 'Real-time chat', 'Simple queries'],
+      badge: {
+        text: 'FLASH',
+        color: 'bg-cyan-600'
+      }
     },
     'gemini-2.5-flash-preview-05-20': {
       name: 'Gemini 2.5 Flash Preview 05-20',
@@ -61,7 +131,11 @@ const ScoutMultiModalChat = () => {
       knowledgeCutoff: 'May 2024',
       specialties: ['Latest features', 'Speed', 'Multimodal'],
       description: 'Newest Gemini 2.5 Flash preview with enhanced capabilities',
-      badge: 'NEW'
+      useCases: ['Quick responses', 'Real-time applications', 'Creative tasks'],
+      badge: {
+        text: 'NEW',
+        color: 'bg-purple-600'
+      }
     },
     
     // Gemini 2.0 Models
@@ -90,7 +164,12 @@ const ScoutMultiModalChat = () => {
       rateLimit: '3000 RPM',
       knowledgeCutoff: 'Aug 2024',
       specialties: ['Ultra-fast', 'Lightweight', 'Cost-effective'],
-      description: 'Lightweight version optimized for speed and efficiency'
+      description: 'Lightweight version optimized for speed and efficiency',
+      useCases: ['Mobile applications', 'Resource-limited devices', 'Quick responses'],
+      badge: {
+        text: 'LITE',
+        color: 'bg-yellow-500'
+      }
     },
     
     // Gemini 1.5 Models
@@ -105,7 +184,12 @@ const ScoutMultiModalChat = () => {
       rateLimit: '360 RPM',
       knowledgeCutoff: 'Feb 2024',
       specialties: ['Long context', 'Complex reasoning', 'Multimodal'],
-      description: 'Most capable model for complex, multi-step tasks'
+      description: 'Most capable model for complex, multi-step tasks',
+      useCases: ['Complex analysis', 'Research assistance', 'Content creation'],
+      badge: {
+        text: 'PRO',
+        color: 'bg-blue-600'
+      }
     },
     'gemini-1.5-flash': {
       name: 'Gemini 1.5 Flash',
@@ -118,7 +202,12 @@ const ScoutMultiModalChat = () => {
       rateLimit: '1000 RPM',
       knowledgeCutoff: 'Feb 2024',
       specialties: ['Speed', 'Efficiency', 'Balanced performance'],
-      description: 'Fast and versatile for a wide range of tasks'
+      description: 'Fast and versatile for a wide range of tasks',
+      useCases: ['Quick responses', 'Real-time chat', 'Standard tasks'],
+      badge: {
+        text: 'FAST',
+        color: 'bg-orange-600'
+      }
     },
     'gemini-1.5-flash-8b': {
       name: 'Gemini 1.5 Flash-8B',
@@ -128,11 +217,15 @@ const ScoutMultiModalChat = () => {
       capabilities: ['fast', 'multilingual', 'summarization', 'low-latency'],
       contextLength: '1M tokens',
       pricing: '≤128K: $0.0375/$0.15 | >128K: $0.075/$0.30',
+      badge: {
+        text: 'LITE',
+        color: 'bg-green-600'
+      },
       rateLimit: '4000 RPM | Free: 15 RPM',
       knowledgeCutoff: 'Sep 2024',
       specialties: ['Low latency', 'Multilingual', 'Summarization'],
       description: 'Realtime data transformation, translation, summarize 8 novels worth of text',
-      useCases: ['Real-time translation', 'Data transformation', 'Text summarization']
+      useCases: ['Real-time translation', 'Data transformation', 'Text summarization', 'Mobile', 'Edge devices']
     },
     
     // Gemma Models (Open Source)
@@ -149,7 +242,10 @@ const ScoutMultiModalChat = () => {
       specialties: ['Free to use', 'Multimodal', 'Fast responses'],
       description: 'Visual and text processing, translation, research content summarization',
       useCases: ['Visual processing', 'Text translation', 'Research summarization'],
-      badge: 'FREE'
+      badge: {
+        text: 'FREE',
+        color: 'bg-green-500'
+      }
     },
     
     // Anthropic Models (Current)
@@ -164,7 +260,12 @@ const ScoutMultiModalChat = () => {
       rateLimit: '4000 RPM',
       knowledgeCutoff: 'Apr 2024',
       specialties: ['Code generation', 'Analysis', 'Creative writing'],
-      description: 'Anthropic\'s most intelligent model for complex tasks'
+      description: 'Anthropic\'s most intelligent model for complex tasks',
+      useCases: ['Code development', 'Content creation', 'Data analysis'],
+      badge: {
+        text: 'PRO',
+        color: 'bg-orange-600'
+      }
     },
     'claude-3-5-haiku-20241022': {
       name: 'Claude 3.5 Haiku',
@@ -177,7 +278,12 @@ const ScoutMultiModalChat = () => {
       rateLimit: '5000 RPM',
       knowledgeCutoff: 'Jul 2024',
       specialties: ['Speed', 'Vision', 'Cost-effective'],
-      description: 'Fast and intelligent with vision capabilities'
+      description: 'Fast and intelligent with vision capabilities',
+      useCases: ['Quick responses', 'Image understanding', 'Daily assistance'],
+      badge: {
+        text: 'FAST',
+        color: 'bg-pink-500'
+      }
     },
     'claude-3-opus-20240229': {
       name: 'Claude 3 Opus',
@@ -190,7 +296,12 @@ const ScoutMultiModalChat = () => {
       rateLimit: '4000 RPM',
       knowledgeCutoff: 'Aug 2023',
       specialties: ['Top performance', 'Complex reasoning', 'Research'],
-      description: 'Most powerful model for highly complex tasks'
+      description: 'Most powerful model for highly complex tasks',
+      useCases: ['Scientific research', 'Complex problem solving', 'Advanced analysis'],
+      badge: {
+        text: 'PREMIUM',
+        color: 'bg-indigo-700'
+      }
     },
     
     // OpenAI Models (Current)
@@ -205,7 +316,12 @@ const ScoutMultiModalChat = () => {
       rateLimit: '10000 RPM',
       knowledgeCutoff: 'Oct 2023',
       specialties: ['Multimodal', 'Reasoning', 'General purpose'],
-      description: 'OpenAI\'s flagship multimodal model'
+      description: 'OpenAI\'s flagship multimodal model',
+      useCases: ['Image understanding', 'General assistant', 'Content creation'],
+      badge: {
+        text: 'PRO',
+        color: 'bg-emerald-600'
+      }
     },
     'gpt-4o-mini': {
       name: 'GPT-4o Mini',
@@ -218,7 +334,12 @@ const ScoutMultiModalChat = () => {
       rateLimit: '30000 RPM',
       knowledgeCutoff: 'Oct 2023',
       specialties: ['Speed', 'Efficiency', 'Vision'],
-      description: 'Smaller, faster version of GPT-4o'
+      description: 'Smaller, faster version of GPT-4o',
+      useCases: ['Quick responses', 'Real-time applications', 'Simple vision tasks'],
+      badge: {
+        text: 'MINI',
+        color: 'bg-green-600'
+      }
     },
     'o1-preview': {
       name: 'o1 Preview',
@@ -231,7 +352,12 @@ const ScoutMultiModalChat = () => {
       rateLimit: '500 RPM',
       knowledgeCutoff: 'Oct 2023',
       specialties: ['Advanced reasoning', 'Math', 'Science'],
-      description: 'OpenAI\'s reasoning model for complex problems'
+      description: 'OpenAI\'s reasoning model for complex problems',
+      useCases: ['Complex reasoning', 'Mathematical proofs', 'Scientific research'],
+      badge: {
+        text: 'PREMIUM',
+        color: 'bg-purple-600'
+      }
     },
     'o1-mini': {
       name: 'o1 Mini',
@@ -244,7 +370,12 @@ const ScoutMultiModalChat = () => {
       rateLimit: '1000 RPM',
       knowledgeCutoff: 'Oct 2023',
       specialties: ['Fast reasoning', 'STEM', 'Coding'],
-      description: 'Faster reasoning model for STEM and coding'
+      description: 'Faster reasoning model for STEM and coding',
+      useCases: ['Coding assistance', 'Technical problems', 'Academic work'],
+      badge: {
+        text: 'MINI',
+        color: 'bg-violet-600'
+      }
     }
   };
 
@@ -262,62 +393,151 @@ const ScoutMultiModalChat = () => {
   };
 
   // Handle file uploads
-  const handleFileUpload = (files, type) => {
-    Array.from(files).forEach(file => {
-      setUploadedFiles(prev => [...prev, {
-        id: Date.now() + Math.random(),
-        file,
-        type,
+  const handleFileUpload = async (files: FileList, type: string): Promise<void> => {
+    if (!files || files.length === 0) return;
+    
+    try {
+      // Show temporary local previews first for better UX
+      const tempFiles: UploadedFile[] = Array.from(files).map(file => ({
+        id: Math.random().toString(36).substring(2, 15),
         name: file.name,
+        type: file.type,
         size: file.size,
-        preview: type === 'image' ? URL.createObjectURL(file) : null
-      }]);
-    });
+        url: URL.createObjectURL(file),
+        preview: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
+        uploadTime: new Date()
+      }));
+      
+      setUploadedFiles(prev => [...prev, ...tempFiles]);
+      
+      // Upload files to server using our service
+      const serverFiles = await uploadFiles(Array.from(files));
+      
+      // Convert service format to our component format
+      const uploadedFilesResponse: UploadedFile[] = serverFiles.map(file => ({
+        id: file.id,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        url: file.url,
+        preview: file.preview,
+        uploadTime: file.uploadTime
+      }));
+      
+      // Replace temporary files with actual server responses
+      setUploadedFiles(prev => {
+        const filteredPrev = prev.filter(p => !tempFiles.some(t => t.id === p.id));
+        return [...filteredPrev, ...uploadedFilesResponse];
+      });
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      // Show error message to user
+      alert('Failed to upload files. Please try again.');
+    }
   };
 
   // Handle drag and drop
-  const handleDrop = (e) => {
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>): void => {
     e.preventDefault();
     const files = e.dataTransfer.files;
     handleFileUpload(files, 'file');
   };
 
+  // Remove uploaded file
+  const handleRemoveFile = (fileId: string): void => {
+    setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
+  };
+
   // Send message
-  const sendMessage = async () => {
+  const handleSendMessage = async (): Promise<void> => {
     if (!inputText.trim() && uploadedFiles.length === 0) return;
-    
-    const newMessage = {
-      id: Date.now(),
-      text: inputText,
-      files: [...uploadedFiles],
-      model: selectedModel,
+
+    // Add user message
+    const userMessage: Message = {
+      id: Math.random().toString(36).substring(2, 15),
+      role: 'user',
+      content: inputText,
       timestamp: new Date(),
-      type: 'user'
+      fileIds: uploadedFiles.map(file => file.id)
     };
 
-    setMessages(prev => [...prev, newMessage]);
+    setMessages(prev => [...prev, userMessage]);
     setInputText('');
-    setUploadedFiles([]);
     setIsLoading(true);
-
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponse = {
-        id: Date.now() + 1,
-        text: `This is a response from ${currentModel.name}. I can see you've sent ${newMessage.files.length > 0 ? `${newMessage.files.length} file(s) and` : ''} your message: "${newMessage.text}". As ${currentModel.name}, I have capabilities including: ${currentModel.capabilities.join(', ')}.`,
-        model: selectedModel,
-        timestamp: new Date(),
-        type: 'assistant',
-        tokens: Math.floor(Math.random() * 1000) + 100
+    
+    try {
+      // Convert our messages to service format
+      const serviceMessages: ServiceMessage[] = messages.map(msg => ({
+        id: msg.id,
+        role: msg.role,
+        content: msg.content,
+        timestamp: msg.timestamp,
+        tokens: msg.tokens,
+        model: msg.model,
+        fileIds: msg.fileIds
+      }));
+      
+      // Convert user message to service format
+      const serviceUserMessage: ServiceMessage = {
+        id: userMessage.id,
+        role: userMessage.role,
+        content: userMessage.content,
+        timestamp: userMessage.timestamp,
+        fileIds: userMessage.fileIds
       };
-      setMessages(prev => [...prev, aiResponse]);
+      
+      // Convert our files to service format
+      const serviceFiles: ServiceUploadedFile[] = uploadedFiles.map(file => ({
+        id: file.id,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        url: file.url,
+        preview: file.preview,
+        uploadTime: file.uploadTime
+      }));
+      
+      // Send message to the appropriate model via our service
+      const modelResponse = await sendMessageToModel(
+        selectedModel, 
+        [...serviceMessages, serviceUserMessage],
+        serviceFiles
+      );
+      
+      // Convert service response to our format
+      const aiMessage: Message = {
+        id: modelResponse.message.id,
+        role: modelResponse.message.role,
+        content: modelResponse.message.content,
+        timestamp: modelResponse.message.timestamp,
+        model: modelResponse.message.model,
+        tokens: modelResponse.message.tokens,
+        fileIds: modelResponse.message.fileIds
+      };
+      
+      // Add AI response to messages
+      setMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+      console.error('Error getting model response:', error);
+      
+      // Add error message if API call fails
+      const errorMessage: Message = {
+        id: Math.random().toString(36).substring(2, 15),
+        role: 'assistant',
+        content: 'I apologize, but I encountered an error while processing your message. Please try again or select a different model.',
+        timestamp: new Date(),
+        model: selectedModel
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   // Capability badges
-  const CapabilityBadge = ({ capability }) => {
-    const capabilityIcons = {
+  const CapabilityBadge: React.FC<CapabilityBadgeProps> = ({ capability }) => {
+    const capabilityIcons: Record<string, CapabilityIcon> = {
       vision: { icon: <Eye size={12} />, color: 'bg-blue-500/20 text-blue-400' },
       audio: { icon: <Mic size={12} />, color: 'bg-green-500/20 text-green-400' },
       video: { icon: <Video size={12} />, color: 'bg-purple-500/20 text-purple-400' },
@@ -380,12 +600,8 @@ const ScoutMultiModalChat = () => {
                   <div className="flex items-center gap-2">
                     <h3 className={`font-semibold ${themeClasses.text} text-sm`}>{model.name}</h3>
                     {model.badge && (
-                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
-                        model.badge === 'NEW' ? 'bg-blue-500/20 text-blue-400' : 
-                        model.badge === 'FREE' ? 'bg-green-500/20 text-green-400' : 
-                        'bg-purple-500/20 text-purple-400'
-                      }`}>
-                        {model.badge}
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-bold text-white ${model.badge.color}`}>
+                        {model.badge.text}
                       </span>
                     )}
                   </div>
@@ -445,12 +661,12 @@ const ScoutMultiModalChat = () => {
                 <div className="flex items-center gap-2">
                   <h1 className={`text-xl font-bold ${themeClasses.text}`}>{currentModel.name}</h1>
                   {currentModel.badge && (
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                      currentModel.badge === 'NEW' ? 'bg-blue-500/20 text-blue-400' : 
-                      currentModel.badge === 'FREE' ? 'bg-green-500/20 text-green-400' : 
-                      'bg-purple-500/20 text-purple-400'
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                      currentModel.badge.text === 'NEW' ? 'bg-blue-500/20 text-blue-400' : 
+                      currentModel.badge.text === 'FREE' ? 'bg-green-500/20 text-green-400' : 
+                      currentModel.badge.color || 'bg-purple-500/20 text-purple-400'
                     }`}>
-                      {currentModel.badge}
+                      {currentModel.badge.text}
                     </span>
                   )}
                 </div>
@@ -522,34 +738,37 @@ const ScoutMultiModalChat = () => {
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`flex gap-4 ${message.type === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
+              className={`flex gap-4 ${message.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
             >
               <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shadow-lg ${
-                message.type === 'user' 
+                message.role === 'user' 
                   ? 'bg-gradient-to-r from-purple-500 to-pink-500' 
-                  : `bg-gradient-to-r ${models[message.model].color}`
+                  : `bg-gradient-to-r ${message.model && models[message.model]?.color || 'from-purple-700 to-purple-900'}`
               }`}>
-                {message.type === 'user' ? '👤' : models[message.model].icon}
+                {message.role === 'user' ? '👤' : (message.model && models[message.model]?.icon || '🤖')}
               </div>
               
-              <div className={`flex-1 max-w-3xl ${message.type === 'user' ? 'text-right' : 'text-left'}`}>
+              <div className={`flex-1 max-w-3xl ${message.role === 'user' ? 'text-right' : 'text-left'}`}>
                 <div className={`inline-block p-4 rounded-2xl ${themeClasses.cardBg} backdrop-blur-md border ${themeClasses.border} shadow-lg`}>
-                  {message.files && message.files.length > 0 && (
+                  {message.fileIds && message.fileIds.length > 0 && (
                     <div className="flex flex-wrap gap-2 mb-3">
-                      {message.files.map(file => (
-                        <div key={file.id} className="flex items-center gap-2 p-2 bg-purple-500/20 rounded-lg">
-                          {file.preview ? (
-                            <img src={file.preview} alt={file.name} className="w-8 h-8 rounded object-cover" />
-                          ) : (
-                            <FileText size={16} className="text-purple-400" />
-                          )}
-                          <span className="text-sm text-purple-300">{file.name}</span>
-                        </div>
-                      ))}
+                      {message.fileIds.map(fileId => {
+                        const file = uploadedFiles.find(f => f.id === fileId);
+                        return (
+                          <div key={fileId} className="flex items-center gap-2 p-2 bg-purple-500/20 rounded-lg">
+                            {file?.preview ? (
+                              <img src={file.preview} alt={file.name} className="w-8 h-8 rounded object-cover" />
+                            ) : (
+                              <FileText size={16} className="text-purple-400" />
+                            )}
+                            <span className="text-sm text-purple-300">{file?.name || 'File'}</span>
+                          </div>
+                        );
+                      })}
                     </div>
                   )}
                   
-                  <p className={`${themeClasses.text} leading-relaxed`}>{message.text}</p>
+                  <p className={`${themeClasses.text} leading-relaxed`}>{message.content}</p>
                   
                   <div className={`flex items-center gap-3 mt-3 pt-3 border-t ${themeClasses.border}`}>
                     <span className={`text-xs ${themeClasses.textSecondary}`}>
@@ -600,15 +819,10 @@ const ScoutMultiModalChat = () => {
             <div className="flex flex-wrap gap-2 mb-4 p-3 bg-purple-500/10 rounded-xl">
               {uploadedFiles.map(file => (
                 <div key={file.id} className="flex items-center gap-2 p-2 bg-purple-500/20 rounded-lg">
-                  {file.preview ? (
-                    <img src={file.preview} alt={file.name} className="w-8 h-8 rounded object-cover" />
-                  ) : (
-                    <FileText size={16} className="text-purple-400" />
-                  )}
-                  <span className="text-sm text-purple-300">{file.name}</span>
+                  <span className="text-xs truncate max-w-[150px]">{file.name}</span>
                   <button
-                    onClick={() => setUploadedFiles(prev => prev.filter(f => f.id !== file.id))}
-                    className="text-purple-400 hover:text-purple-300"
+                    onClick={() => handleRemoveFile(file.id)}
+                    className="p-1 rounded-full bg-purple-600/30 hover:bg-purple-600/50 transition-colors"
                   >
                     <X size={14} />
                   </button>
@@ -616,68 +830,38 @@ const ScoutMultiModalChat = () => {
               ))}
             </div>
           )}
-
-          <div className="flex gap-3">
-            {/* File Upload Buttons */}
-            <div className="flex gap-2">
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                className={`p-3 rounded-xl ${themeClasses.button} transition-colors`}
-                title="Upload file"
-              >
-                <Paperclip size={18} />
-              </button>
-              <button
-                onClick={() => imageInputRef.current?.click()}
-                className={`p-3 rounded-xl ${themeClasses.button} transition-colors`}
-                title="Upload image"
-              >
-                <Image size={18} />
-              </button>
-              <button
-                onClick={() => videoInputRef.current?.click()}
-                className={`p-3 rounded-xl ${themeClasses.button} transition-colors`}
-                title="Upload video"
-              >
-                <Video size={18} />
-              </button>
-              <button
-                onClick={() => setIsRecording(!isRecording)}
-                className={`p-3 rounded-xl transition-colors ${
-                  isRecording ? 'bg-red-500 text-white' : themeClasses.button
-                }`}
-                title="Record audio"
-              >
-                {isRecording ? <MicOff size={18} /> : <Mic size={18} />}
-              </button>
-            </div>
-
-            {/* Text Input */}
-            <div className="flex-1 relative">
-              <textarea
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-                placeholder={`Message ${currentModel.name}...`}
-                onDrop={handleDrop}
-                onDragOver={(e) => e.preventDefault()}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    sendMessage();
-                  }
-                }}
-                className={`w-full px-4 py-3 pr-12 rounded-xl border ${themeClasses.input} focus:border-purple-400 focus:outline-none resize-none transition-colors backdrop-blur-sm`}
-                rows={1}
-                style={{ minHeight: '50px' }}
-              />
-              <button
-                onClick={sendMessage}
-                disabled={!inputText.trim() && uploadedFiles.length === 0}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105"
-              >
-                <Send size={16} />
-              </button>
-            </div>
+          
+          {/* Message Input */}
+          <div className="relative">
+            <textarea
+              value={inputText}
+              onChange={(e) => setInputText(e.target.value)}
+              placeholder={`Message ${currentModel.name}...`}
+              onKeyDown={(e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+              onDrop={(e: React.DragEvent<HTMLTextAreaElement>) => {
+                e.preventDefault();
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                  handleFileUpload(files, 'file');
+                }
+              }}
+              onDragOver={(e: React.DragEvent<HTMLTextAreaElement>) => e.preventDefault()}
+              className={`w-full px-4 py-3 pr-12 rounded-xl border ${themeClasses.input} focus:border-purple-400 focus:outline-none resize-none transition-colors backdrop-blur-sm`}
+              rows={1}
+              style={{ minHeight: '50px' }}
+            />
+            <button
+              onClick={handleSendMessage}
+              disabled={!inputText.trim() && uploadedFiles.length === 0}
+              className={`absolute right-3 top-1/2 transform -translate-y-1/2 p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed transition-all hover:scale-105 ${inputText.trim() || uploadedFiles.length > 0 ? '' : 'opacity-50 cursor-not-allowed'}`}
+            >
+              <Send size={16} />
+            </button>
           </div>
 
           {/* Hidden file inputs */}
@@ -686,7 +870,11 @@ const ScoutMultiModalChat = () => {
             type="file"
             hidden
             multiple
-            onChange={(e) => handleFileUpload(e.target.files, 'file')}
+            onChange={(e) => {
+              if (e.target.files && e.target.files.length > 0) {
+                handleFileUpload(e.target.files, 'file');
+              }
+            }}
           />
           <input
             ref={imageInputRef}
@@ -694,14 +882,22 @@ const ScoutMultiModalChat = () => {
             hidden
             accept="image/*"
             multiple
-            onChange={(e) => handleFileUpload(e.target.files, 'image')}
+            onChange={(e) => {
+              if (e.target.files && e.target.files.length > 0) {
+                handleFileUpload(e.target.files, 'image');
+              }
+            }}
           />
           <input
             ref={videoInputRef}
             type="file"
             hidden
             accept="video/*"
-            onChange={(e) => handleFileUpload(e.target.files, 'video')}
+            onChange={(e) => {
+              if (e.target.files && e.target.files.length > 0) {
+                handleFileUpload(e.target.files, 'video');
+              }
+            }}
           />
         </div>
       </div>

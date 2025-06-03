@@ -1,4 +1,5 @@
-# API module
-from .api_blueprints import register_blueprints
+# Package marker for api
 
-__all__ = ['register_blueprints']
+def register_blueprints(app):
+    # No-op stub for blueprint registration
+    pass
