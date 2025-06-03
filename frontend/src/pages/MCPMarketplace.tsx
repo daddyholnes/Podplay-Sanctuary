@@ -31,6 +31,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Textarea } from '@/components/ui/textarea';
 import { useThemeStore, useMCPStore } from '@/stores';
 import { MCPPackage } from '@/types';
+import DraggableChat from '@/components/DraggableChat';
 
 const MCPMarketplace: React.FC = () => {
   const { theme } = useThemeStore();
@@ -509,73 +510,16 @@ const MCPMarketplace: React.FC = () => {
         </motion.div>
       )}
 
-      {/* Mama Bear Chat */}
-      <AnimatePresence>
-        {showMamaBearChat && (
-          <motion.div
-            initial={{ x: 400, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: 400, opacity: 0 }}
-            className={`fixed right-4 top-20 w-80 h-96 rounded-lg shadow-xl overflow-hidden z-50 ${
-              theme === 'light'
-                ? 'bg-white border border-purple-200'
-                : 'bg-slate-800 border border-slate-600'
-            }`}
-          >
-            <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-2">
-                  <Heart className="w-4 h-4 text-white" />
-                  <span className="text-white font-medium text-sm">Mama Bear MCP Assistant</span>
-                </div>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="text-white hover:bg-white/20"
-                  onClick={() => setShowMamaBearChat(false)}
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-            
-            <div className="flex flex-col h-full">
-              <ScrollArea className="flex-1 p-3">
-                <div className={`p-3 rounded-lg mb-3 ${
-                  theme === 'light' 
-                    ? 'bg-purple-50 border border-purple-200' 
-                    : 'bg-purple-900/20 border border-purple-600/30'
-                }`}>
-                  <p className="text-sm text-purple-600 dark:text-purple-300">
-                    Hi! I'm here to help you discover, install, and configure MCP packages. 
-                    What would you like to know about these tools?
-                  </p>
-                </div>
-              </ScrollArea>
-              
-              <div className="p-3 border-t border-purple-200 dark:border-slate-600">
-                <div className="flex items-end space-x-2">
-                  <Textarea
-                    value={chatMessage}
-                    onChange={(e) => setChatMessage(e.target.value)}
-                    placeholder="Ask about MCP packages..."
-                    className="min-h-[32px] text-sm resize-none"
-                    rows={1}
-                  />
-                  <Button
-                    size="sm"
-                    onClick={sendChatMessage}
-                    disabled={!chatMessage.trim()}
-                    className="bg-purple-600 hover:bg-purple-700 text-white"
-                  >
-                    <ArrowRight className="w-3 h-3" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Mama Bear Chat - Enhanced Draggable Version */}
+      <DraggableChat
+        id="mama-bear-mcp-chat"
+        title="Mama Bear MCP Assistant"
+        isVisible={showMamaBearChat}
+        onClose={() => setShowMamaBearChat(false)}
+        initialPosition={{ x: window.innerWidth - 450, y: 100 }}
+        initialSize={{ width: 400, height: 500 }}
+        zIndex={1000}
+      />
     </div>
   );
 };

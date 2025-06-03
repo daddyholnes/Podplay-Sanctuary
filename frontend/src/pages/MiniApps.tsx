@@ -12,13 +12,15 @@ import {
   ArrowLeft,
   ExternalLink,
   Loader2,
-  RefreshCw
+  RefreshCw,
+  Brain
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useThemeStore, useMiniAppStore } from '@/stores';
 import { MiniApp } from '@/types';
 
@@ -213,13 +215,55 @@ const MiniApps: React.FC = () => {
   ];
 
   const categories = [
-    { id: 'all', name: 'All Apps', count: sampleApps.length },
-    { id: 'AI Chat', name: 'AI Chat', count: sampleApps.filter(app => app.category === 'AI Chat').length },
-    { id: 'Development', name: 'Development', count: sampleApps.filter(app => app.category === 'Development').length },
-    { id: 'AI Search', name: 'AI Search', count: sampleApps.filter(app => app.category === 'AI Search').length },
-    { id: 'Productivity', name: 'Productivity', count: sampleApps.filter(app => app.category === 'Productivity').length },
-    { id: 'Search', name: 'Search', count: sampleApps.filter(app => app.category === 'Search').length },
-    { id: 'Automation', name: 'Automation', count: sampleApps.filter(app => app.category === 'Automation').length }
+    { 
+      id: 'all', 
+      name: 'All Apps', 
+      icon: Grid3X3,
+      count: sampleApps.length,
+      color: 'purple'
+    },
+    { 
+      id: 'AI Chat', 
+      name: 'AI Chat', 
+      icon: Brain,
+      count: sampleApps.filter(app => app.category === 'AI Chat').length,
+      color: 'blue'
+    },
+    { 
+      id: 'Development', 
+      name: 'Development', 
+      icon: Plus,
+      count: sampleApps.filter(app => app.category === 'Development').length,
+      color: 'green'
+    },
+    { 
+      id: 'AI Search', 
+      name: 'AI Search', 
+      icon: Search,
+      count: sampleApps.filter(app => app.category === 'AI Search').length,
+      color: 'orange'
+    },
+    { 
+      id: 'Productivity', 
+      name: 'Productivity', 
+      icon: Star,
+      count: sampleApps.filter(app => app.category === 'Productivity').length,
+      color: 'purple'
+    },
+    { 
+      id: 'Search', 
+      name: 'Search', 
+      icon: Globe,
+      count: sampleApps.filter(app => app.category === 'Search').length,
+      color: 'indigo'
+    },
+    { 
+      id: 'Automation', 
+      name: 'Automation', 
+      icon: RefreshCw,
+      count: sampleApps.filter(app => app.category === 'Automation').length,
+      color: 'teal'
+    }
   ];
 
   useEffect(() => {
@@ -407,29 +451,57 @@ const MiniApps: React.FC = () => {
         </h3>
         
         <div className="space-y-2">
-          {categories.map((category, index) => (
-            <motion.button
-              key={category.id}
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: index * 0.05 }}
-              onClick={() => setSelectedCategory(category.id)}
-              className={`w-full flex items-center justify-between p-3 rounded-lg transition-all ${
-                selectedCategory === category.id
-                  ? theme === 'light'
-                    ? 'bg-purple-100 text-purple-800'
-                    : 'bg-purple-800/30 text-purple-100'
-                  : theme === 'light'
-                  ? 'hover:bg-gray-50 text-gray-700'
-                  : 'hover:bg-slate-700/50 text-gray-300'
-              }`}
-            >
-              <span className="font-medium">{category.name}</span>
-              <Badge variant="secondary" className="text-xs">
-                {category.count}
-              </Badge>
-            </motion.button>
-          ))}
+          {categories.map((category, index) => {
+            const IconComponent = category.icon;
+            const isSelected = selectedCategory === category.id || (!selectedCategory && category.id === 'all');
+            
+            return (
+              <motion.button
+                key={category.id}
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: index * 0.05 }}
+                whileHover={{ scale: 1.02, x: 4 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={() => setSelectedCategory(category.id)}
+                className={`w-full flex items-center justify-between p-3 rounded-lg transition-all duration-200 ${
+                  isSelected
+                    ? theme === 'light'
+                      ? 'bg-purple-100 text-purple-800 border-l-4 border-purple-500 shadow-sm'
+                      : 'bg-purple-800/30 text-purple-100 border-l-4 border-purple-400 shadow-lg'
+                    : theme === 'light'
+                    ? 'hover:bg-gray-50 text-gray-700 hover:border-l-4 hover:border-gray-300'
+                    : 'hover:bg-slate-700/50 text-gray-300 hover:border-l-4 hover:border-slate-500'
+                }`}
+              >
+                <div className="flex items-center space-x-3">
+                  <div className={`p-1.5 rounded-md ${
+                    isSelected 
+                      ? 'bg-purple-200 dark:bg-purple-700/50' 
+                      : 'bg-gray-100 dark:bg-slate-600/50'
+                  }`}>
+                    <IconComponent className={`w-4 h-4 ${
+                      isSelected 
+                        ? 'text-purple-600 dark:text-purple-300' 
+                        : 'text-gray-500 dark:text-gray-400'
+                    }`} />
+                  </div>
+                  <span className="font-medium">{category.name}</span>
+                </div>
+                
+                <Badge 
+                  variant={isSelected ? "default" : "secondary"} 
+                  className={`text-xs ${
+                    isSelected 
+                      ? 'bg-purple-600 text-white' 
+                      : 'bg-gray-200 dark:bg-slate-600 text-gray-700 dark:text-gray-300'
+                  }`}
+                >
+                  {category.count}
+                </Badge>
+              </motion.button>
+            );
+          })}
         </div>
       </motion.div>
 
@@ -482,51 +554,155 @@ const MiniApps: React.FC = () => {
           </div>
         </motion.div>
 
-        {/* Apps Grid */}
+        {/* Enhanced Apps Grid with Rich Hover Information */}
         <ScrollArea className="flex-1 p-6">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-            {filteredApps.map((app, index) => (
-              <motion.div
-                key={app.id}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: index * 0.05 }}
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                <Card 
-                  className="cursor-pointer transition-all duration-200 hover:shadow-lg group"
-                  onClick={() => openApp(app)}
-                >
-                  <CardContent className="p-4 text-center">
-                    <div className="mb-3 flex justify-center">
-                      <AppIcon app={app} size="lg" />
+          <TooltipProvider>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 gap-4">
+              {filteredApps.map((app, index) => (
+                <Tooltip key={app.id} delayDuration={300}>
+                  <TooltipTrigger asChild>
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.8, y: 20 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      transition={{ delay: index * 0.03, duration: 0.4 }}
+                      whileHover={{ scale: 1.05, y: -5 }}
+                      whileTap={{ scale: 0.95 }}
+                      className="relative group"
+                    >
+                      <Card 
+                        className="cursor-pointer transition-all duration-300 hover:shadow-xl hover:shadow-purple-500/10 border-2 hover:border-purple-300 dark:hover:border-purple-600 overflow-hidden"
+                        onClick={() => openApp(app)}
+                      >
+                        <CardContent className="p-4 text-center relative">
+                          {/* App Icon with Enhanced Styling */}
+                          <div className="mb-3 flex justify-center relative">
+                            <div className="relative group-hover:scale-110 transition-transform duration-300">
+                              <AppIcon app={app} size="lg" />
+                              {app.isActive && (
+                                <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-500 rounded-full border-2 border-white shadow-md animate-pulse"></div>
+                              )}
+                            </div>
+                          </div>
+                          
+                          {/* App Name */}
+                          <h3 className={`font-bold text-sm mb-1 truncate group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors ${
+                            theme === 'light' ? 'text-gray-900' : 'text-gray-100'
+                          }`}>
+                            {app.name}
+                          </h3>
+                          
+                          {/* App Description */}
+                          <p className={`text-xs mb-2 line-clamp-2 leading-relaxed ${
+                            theme === 'light' ? 'text-gray-600' : 'text-gray-400'
+                          }`}>
+                            {app.description}
+                          </p>
+                          
+                          {/* Category Badge */}
+                          <Badge 
+                            variant="outline" 
+                            className="text-xs group-hover:bg-purple-50 group-hover:border-purple-300 dark:group-hover:bg-purple-900/30 transition-colors"
+                          >
+                            {app.category}
+                          </Badge>
+                          
+                          {/* Hover Gradient Overlay */}
+                          <div className="absolute inset-0 bg-gradient-to-t from-purple-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  </TooltipTrigger>
+                  
+                  {/* Rich Hover Tooltip */}
+                  <TooltipContent 
+                    side="top" 
+                    className="w-80 p-0 bg-white dark:bg-slate-800 border-2 border-purple-200 dark:border-purple-700 shadow-xl"
+                  >
+                    <div className="relative">
+                      {/* Header with App Info */}
+                      <div className="bg-gradient-to-r from-purple-600 to-pink-600 p-4 text-white">
+                        <div className="flex items-center space-x-3">
+                          <div className="relative">
+                            <AppIcon app={app} size="md" />
+                            {app.isActive && (
+                              <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2 border-white"></div>
+                            )}
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-bold text-lg">{app.name}</h4>
+                            <p className="text-purple-100 text-sm opacity-90">{app.category}</p>
+                          </div>
+                          <ExternalLink className="w-5 h-5 text-purple-200" />
+                        </div>
+                      </div>
+                      
+                      {/* Content */}
+                      <div className="p-4 space-y-3">
+                        {/* Description */}
+                        <div>
+                          <h5 className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-1">Description</h5>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                            {app.description}
+                          </p>
+                        </div>
+                        
+                        {/* URL Info */}
+                        <div>
+                          <h5 className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-1">Website</h5>
+                          <p className="text-xs text-purple-600 dark:text-purple-400 font-mono bg-purple-50 dark:bg-purple-900/30 px-2 py-1 rounded">
+                            {app.url}
+                          </p>
+                        </div>
+                        
+                        {/* Quick Actions */}
+                        <div className="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                          <div className="flex items-center space-x-2">
+                            <Button 
+                              size="sm" 
+                              variant="outline"
+                              className="text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                window.open(app.url, '_blank');
+                              }}
+                            >
+                              <ExternalLink className="w-3 h-3 mr-1" />
+                              Open
+                            </Button>
+                            {app.isActive ? (
+                              <Badge variant="default" className="bg-green-100 text-green-700 text-xs">
+                                <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
+                                Active
+                              </Badge>
+                            ) : (
+                              <Badge variant="secondary" className="text-xs">
+                                Available
+                              </Badge>
+                            )}
+                          </div>
+                          
+                          {/* Category Icon */}
+                          <div className={`p-1 rounded ${
+                            app.category === 'AI Chat' ? 'bg-blue-100 dark:bg-blue-900/30' :
+                            app.category === 'Development' ? 'bg-green-100 dark:bg-green-900/30' :
+                            app.category === 'Search' ? 'bg-orange-100 dark:bg-orange-900/30' :
+                            app.category === 'Productivity' ? 'bg-purple-100 dark:bg-purple-900/30' :
+                            'bg-gray-100 dark:bg-gray-900/30'
+                          }`}>
+                            <div className="w-4 h-4 rounded bg-white dark:bg-slate-700 flex items-center justify-center">
+                              <span className="text-xs font-bold">
+                                {app.category.split(' ').map(word => word[0]).join('')}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    
-                    <h3 className={`font-semibold text-sm mb-1 truncate ${
-                      theme === 'light' ? 'text-gray-900' : 'text-gray-100'
-                    }`}>
-                      {app.name}
-                    </h3>
-                    
-                    <p className={`text-xs mb-2 line-clamp-2 ${
-                      theme === 'light' ? 'text-gray-600' : 'text-gray-400'
-                    }`}>
-                      {app.description}
-                    </p>
-                    
-                    <Badge variant="outline" className="text-xs">
-                      {app.category}
-                    </Badge>
-                    
-                    {app.isActive && (
-                      <div className="absolute top-2 right-2 w-2 h-2 bg-green-500 rounded-full"></div>
-                    )}
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
-          </div>
+                  </TooltipContent>
+                </Tooltip>
+              ))}
+            </div>
+          </TooltipProvider>
           
           {filteredApps.length === 0 && (
             <motion.div

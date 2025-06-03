@@ -10,7 +10,9 @@ import {
   Coffee,
   Heart,
   Brain,
-  Globe
+  Globe,
+  Smile,
+  Palette
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,7 +21,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { useThemeStore, useChatStore } from '@/stores';
 import { api } from '@/lib/api';
 import { Message, Conversation } from '@/types';
-import Logo from '../components/Logo';
 
 const MainChat: React.FC = () => {
   const { theme } = useThemeStore();
@@ -42,9 +43,31 @@ const MainChat: React.FC = () => {
   const [isRecording, setIsRecording] = useState(false);
   const [showBrowser, setShowBrowser] = useState(false);
   const [browserUrl, setBrowserUrl] = useState('https://www.google.com');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showColorPicker, setShowColorPicker] = useState(false);
+  const [selectedTextColor, setSelectedTextColor] = useState('default');
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Emoji options for better chat experience
+  const commonEmojis = [
+    '😀', '😂', '🤣', '😊', '😍', '🤔', '👍', '👎', '❤️', '🔥',
+    '💯', '🎉', '🚀', '💡', '⚡', '🌟', '🎯', '🏆', '💪', '🙌',
+    '👏', '🤝', '🙏', '✨', '🌈', '🎈', '🎊', '🥳', '😎', '🤩'
+  ];
+
+  // Text color options for better accessibility and readability
+  const textColors = [
+    { name: 'Default', value: 'default', class: '' },
+    { name: 'Purple', value: 'purple', class: 'text-purple-600 dark:text-purple-400' },
+    { name: 'Blue', value: 'blue', class: 'text-blue-600 dark:text-blue-400' },
+    { name: 'Green', value: 'green', class: 'text-green-600 dark:text-green-400' },
+    { name: 'Orange', value: 'orange', class: 'text-orange-600 dark:text-orange-400' },
+    { name: 'Red', value: 'red', class: 'text-red-600 dark:text-red-400' },
+    { name: 'Pink', value: 'pink', class: 'text-pink-600 dark:text-pink-400' },
+    { name: 'Indigo', value: 'indigo', class: 'text-indigo-600 dark:text-indigo-400' }
+  ];
 
   // Load conversations on component mount
   useEffect(() => {
@@ -71,6 +94,17 @@ const MainChat: React.FC = () => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Helper functions for enhanced chat UX
+  const insertEmoji = (emoji: string) => {
+    setInputValue(prev => prev + emoji);
+    setShowEmojiPicker(false);
+  };
+
+  const getTextColorClass = () => {
+    const color = textColors.find(c => c.value === selectedTextColor);
+    return color?.class || '';
+  };
 
   const loadConversations = async () => {
     try {
@@ -206,6 +240,7 @@ const MainChat: React.FC = () => {
               New Chat
             </Button>
           </div>
+          
           <div className="relative">
             <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
             <Input
@@ -283,8 +318,8 @@ const MainChat: React.FC = () => {
           } backdrop-blur-md`}
         >
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 rounded-full flex items-center justify-center bg-transparent">
-              <Logo name={((currentConversation as any)?.model || 'gemini').toLowerCase()} size={36} alt="Current Model Logo" darkMode={theme === 'dark'} />
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center">
+              <Heart className="w-5 h-5 text-white" />
             </div>
             <div>
               <h3 className={`font-semibold ${
@@ -299,6 +334,7 @@ const MainChat: React.FC = () => {
               </p>
             </div>
           </div>
+          
           <div className="flex items-center space-x-2">
             <Button
               variant="ghost"
@@ -314,9 +350,10 @@ const MainChat: React.FC = () => {
           </div>
         </motion.div>
 
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex">
           {/* Messages Area */}
           <div className="flex-1 flex flex-col">
+            {/* Daily Briefing */}
             {messages.length === 0 && (
               <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
@@ -339,6 +376,8 @@ const MainChat: React.FC = () => {
                 </p>
               </motion.div>
             )}
+
+            {/* Messages */}
             <ScrollArea className="flex-1 p-4">
               <div className="space-y-4">
                 {messages.map((message, index) => (
@@ -349,26 +388,40 @@ const MainChat: React.FC = () => {
                     transition={{ duration: 0.3, delay: index * 0.05 }}
                     className={`flex ${message.sender_type === 'user' ? 'justify-end' : 'justify-start'}`}
                   >
-                    <div className={`max-w-[70%] rounded-2xl px-4 py-3 ${
+                    <div className={`max-w-[70%] rounded-2xl px-4 py-3 shadow-sm ${
                       message.sender_type === 'user'
                         ? 'bg-purple-600 text-white'
                         : theme === 'light'
-                        ? 'bg-white border border-gray-200'
-                        : 'bg-slate-700 border border-slate-600'
+                        ? 'bg-white border border-gray-200 text-gray-900'
+                        : 'bg-slate-700 border border-slate-600 text-gray-100'
                     }`}>
-                      <p className="whitespace-pre-wrap">{message.content}</p>
-                      <p className={`text-xs mt-2 ${
+                      <p className={`whitespace-pre-wrap font-medium leading-relaxed ${
                         message.sender_type === 'user' 
-                          ? 'text-purple-200' 
+                          ? 'text-white' 
+                          : selectedTextColor === 'default' 
+                          ? (theme === 'light' ? 'text-gray-900' : 'text-gray-100')
+                          : getTextColorClass()
+                      }`}
+                      style={{ 
+                        fontSize: '15px', 
+                        lineHeight: '1.6',
+                        fontFamily: 'Inter, system-ui, sans-serif'
+                      }}>
+                        {message.content}
+                      </p>
+                      <p className={`text-xs mt-2 font-medium ${
+                        message.sender_type === 'user' 
+                          ? 'text-purple-100' 
                           : theme === 'light' 
-                          ? 'text-gray-500' 
-                          : 'text-gray-400'
+                          ? 'text-gray-600' 
+                          : 'text-gray-300'
                       }`}>
                         {new Date(message.created_at).toLocaleTimeString()}
                       </p>
                     </div>
                   </motion.div>
                 ))}
+                
                 {isLoading && (
                   <motion.div
                     initial={{ opacity: 0 }}
@@ -388,45 +441,155 @@ const MainChat: React.FC = () => {
                     </div>
                   </motion.div>
                 )}
+                
                 <div ref={messagesEndRef} />
               </div>
             </ScrollArea>
-          </div>
 
-          {/* Input Area */}
-          <div className="p-4 border-t border-purple-200 dark:border-slate-700 flex items-end space-x-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleRecording}
-              className={`${isRecording ? 'text-red-600' : 'text-purple-600'} hover:text-purple-700`}
+            {/* Input Area */}
+            <motion.div
+              initial={{ y: 100, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ duration: 0.3, delay: 0.2 }}
+              className={`p-4 border-t ${
+                theme === 'light'
+                  ? 'bg-white/50 border-purple-200'
+                  : theme === 'dark'
+                  ? 'bg-slate-800/50 border-slate-700'
+                  : 'bg-purple-900/30 border-purple-600/30'
+              } backdrop-blur-md`}
             >
-              <Mic className="w-4 h-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-purple-600 hover:text-purple-700"
-            >
-              <Video className="w-4 h-4" />
-            </Button>
-            <div className="flex-1">
-              <Textarea
-                value={inputValue}
-                onChange={(e) => setInputValue(e.target.value)}
-                onKeyPress={handleKeyPress}
-                placeholder="Message Mama Bear..."
-                className="min-h-[44px] max-h-32 resize-none"
-                rows={1}
-              />
-            </div>
-            <Button
-              onClick={sendMessage}
-              disabled={!inputValue.trim() || isLoading}
-              className="bg-purple-600 hover:bg-purple-700 text-white"
-            >
-              <Send className="w-4 h-4" />
-            </Button>
+              <div className="flex items-end space-x-3 relative">
+                <div className="flex space-x-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-purple-600 hover:text-purple-700"
+                    title="Attach file"
+                  >
+                    <Paperclip className="w-4 h-4" />
+                  </Button>
+                  
+                  {/* Emoji Picker Button */}
+                  <div className="relative">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                      className="text-purple-600 hover:text-purple-700"
+                      title="Add emoji"
+                    >
+                      <Smile className="w-4 h-4" />
+                    </Button>
+                    
+                    {/* Emoji Picker Dropdown */}
+                    {showEmojiPicker && (
+                      <div className={`absolute bottom-full left-0 mb-2 p-3 rounded-lg border shadow-lg z-50 w-64 ${
+                        theme === 'light' 
+                          ? 'bg-white border-gray-200' 
+                          : 'bg-slate-800 border-slate-600'
+                      }`}>
+                        <div className="grid grid-cols-8 gap-1">
+                          {commonEmojis.map((emoji) => (
+                            <button
+                              key={emoji}
+                              onClick={() => insertEmoji(emoji)}
+                              className="p-1 hover:bg-purple-100 dark:hover:bg-purple-900/30 rounded text-lg transition-colors"
+                            >
+                              {emoji}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Text Color Picker */}
+                  <div className="relative">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowColorPicker(!showColorPicker)}
+                      className="text-purple-600 hover:text-purple-700"
+                      title="Text color"
+                    >
+                      <Palette className="w-4 h-4" />
+                    </Button>
+                    
+                    {/* Color Picker Dropdown */}
+                    {showColorPicker && (
+                      <div className={`absolute bottom-full left-0 mb-2 p-3 rounded-lg border shadow-lg z-50 w-48 ${
+                        theme === 'light' 
+                          ? 'bg-white border-gray-200' 
+                          : 'bg-slate-800 border-slate-600'
+                      }`}>
+                        <h4 className="text-sm font-medium mb-2">Text Color</h4>
+                        <div className="space-y-1">
+                          {textColors.map((color) => (
+                            <button
+                              key={color.value}
+                              onClick={() => {
+                                setSelectedTextColor(color.value);
+                                setShowColorPicker(false);
+                              }}
+                              className={`w-full text-left px-2 py-1 rounded text-sm hover:bg-purple-100 dark:hover:bg-purple-900/30 transition-colors ${
+                                selectedTextColor === color.value ? 'bg-purple-100 dark:bg-purple-900/30' : ''
+                              } ${color.class}`}
+                            >
+                              {color.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={toggleRecording}
+                    className={`${isRecording ? 'text-red-600' : 'text-purple-600'} hover:text-purple-700`}
+                    title="Voice recording"
+                  >
+                    <Mic className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-purple-600 hover:text-purple-700"
+                    title="Video recording"
+                  >
+                    <Video className="w-4 h-4" />
+                  </Button>
+                </div>
+                
+                <div className="flex-1">
+                  <Textarea
+                    value={inputValue}
+                    onChange={(e) => setInputValue(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    placeholder="Message Mama Bear..."
+                    className={`min-h-[44px] max-h-32 resize-none font-medium text-base leading-relaxed ${getTextColorClass()}`}
+                    rows={1}
+                    style={{ 
+                      fontSize: '16px', 
+                      lineHeight: '1.6',
+                      fontFamily: 'Inter, system-ui, sans-serif'
+                    }}
+                  />
+                </div>
+                
+                <Button
+                  onClick={sendMessage}
+                  disabled={!inputValue.trim() || isLoading}
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                  title="Send message"
+                >
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
+            </motion.div>
           </div>
 
           {/* Shared Browser */}

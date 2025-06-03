@@ -58,6 +58,7 @@ export interface AIModel {
   };
   knowledge_cutoff?: string;
   badges?: string[];
+  logo?: string;
 }
 
 export interface Workspace {

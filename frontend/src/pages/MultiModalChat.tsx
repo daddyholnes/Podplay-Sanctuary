@@ -16,7 +16,8 @@ import {
   DollarSign,
   Activity,
   Smile,
-  Palette
+  Palette,
+  Heart
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -25,6 +26,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { useThemeStore, useChatStore } from '@/stores';
 import { AIModel, Message } from '@/types';
+import ModelSelector from '@/components/ModelSelector';
+import DraggableChat from '@/components/DraggableChat';
 
 const MultiModalChat: React.FC = () => {
   const { theme } = useThemeStore();
@@ -38,6 +41,7 @@ const MultiModalChat: React.FC = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [showColorPicker, setShowColorPicker] = useState(false);
   const [selectedTextColor, setSelectedTextColor] = useState('default');
+  const [showMamaBearChat, setShowMamaBearChat] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -282,149 +286,18 @@ const MultiModalChat: React.FC = () => {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Compact Model Selection Tabs */}
+      {/* Enhanced Model Selection */}
       <motion.div
         initial={{ y: -50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ duration: 0.3 }}
-        className={`border-b ${
-          theme === 'light'
-            ? 'bg-white/50 border-purple-200'
-            : theme === 'dark'
-            ? 'bg-slate-800/50 border-slate-700'
-            : 'bg-purple-900/30 border-purple-600/30'
-        } backdrop-blur-md`}
       >
-        <div className="p-3">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className={`text-lg font-semibold ${
-              theme === 'light' ? 'text-purple-800' : 'text-purple-100'
-            }`}>
-              AI Models
-            </h2>
-            <Badge variant="outline" className="text-xs">
-              {availableModels.length} available
-            </Badge>
-          </div>
-          
-          <ScrollArea className="w-full">
-            <div className="flex space-x-2 pb-2">
-              {availableModels.map((model, index) => {
-                const isSelected = selectedModel?.id === model.id;
-                return (
-                  <motion.div
-                    key={model.id}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: index * 0.03 }}
-                    className="relative group"
-                  >
-                    <Button
-                      variant={isSelected ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setSelectedModel(model)}
-                      className={`min-w-fit whitespace-nowrap relative ${
-                        isSelected
-                          ? `bg-${getProviderColor(model.provider)}-600 hover:bg-${getProviderColor(model.provider)}-700`
-                          : `hover:border-${getProviderColor(model.provider)}-300`
-                      }`}
-                    >
-                      <div className="flex items-center space-x-2">
-                        <Zap className={`w-3 h-3 ${
-                          isSelected ? 'text-white' : `text-${getProviderColor(model.provider)}-600`
-                        }`} />
-                        <span className="text-xs font-medium">{model.name}</span>
-                        {model.badges?.map((badge) => (
-                          <Badge 
-                            key={badge} 
-                            variant="secondary" 
-                            className="text-xs px-1 py-0 text-xs"
-                          >
-                            {badge}
-                          </Badge>
-                        ))}
-                      </div>
-                    </Button>
-                    
-                    {/* Hover Tooltip */}
-                    <div className="absolute top-full left-1/2 transform -translate-x-1/2 mt-2 w-80 z-50 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-                      <Card className="shadow-xl border-2">
-                        <CardHeader className="pb-2">
-                          <div className="flex items-start justify-between">
-                            <div>
-                              <h4 className="font-semibold text-sm">{model.name}</h4>
-                              <div className="flex items-center space-x-2 mt-1">
-                                <Badge 
-                                  variant="outline" 
-                                  className={`text-xs text-${getProviderColor(model.provider)}-600`}
-                                >
-                                  {model.provider.toUpperCase()}
-                                </Badge>
-                                {model.badges?.map((badge) => (
-                                  <Badge key={badge} variant="secondary" className="text-xs">
-                                    {badge}
-                                  </Badge>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        </CardHeader>
-                        <CardContent className="pt-0 space-y-3">
-                          {/* Capabilities */}
-                          <div>
-                            <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">
-                              Best for:
-                            </p>
-                            <div className="flex flex-wrap gap-1">
-                              {model.capabilities.map((capability) => (
-                                <Badge key={capability} variant="outline" className="text-xs">
-                                  {capability}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-
-                          {/* Pricing & Stats */}
-                          <div className="grid grid-cols-2 gap-3 text-xs">
-                            <div>
-                              <div className="flex items-center space-x-1 mb-1">
-                                <DollarSign className="w-3 h-3" />
-                                <span className="font-medium">Pricing</span>
-                              </div>
-                              <p>In: ${model.pricing.input}/1M</p>
-                              <p>Out: ${model.pricing.output}/1M</p>
-                            </div>
-                            <div>
-                              <div className="flex items-center space-x-1 mb-1">
-                                <Activity className="w-3 h-3" />
-                                <span className="font-medium">Limits</span>
-                              </div>
-                              <p>{model.rate_limits.rpm} RPM</p>
-                              {model.rate_limits.rpd && <p>{model.rate_limits.rpd} RPD</p>}
-                            </div>
-                          </div>
-
-                          {/* Context & Updates */}
-                          <div className="flex items-center justify-between text-xs">
-                            <div className="flex items-center space-x-1">
-                              <Clock className="w-3 h-3" />
-                              <span>{model.context_length.toLocaleString()} tokens</span>
-                            </div>
-                            {model.knowledge_cutoff && (
-                              <span className="text-gray-500">
-                                Updated: {model.knowledge_cutoff}
-                              </span>
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-          </ScrollArea>
-        </div>
+        <ModelSelector
+          selectedModel={selectedModel || undefined}
+          onModelSelect={setSelectedModel}
+          paidUser={true} // You can make this dynamic based on user tier
+          showHeader={true}
+        />
       </motion.div>
 
       {/* Chat Area */}
@@ -442,30 +315,42 @@ const MultiModalChat: React.FC = () => {
               : 'bg-purple-900/30 border-purple-600/30'
           } backdrop-blur-md`}
         >
-          {selectedModel && (
-            <div className="flex items-center space-x-3">
-              <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-${getProviderColor(selectedModel.provider)}-100 dark:bg-${getProviderColor(selectedModel.provider)}-900/30`}>
-                <Zap className={`w-5 h-5 text-${getProviderColor(selectedModel.provider)}-600`} />
+          <div className="flex items-center justify-between w-full">
+            {selectedModel && (
+              <div className="flex items-center space-x-3">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-${getProviderColor(selectedModel.provider)}-100 dark:bg-${getProviderColor(selectedModel.provider)}-900/30`}>
+                  <Zap className={`w-5 h-5 text-${getProviderColor(selectedModel.provider)}-600`} />
+                </div>
+                <div>
+                  <h3 className={`font-semibold ${
+                    theme === 'light' ? 'text-purple-800' : 'text-purple-100'
+                  }`}>
+                    {selectedModel.name}
+                  </h3>
+                  <p className={`text-sm ${
+                    theme === 'light' ? 'text-purple-600' : 'text-purple-300'
+                  }`}>
+                    ${selectedModel.pricing.input}/${selectedModel.pricing.output} • {selectedModel.context_length.toLocaleString()} tokens
+                  </p>
+                </div>
+                {selectedModel.badges?.map((badge) => (
+                  <Badge key={badge} variant="secondary">
+                    {badge}
+                  </Badge>
+                ))}
               </div>
-              <div>
-                <h3 className={`font-semibold ${
-                  theme === 'light' ? 'text-purple-800' : 'text-purple-100'
-                }`}>
-                  {selectedModel.name}
-                </h3>
-                <p className={`text-sm ${
-                  theme === 'light' ? 'text-purple-600' : 'text-purple-300'
-                }`}>
-                  ${selectedModel.pricing.input}/${selectedModel.pricing.output} • {selectedModel.context_length.toLocaleString()} tokens
-                </p>
-              </div>
-              {selectedModel.badges?.map((badge) => (
-                <Badge key={badge} variant="secondary">
-                  {badge}
-                </Badge>
-              ))}
-            </div>
-          )}
+            )}
+            
+            {/* Mama Bear Button */}
+            <Button
+              onClick={() => setShowMamaBearChat(true)}
+              variant="outline"
+              className="text-purple-600 border-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/30"
+            >
+              <Heart className="w-4 h-4 mr-2" />
+              Mama Bear
+            </Button>
+          </div>
         </motion.div>
 
         {/* Messages */}
@@ -779,6 +664,17 @@ const MultiModalChat: React.FC = () => {
           </div>
         </motion.div>
       </div>
+
+      {/* Mama Bear Chat - Enhanced Draggable Version */}
+      <DraggableChat
+        id="mama-bear-multimodal-chat"
+        title="Mama Bear Multi-Modal Assistant"
+        isVisible={showMamaBearChat}
+        onClose={() => setShowMamaBearChat(false)}
+        initialPosition={{ x: window.innerWidth - 450, y: 100 }}
+        initialSize={{ width: 400, height: 500 }}
+        zIndex={1000}
+      />
 
       {/* Hidden file input */}
       <input
